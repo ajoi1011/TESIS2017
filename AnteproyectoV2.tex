@@ -17,7 +17,7 @@
 \begin{center}
 \textsc{universidad central de venezuela\\facultad de ingeniería\\escuela de ingeniería eléctrica\\departamento de comunicaciones\\anteproyecto de trabajo de grado\\}
 \vspace*{5cm}
-IMPLEMENTACIÓN DEL PROTOCOLO H.239 EN UNA UNIDAD DE CONTROL MULTIPUNTO (MCU) BASADO EN CÓDIGO ABIERTO PARA LA COMPARTICION DE DATOS EN FORMATO DUAL STREAM.
+ESTUDIO PARA LA IMPLEMENTACIÓN DEL PROTOCOLO H.239 EN UNA UNIDAD DE CONTROL MULTIPUNTO BASADO EN CÓDIGO ABIERTO.
 \end{center}
 \vspace*{4cm}
 
@@ -32,26 +32,26 @@ IMPLEMENTACIÓN DEL PROTOCOLO H.239 EN UNA UNIDAD DE CONTROL MULTIPUNTO (MCU) BA
 \newpage
 \centerline{\textbf{TÍTULO}}
 
-Implementación del protocolo H.239 en una Unidad de Control Multipunto (MCU) basado en código abierto para la compartición de datos en formato \emph{dual stream}.
+Estudio para la implementación del protocolo H.239 en una Unidad de Control Multipunto basado en código abierto.
 
 \centerline{\textbf{INTRODUCCIÓN}}
 
-El gran avance que ha tenido el desarrollo de las Tecnologías de la Información y la Comunicación\footnote{TIC. \emph{Tecnologías de la Información y la Comunicación}.} en las últimas décadas, ha permitido que su aplicación en el sector salud sea cada vez frecuente, logrando importantes mejorías en la atención al paciente y en la calidad de los servicios prestados, así como una significativa reducción de los costos  operativos y administrativos.
+El gran avance que ha tenido el desarrollo de las Tecnologías de la Información y la Comunicación en las últimas décadas, ha permitido que su aplicación en el sector salud sea cada vez frecuente, logrando importantes mejorías en la atención al paciente y en la calidad de los servicios prestados, así como una significativa reducción de los costos  operativos y administrativos.
 
-En Venezuela, el uso de TIC en la salud se remonta a la década de los 90, principalmente a nivel de investigación en diversas entidades académicas y centros universitarios orientados hacia las  áreas de las telecomunicaciones y telemedicina, desarrollo de \emph{software} para registro clínico, procesamiento de imágenes médicas y aplicaciones web.
+En Venezuela, el uso de TIC\footnote{TIC. \emph{Tecnologías de la Información y la Comunicación}.} en la salud se remonta a la década de los 90, principalmente a nivel de investigación en diversas entidades académicas y centros universitarios orientados hacia las  áreas de las telecomunicaciones y telemedicina, desarrollo de software para registro clínico, procesamiento de imágenes médicas y aplicaciones web.
 
-Uno de los proyectos de gran importancia para la comunidad médica del país es SOS\footnote{SOS. \emph{Segunda Opción en Salud}.} Telemedicina para Venezuela, resultado del esfuerzo y continuo trabajo que data desde 1996 y es liderado por el Centro de Análisis de Imágenes Biomédicas Computarizadas\footnote{CAIBCO. \emph{Centro de Análisis de Imágenes Biomédicas Computarizadas}.} en la Facultad de Medicina de la UCV, con el objetivo fundamental de mejorar la calidad resolutiva del servicio público nacional de salud mediante el diseño, desarrollo, implementación y puesta en marcha de un sistema de telemedicina que conecte en red a centros remotos de atención primaria de salud con especialistas de la Universidad Central de Venezuela y otras universidades nacionales e internacionales; dedicadas a la investigación, a la transferencia de tecnologías, al equipamiento y soporte de la plataforma tecnológica, a la capacitación del personal de la salud, a la evaluación e intercambio de opiniones sobre casos médicos y sus posibles soluciones. 
+Uno de los proyectos de gran importancia para la comunidad médica del país es SOS\footnote{SOS. \emph{Segunda Opción en Salud}.} Telemedicina para Venezuela, resultado del esfuerzo y continuo trabajo que data desde 1996 y es liderado por el CAIBCO\footnote{CAIBCO. \emph{Centro de Análisis de Imágenes Biomédicas Computarizadas}.} en la Facultad de Medicina de la UCV, con el objetivo fundamental de mejorar la calidad resolutiva del servicio público nacional de salud mediante el diseño, desarrollo, implementación y puesta en marcha de un sistema de telemedicina que conecte en red a centros remotos de atención primaria de salud con especialistas de la Universidad Central de Venezuela y otras universidades nacionales e internacionales; dedicadas a la investigación, a la transferencia de tecnologías, al equipamiento y soporte de la plataforma tecnológica, a la capacitación del personal de la salud, a la evaluación e intercambio de opiniones sobre casos médicos y sus posibles soluciones. 
 
-Es importante señalar, que en más de 10 años de experiencias, con la colaboración de estudiantes de pregado y postgrado, profesores, personal administrativo, profesionales y expertos de diversas facultades y dependencias adscritas a la UCV, el proyecto se ha consolidado satisfactoriamente y en la actualidad se cuenta con una red en expansión, de arquitectura abierta con aplicaciones propias desarrolladas tanto en \emph{software} libre como en \emph{software} propietario de importantes empresas (HP, Cisco, Microsoft, entre otras), empleando diferentes TIC que gestionan grandes bases de datos alojados en servidores, protocolos de comunicación, estándares de interoperabilidad, lenguajes de programación; para ofrecer soluciones tecnológicas de teleconsulta, telediagnóstico y teleducación a través de videoconferencias, acceso a distinto portales web con temáticas sobre la salud, acceso al historial clínico electrónico, entre otras. 
+Es importante señalar, que en más de 10 años de experiencias, con la colaboración de estudiantes de pregado y postgrado, profesores, personal administrativo, profesionales y expertos de diversas facultades y dependencias adscritas a la UCV, el proyecto se ha consolidado satisfactoriamente y en la actualidad se cuenta con una red en expansión, de arquitectura abierta con aplicaciones propias desarrolladas tanto en software libre como en software propietario de importantes empresas (HP, Cisco, Microsoft, entre otras); que manejan grandes bases de datos alojados en servidores, protocolos de comunicación, estándares de interoperabilidad, lenguajes de programación, para ofrecer soluciones tecnológicas de teleconsulta, telediagnóstico y teleducación a través de videoconferencias, acceso a distinto portales web con temáticas sobre la salud, acceso al historial clínico electrónico, entre otras. 
 
-La red y sus tecnologías son impulsadas a través de varias instancias relacionadas al proyecto, siendo una de ellas, el Centro de Informática de Medicina\footnote{CIM. \emph{Centro de Informática de Medicina}.}, donde se encargan de mantener operativos y funcionales los equipos que conforman la plataforma a través de correctas políticas de uso y de seguridad. 
+La red y sus tecnologías son impulsadas a través de varias instancias relacionadas al proyecto, siendo una de ellas, el Centro de Informática de Medicina, donde se encargan de mantener operativos y funcionales los equipos que conforman la plataforma a través de correctas políticas de uso y de seguridad. 
    
 \centerline{\textbf{PLANTEAMIENTO DEL PROBLEMA}}
 
 
-Debido a su labor, es como surge la necesidad de realizar este trabajo, ya que actualmente uno de los equipos de la plataforma, específicamente la Unidad de Control Multipunto\footnote{MCU. \emph{Multipunt Control Unit, por sus siglas en inglés.}}, equipo que forma parte del sistema de videoconferencia se encuentra inhabilitado.
+Debido a su labor, es como surge la necesidad de realizar este trabajo, ya que actualmente uno de los equipos de la plataforma, específicamente la Unidad de Control Multipunto (MCU)\footnote{MCU. \emph{Multipunt Control Unit, por sus siglas en inglés.}}, equipo que forma parte del sistema de videoconferencia se encuentra inhabilitado.
 
-Ante tal situación, el Departamento de Telecomunicaciones del CIM optó por implementar una Unidad de Control Multipunto \emph{software} libre y código abierto, la cual se encuentra alojado en un servidor de la Facultad de Medicina en el Data Center de la UCV; y maneja la mayoría de los protocolos de comunicación para ofrecer servicio de videoconferencia. Sin embargo, es importante mencionar que una de las características que no presenta, es la de incluir en el stack de protocolos al H.239, principalmente responsable en la gestión de compartición de datos sobre vídeo (\emph{dual stream}) en una sesión de videoconferencia, condición que afecta de manera cualitativamente, la calidad del servicio (QoS) \footnote{QoS. \emph{Quality of Service, por sus siglas en inglés.}} que se desea ofrecer.
+Ante tal situación, el Departamento de Telecomunicaciones del CIM\footnote{CIM. \emph{Centro de Informática de Medicina}.} optó por implementar una Unidad de Control Multipunto software libre y código abierto, la cual se encuentra alojado en un servidor de la Facultad de Medicina en el Data Center de la UCV; y maneja la mayoría de los protocolos de comunicación para ofrecer servicio de videoconferencia. Sin embargo, es importante mencionar que una de las características que no presenta, es la de incluir en el stack de protocolos al H.239, principalmente responsable en la gestión de compartición de datos sobre vídeo (\emph{dual stream}) en una sesión de videoconferencia, condición que afecta de manera cualitativamente, la calidad del servicio que se desea ofrecer.
 
 Por esto es necesario hacer un estudio que permita la adición del protocolo H.239 a esta MCU; sin embargo antes hay que plantearse las siguiente interrogantes: ¿Es la MCU de código abierto capaz de soportar al protocolo H.239?, ¿Existe otra alternativa que solucione este problema?.        
 
@@ -59,21 +59,21 @@ Por esto es necesario hacer un estudio que permita la adición del protocolo H.2
 
 El servicio de videoconferencia es el pilar fundamental sobre el cual se apoya la plataforma, esto implica que cualquier estudio que se realice, que sea factible y permita mejoras al sistema, se considera relevante en pro de los beneficios que se desean obtener.
 
-Teniendo en cuenta esto, se decidió por una MCU \emph{software} libre y código abierto en vez de equipos nuevos, porque de esta manera se reducen los costos económicos de operación y mantenimiento de manera significativa, y además se tiene acceso a los códigos fuentes de la aplicación, el cual permite la posibilidad de insertar nuevos protocolos a la MCU. 
+Teniendo en cuenta esto, se decidió por una MCU software libre y código abierto en vez de equipos nuevos, porque de esta manera se reducen los costos económicos de operación y mantenimiento de manera significativa, y además se tiene acceso a los códigos fuentes de la aplicación, el cual permite la posibilidad de insertar nuevos protocolos a la MCU. 
 
 \centerline{\textbf{ANTECEDENTES DEL ESTUDIO}}
 
-Además de la reducción de los costos, con las MCU \emph{software} libre y código abierto, se pueden diseñar e implementar redes escalables e interoperables que brindan servicios de comunicaciones avanzadas. 
+Además de la reducción de los costos, con las MCU software libre y código abierto, se pueden diseñar e implementar redes escalables e interoperables que brindan servicios de comunicaciones avanzadas. 
 
-Motivado a esto y con la finalidad de promover el uso de este tipo de tecnologías, en instituciones académicas nacionales e internacionales se han hecho estudios para evaluar sus beneficios y limitaciones. Se mencionan entre algunos; la propuesta para la incorporación de una MCU en la red VoIP\footnote{VoIP. \emph{Voice over IP, por sus siglas en inglés.}} de Argentina\cite{VoIP}, la implementación de un sistema multiconferencia basado en software libre\cite{inacap} para Pymes en Chile, el diseño y aplicación de una MCU para gestionar videoconferencias\cite{MCUAD} en España. 
+Motivado a esto y con la finalidad de promover el uso de este tipo de tecnologías en instituciones académicas nacionales e internacionales, se han hecho estudios para evaluar sus beneficios y limitaciones. Se mencionan entre algunos; la propuesta para la incorporación de una MCU en la red VoIP\footnote{VoIP. \emph{Voice over IP, por sus siglas en inglés.}} de Argentina\cite{VoIP}, la implementación de un sistema multiconferencia basado en software libre\cite{inacap} para Pymes en Chile, el diseño y aplicación de una MCU para gestionar videoconferencias\cite{MCUAD} en España. 
 
-En la Universidad Central de Venezuela, particularmente en la Escuela de Ingeniería Eléctrica se cuenta con dos tesis de grado relacionadas a esta temática\cite{Max}\cite{Sarif}, las cuales servirán como referencias  para la realización de este trabajo.
+En Venezuela, particularmente en la Escuela de Ingeniería Eléctrica de la UCV se cuenta con dos tesis de grado relacionadas a esta temática\cite{Max}\cite{Sarif}, las cuales servirán como referencias  para la realización de este trabajo.
 
 \centerline{\textbf{OBJETIVOS}}
 
 \textbf{Objetivo General}
 
-Implementar el protocolo H.239 en una Unidad de Control Multipunto (MCU) basado en código abierto para la compartición de datos en formato \emph{dual stream} .
+Realizar un estudio para implementar el protocolo H.239 en una Unidad de Control Multipunto (MCU) basado en código abierto 
 
 \textbf{Objetivos específicos}	
 	\begin{enumerate}
@@ -81,7 +81,7 @@ Implementar el protocolo H.239 en una Unidad de Control Multipunto (MCU) basado 
 	\item Describir un sistema de videoconferencia basada en IP\footnote{IP. \emph{Internet Protocol, por sus siglas en inglés.}}.
 	\item Estudiar sobre la normativa H.323 que provee sesiones de comunicación audiovisual sobre paquetes de red.
 	\item Aplicar el concepto de ingeniería inversa para el desarrollo de protocolos de comunicación.
-	\item Usar herramientas \emph{software} libre y código abierto para el manejo de repositorios de códigos fuentes, administración de proyectos, programación de protocolos.
+	\item Usar herramientas software libre y código abierto para el manejo de repositorios de códigos fuentes, administración de proyectos, programación de protocolos.
 	\end{enumerate}
 
 \centerline{\textbf{METODOLOGÍA}}
@@ -90,23 +90,23 @@ Implementar el protocolo H.239 en una Unidad de Control Multipunto (MCU) basado 
 
 En esta fase se recopilará toda la información necesaria para lograr los objetivos propuestos. La búsqueda se llevará a cabo a través de distintas fuentes (internet, libros, tesis, etc) y se tomará en cuenta:
 \begin{enumerate}
-\item Documentación técnica sobre telemedicina, caracterización de una red de telemedicina, sistema de videoconferencia, protocolos de comunicación, ingeniería en el diseño de protocolos, \emph{software} libre y código abierto, programación, compilación.  
-\item Recomendaciones  dadas por la ITU\footnote{ITU. \emph{International Telecommunication Union, por sus siglas en inglés.}}-T referidas a la forma de proveer sesiones de comunicación audiovisual sobre paquetes de red, específicamente para videoconferencias.
+\item Documentación técnica sobre telemedicina, caracterización de una red de telemedicina, sistema de videoconferencia, protocolos de comunicación, ingeniería en el diseño de protocolos, software libre y código abierto, programación, compilación.  
+\item Recomendaciones  dadas por la ITU-T\footnote{ITU-T. \emph{International Telecommunication Union Telecommunication Standardization Sector, por sus siglas en inglés.}} referidas a la forma de proveer sesiones de comunicación audiovisual sobre paquetes de red, específicamente para videoconferencias.
 \end{enumerate}
 
 \textbf{Fase 2. Desarrollo e implementación.}
 
-En esta fase se aplicarán los conceptos de ingeniería inversa, ingeniería en el desarrollo de protocolos, manejo de repositorios de códigos fuentes a través de la programación en aplicaciones \emph{software} libre y código abierto para efectuar la implementación.
+En esta fase se aplicarán los conceptos de ingeniería inversa, ingeniería en el desarrollo de protocolos, manejo de repositorios de códigos fuentes a través de la programación en aplicaciones software libre y código abierto para efectuar la implementación.
 
 \textbf{Fase 3. Evaluación de resultados / Elaboración del informe final.}  
 
-En esta fase se analizarán los resultados, se determinará si satisfacen los objetivos planteados y se sugerirán mejoras para la propuesta. Además se elaborará el informe documentando todas la actividades realizadas en cada fase del proyecto.
+En esta fase se analizarán los resultados, se determinará si satisfacen los objetivos planteados y se sugerirán recomendaciones a la propuesta. Además se elaborará el informe documentando todas la actividades realizadas en cada fase del proyecto.
 
 \centerline{\textbf{HERRAMIENTAS Y EQUIPOS A UTILIZAR}}
 
 Los recursos disponibles para llevar a cabo este trabajo se indican a continuación:
 \begin{itemize} 
-	\item MCU \emph{software} libre y código abierto OpenMCU y otros herramientas computacionales.
+	\item MCU software libre y código abierto OpenMCU y otras herramientas computacionales.
 	\item Acceso a internet.
 	\item Documentación técnica - Referencias ITU-T.
 	\item Acceso al sistema de videoconferencia. 
@@ -123,7 +123,7 @@ Entre los equipos disponibles se señalan:
 
 El proyecto se ejecutará en el Departamento de Telecomunicaciones, perteneciente al Centro de Informática de Medicina de la Escuela Luis Razetti ubicada en la Universidad Central de Venezuela. 
 
-El estudio es factible tanto técnicamente como económicamente, ya que se dispone de los equipos necesarios y tecnologías \emph{software} libre y código abierto. Se espera que el tiempo para culminar este trabajo sea el establecido en el cronograma. 
+El estudio es factible tanto técnicamente como económicamente, ya que se dispone de los equipos necesarios y tecnologías software libre y código abierto. Se espera que el tiempo para culminar este trabajo sea el establecido en el cronograma. 
 
 \renewcommand{\refname}{\centerline{\normalsize REFERENCIAS BIBLIOGRÁFICAS}}
 
