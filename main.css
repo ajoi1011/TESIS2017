@@ -1,3 +1,4 @@
+html {height:100%;width:100%;}
 body {
   font-size: .875rem;
 }
@@ -104,3 +105,22 @@ body {
   border-color: transparent;
   box-shadow: 0 0 0 3px rgba(255, 255, 255, .25);
 }
+
+.clr {clear:both;}
+.wrapper {width:100%;margin:0;padding:0;}
+#body-shad-l {background: 0 0 repeat-y;padding:0;}
+#body-shad-r {background: 100% 0 repeat-y;padding:0;}
+#mainbody {background:#fff;margin:0;padding:0;}
+.mybody{width:50%;}
+.pathway-wrap {margin:0;padding:10px;}
+.tborder {border:1px solid #e2e2e2;padding:0;}
+.catbg,tr.catbg td,.catbg3,tr.catbg3 td,.catbg2,tr.catbg2 td {color:#fff;padding-left:10px;padding-right:10px;background:#990000;}
+.bordercolor {background-color:#999;padding:0;border:1px solid #e2e2e2;}
+.windowbg2 {background:#fff;}
+.post,.personalmessage {width:100%;overflow:auto;line-height:1.3em;}
+.quote {background-color:#eaeff3;color:#333;text-decoration:none;font-style:normal;font-weight:none;font-size:11px;line-height:1.2em;border: 1px dashed #404040;overflow:auto;max-height:24em;margin:5px auto 10px;padding:5px;}
+.titlebg,tr.titlebg th,tr.titlebg td,.titlebg2,tr.titlebg2 th,tr.titlebg2 td {color:#FFFFFF;background:#143A59 repeat-x;###border-bottom:solid 2px #67A0CF;padding-left:10px;padding-right:10px;}
+ .titlebg2 a:link,.titlebg2 a:visited {color:#dcdcdc;font-style:normal;text-decoration:underline;}
+ .titlebg2 a:hover {color:#b2b2b2;}
+
+
