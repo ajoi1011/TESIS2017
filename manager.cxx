@@ -140,12 +140,12 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
   PSYSTEMLOG(Info, "Configuring Globals");
 
   // General parameters for all endpoint types
-  SetDefaultDisplayName(rsrc->AddStringField("Display", 80, GetDefaultDisplayName(), "Display name used in various protocols"));
+  SetDefaultDisplayName(rsrc->AddStringField("Display", 30, GetDefaultDisplayName(), "Display name used in various protocols"));
 
   bool overrideProductInfo = rsrc->AddBooleanField("Info de aplicacion", false, "Override the default product information");
-  m_savedProductInfo.vendor = rsrc->AddStringField("Desarrollador", 80, m_savedProductInfo.vendor);
-  m_savedProductInfo.name = rsrc->AddStringField("Nombre", 80, m_savedProductInfo.name);
-  m_savedProductInfo.version = rsrc->AddStringField("Version", 80, m_savedProductInfo.version);
+  m_savedProductInfo.vendor = rsrc->AddStringField("Desarrollador", 30, m_savedProductInfo.vendor);
+  m_savedProductInfo.name = rsrc->AddStringField("Nombre", 30, m_savedProductInfo.name);
+  m_savedProductInfo.version = rsrc->AddStringField("Version", 30, m_savedProductInfo.version);
   if (overrideProductInfo) 
     SetProductInfo(m_savedProductInfo);
 
@@ -194,8 +194,8 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
       PHTTPCompositeField * fields = new PHTTPCompositeField("NAT\\" + it->m_method, it->m_method,
                    "Enable flag and Server IP/hostname for NAT traversal using " + it->m_friendly);
       fields->Append(new PHTTPBooleanField("NATActiveKey", it->m_active));
-      fields->Append(new PHTTPStringField("NATServerKey", 0, 0, it->m_server, NULL, 1, 50));
-      fields->Append(new PHTTPStringField("NATInterfaceKey", 0, 0, it->m_interface, NULL, 1, 25));
+      fields->Append(new PHTTPStringField("NATServerKey", 0, 0, it->m_server, NULL, 1, 15));
+      fields->Append(new PHTTPStringField("NATInterfaceKey", 0, 0, it->m_interface, NULL, 1, 15));
       rsrc->Add(fields);
       if (!fields->LoadFromConfig(cfg))
         SetNATServer(it->m_method, (*fields)[1].GetValue(), (*fields)[0].GetValue() *= "true", 0, (*fields)[2].GetValue());

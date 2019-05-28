@@ -84,18 +84,18 @@ bool MyProcess::InitialiseBase(Params & params)
     info = logFile->GetRotateInfo();
 
   if (params.m_configPage != NULL) {
-    params.m_configPage->AddStringField(params.m_usernameKey, 80, params.m_authority.GetUserName(), "User name to access HTTP user interface for server.");
-    params.m_configPage->Add(new PHTTPPasswordField(params.m_passwordKey, 80, params.m_authority.GetPassword()));
+    params.m_configPage->AddStringField(params.m_usernameKey, 30, params.m_authority.GetUserName(), "User name to access HTTP user interface for server.");
+    params.m_configPage->Add(new PHTTPPasswordField(params.m_passwordKey, 30, params.m_authority.GetPassword()));
 
     level = PSystemLog::LevelFromInt(
                 params.m_configPage->AddIntegerField(params.m_levelKey,
                                                PSystemLog::Fatal, PSystemLog::NumLogLevels-1,
                                                GetLogLevel(),
-                                               "0=Fatal only, 1=Errors, 2=Warnings, 3=Info, 4=Debug, 5=Detailed"));
+                                               "", "0=Fatal only, 1=Errors, 2=Warnings, 3=Info, 4=Debug, 5=Detailed"));
     fileName = params.m_configPage->AddStringField(params.m_fileKey, 0, logFile != NULL ? logFile->GetFilePath() : PString::Empty(),
-                                             "File for logging output, empty string disables logging", 1, 80);
+                                             "File for logging output, empty string disables logging", 1, 30);
     info.m_directory = params.m_configPage->AddStringField(params.m_rotateDirKey, 0, info.m_directory,
-                                                     "Directory path for log file rotation", 1, 80);
+                                                     "Directory path for log file rotation", 1, 30);
     info.m_maxSize = params.m_configPage->AddIntegerField(params.m_rotateSizeKey, 0, INT_MAX, info.m_maxSize / 1000,
                                                     "kb", "Size of log file to trigger rotation, zero disables")*1000;
     info.m_maxFileCount = params.m_configPage->AddIntegerField(params.m_rotateCountKey, 0, 10000, info.m_maxFileCount,
@@ -108,7 +108,7 @@ bool MyProcess::InitialiseBase(Params & params)
   // HTTP Port number to use.
     params.m_httpPort = (WORD)params.m_configPage->AddIntegerField(params.m_httpPortKey, 1, 65535, params.m_httpPort,
                                                                    "", "Port for HTTP user interface for server.");
-    params.m_httpInterfaces = params.m_configPage->AddStringField(params.m_httpInterfacesKey, 80, params.m_httpInterfaces,
+    params.m_httpInterfaces = params.m_configPage->AddStringField(params.m_httpInterfacesKey, 30, params.m_httpInterfaces,
                                                                  "Local network interface(s) for HTTP user interface for server.");
   }
   else {
@@ -217,20 +217,20 @@ void MyPConfigPage::BuildHTML(PHTML & html, BuildOptions option)
   PStringStream html_begin, html_end, html_page, meta_page;
   html.Set(PHTML::InBody);
   html <<PHTML::Form("POST");
-  html << PHTML::TableStart("cellspacing=8");
+  html << PHTML::TableStart("cellspacing=8; align='center' style='border:1px solid black;'");
   for (PINDEX fld = 0; fld < m_fields.GetSize(); fld++) {
     PHTTPField & field = m_fields[fld];
     bool isDivider = dynamic_cast<PHTTPDividerField *>(&field) != NULL;
     if (field.NotYetInHTML()) {
-      html <<PHTML::TableRow("align='left' style='background-color:#d9e5e3;padding:0px 4px 0px 4px;border-bottom:2px solid white;'")
-           << PHTML::TableData("align='middle' style='background-color:#d9e5e3;padding:0px; border-right:2px solid white;'");
+      html <<PHTML::TableRow("align='left' style='background-color:#d9e5e3; padding:0px 4px 0px 4px; border-bottom:1px solid black;'")
+           << PHTML::TableData("align='middle' style='background-color:#d9e5e3; padding:0px; border-right:1px solid black;'");
       if (isDivider)
         html << PHTML::HRule();
       else
         html <<PHTML::Escaped(field.GetTitle());
-      html << PHTML::TableData("align='left' style='background-color:#d9e5e3;padding:5px 5px 0px 5px;border-right:2px solid white;'")
+      html << PHTML::TableData("align='left' style='background-color:#d9e5e3; padding:5px; border-right:1px solid black;'")
            << "<!--#form html " << field.GetName() << "-->"
-           << PHTML::TableData("align='left' style='background-color:#d9e5e3;padding:5px;border-right:2px solid white;'");
+           << PHTML::TableData("align='left' style='background-color:#d9e5e3; padding:5px; border-right:1px solid black;'");
       if (isDivider)
         html << PHTML::HRule();
       else

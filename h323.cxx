@@ -33,7 +33,7 @@ bool MyH323EndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
 
   // Add H.323 parameters
   {
-    PStringArray newAliases = rsrc->AddStringArrayField("H323AliasesKey", false, 0, m_configuredAliases, "H.323 Alias names for local user", 1, 65);
+    PStringArray newAliases = rsrc->AddStringArrayField("H323AliasesKey", false, 0, m_configuredAliases, "H.323 Alias names for local user", 1, 20);
     for (PINDEX i = 0; i < m_configuredAliases.GetSize(); ++i) {
       if (newAliases.GetValuesIndex(m_configuredAliases[i]) == P_MAX_INDEX)
         RemoveAliasName(m_configuredAliases[i]);

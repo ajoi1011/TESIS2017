@@ -71,9 +71,9 @@ bool MyManager::ConfigureCDR(PConfig & cfg, PConfigPage * rsrc)
 
   m_cdrTextFile.Close();
 
-  PString filename = rsrc->AddStringField("CDRTextFileKey", 0, m_cdrTextFile.GetFilePath(), "Call Detail Record text file name", 1, 80);
-  PString cdrHeadings = rsrc->AddStringField("CDRTextHeadingsKey", 0, GetDefaultTextHeadings(), "Call Detail Record text output headings", 1, 80);
-  m_cdrFormat = rsrc->AddStringField("CDRTextFormatKey", 0, GetDefaultTextFormats(), "Call Detail Record text output format", 1, 80);
+  PString filename = rsrc->AddStringField("CDRTextFileKey", 0, m_cdrTextFile.GetFilePath(), "Call Detail Record text file name", 1, 30);
+  PString cdrHeadings = rsrc->AddStringField("CDRTextHeadingsKey", 0, GetDefaultTextHeadings(), "Call Detail Record text output headings", 1, 30);
+  m_cdrFormat = rsrc->AddStringField("CDRTextFormatKey", 0, GetDefaultTextFormats(), "Call Detail Record text output format", 1, 30);
 
   if (!filename.IsEmpty()) {
     if (m_cdrTextFile.Open(filename, PFile::WriteOnly, PFile::Create)) {
