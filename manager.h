@@ -13,6 +13,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 class MyH323EndPoint;
+class MySIPEndPoint;
 class MyMixerEndPoint; 
 
 class MyManager : public MyManagerParent
@@ -55,14 +56,17 @@ class MyManager : public MyManagerParent
     bool NotEndCDR(const CDRList::const_iterator & it);
     
     bool FindCDR(const PString & guid, MyCallDetailRecord & cdr);
- 
-  protected:
-    OpalConsoleEndPoint * GetConsoleEndPoint(const PString & prefix);
 
 #if OPAL_H323
     virtual H323ConsoleEndPoint * CreateH323EndPoint();
     
     MyH323EndPoint & GetH323EndPoint() const;
+#endif
+
+#if OPAL_SIP
+    virtual SIPConsoleEndPoint * CreateSIPEndPoint();
+
+    MySIPEndPoint & GetSIPEndPoint() const;
 #endif
 
 #if OPAL_HAS_MIXER
@@ -71,6 +75,9 @@ class MyManager : public MyManagerParent
     MyMixerEndPoint & GetMixerEndPoint() const ;
 #endif
 
+ 
+  protected:
+    OpalConsoleEndPoint * GetConsoleEndPoint(const PString & prefix);
     OpalProductInfo   m_savedProductInfo;
     unsigned          m_maxCalls;
     MediaTransferMode m_mediaTransferMode;

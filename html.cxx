@@ -6,6 +6,8 @@
  */
 
 #include "html.h"
+#include "manager.h"
+#include "mixer.h"
 
 static unsigned long html_template_size; // count on zero initialization
 char * html_template_buffer;
@@ -462,7 +464,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
     if((q=request.Find("?"))!=P_MAX_INDEX) { request=request.Mid(q+1,P_MAX_INDEX); PURL::SplitQueryVars(request,data); }
   }
 
-  /*MyMixerEndPoint & m_mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
+  MyMixerEndPoint & m_mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
   MyManager & manager = MyProcess::Current().GetManager();
  
   
@@ -479,7 +481,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
        cout << "Conference name \"" << room << "\" already exists." << endl;
       }
       else {
-       MyMixerNodeInfo * info = new MyMixerNodeInfo();
+       OpalMixerNodeInfo * info = new OpalMixerNodeInfo();
        info->m_name = room;
        PSafePtr<OpalMixerNode> node = m_mixer.AddNode(info);
        if (!node->AddName(room))
@@ -501,7 +503,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
       }
 
     }
-  }*/
+  }
   
 
 
@@ -517,7 +519,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
     << "<table id=\"Table\" class=\"table table-striped table-bordered table-condensed\">"
 
     << "<tr>"
-    << "<td colspan='7'><input type='text' class='input-small' name='newroom' id='newroom' value='" << nextRoom << "' /><input type='button' class='btn btn-large btn-info' id='l_select_create' onclick=\"location.href='?action=create&room='+encodeURIComponent(document.getElementById('newroom').value);\"></td>"
+    << "<td colspan='7'><input type='text' class='input-small' name='newroom' id='newroom' value='" << nextRoom << "' /><input type='button' class='btn btn-large btn-info' value='Crear Sala de Conferencia' onclick=\"location.href='?action=create&room='+encodeURIComponent(document.getElementById('newroom').value);\"></td>"
     << "</tr>"
 
     << "<tr>"
@@ -529,9 +531,6 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
     << "</tr>"
   ;
   
-  
-   /*//PWaitAndSignal m(MyProcess::Current().GetManager().GetManagerMutex());
-    //{
     for (PSafePtr<OpalMixerNode> node = m_mixer.GetFirstNode(PSafeReadOnly); node != NULL; ++node) 
     {
       
@@ -552,14 +551,14 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
       if(controlled) roomButton+=" onclick='document.forms[0].submit();'";
       roomButton += "></span>";*/
     
-      /*html << "<tr>"
+      html << "<tr>"
         << "<td style='text-align:left'><a href='Invite'>"+  node->GetNodeInfo().m_name  +"</a></td>"
-        << "<td style='text-align:center'>" << recordButton                            << "</td>"
+        //<< "<td style='text-align:center'>" << recordButton                            << "</td>"
         //<< "<td style='text-align:center'>" << charModerated                         << "</td>"
         //<< "<td style='text-align:right'>"  << visibleMemberCount                    << "</td>"
         << "<td style='text-align:center'><span class=\"btn btn-large btn-danger\" onclick=\"if(confirm('Вы уверены? Are you sure?')){ location.href='?action=delete&room="+node->GetNodeInfo().m_name+"';}\">X</td>"
         << "</tr>";
-    }*/
+    }
  
 
   html << "</table></form>";

@@ -53,7 +53,7 @@ class MyProcess : public MyProcessHTTP
 
     virtual bool InitialiseBase(Params & params);
 
-    //void CreateHTTPResource(const PString & name);
+    void CreateHTTPResource(const PString & name);
 
     PString GetHtmlCopyright()
     {
@@ -61,6 +61,8 @@ class MyProcess : public MyProcessHTTP
       html << "MCU &copy;" << m_compilationDate.AsString("yyyy") << " por " << m_copyrightHolder;
       return html;
     }
+
+    MyManager & GetManager() { return *m_manager;}
 
   protected:
     MyManager        * m_manager;

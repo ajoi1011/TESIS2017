@@ -7,6 +7,7 @@
 
 #include "call.h"
 #include "h323.h"
+#include "sip.h"
 #include "manager.h"
 #include "mixer.h"
 
@@ -209,6 +210,12 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
    return false;
 #endif // OPAL_H323
 
+#if OPAL_SIP
+  PSYSTEMLOG(Info, "Configuring SIP");
+  if (!GetSIPEndPoint().Configure(cfg, rsrc))
+   return false;
+#endif // OPAL_SIP
+
 #if OPAL_HAS_MIXER
   if (!GetMixerEndPoint().Configure(cfg, rsrc))
    return false;
@@ -227,10 +234,20 @@ bool MyManager::ConfigureCommon(OpalEndPoint * ep,
   bool enabled = rsrc->AddBooleanField(cfgPrefix & "Enabled", true);
   
   if (cfgPrefix == "H.323" && enabled) { 
-   PString defaulth323Interfaces = "*:1720";
-    if (!ep->StartListeners(defaulth323Interfaces)) {
+   PString defaultH323Interfaces = "*:1720";
+    if (!ep->StartListeners(defaultH323Interfaces)) {
      if (m_verbose)
-      cout <<"No se pudo abrir listeners para " << defaulth323Interfaces << endl;
+      cout <<"No se pudo abrir listeners para " << defaultH323Interfaces << endl;
+     return false;
+     }
+    else if (m_verbose)
+     cout  <<"Listeners " << cfgPrefix << ':' << ep->GetListeners() << endl;
+  }
+  else if (cfgPrefix == "SIP" && enabled) { 
+   PString defaultSIPInterfaces = "*:5060";
+    if (!ep->StartListeners(defaultSIPInterfaces)) {
+     if (m_verbose)
+      cout <<"No se pudo abrir listeners para " << defaultSIPInterfaces << endl;
      return false;
      }
     else if (m_verbose)
@@ -333,6 +350,18 @@ MyH323EndPoint & MyManager::GetH323EndPoint() const
 }
 #endif
 
+#if OPAL_SIP
+SIPConsoleEndPoint * MyManager::CreateSIPEndPoint()
+{
+  return new MySIPEndPoint(*this);
+}
+
+MySIPEndPoint & MyManager::GetSIPEndPoint() const
+{
+  return *FindEndPointAs<MySIPEndPoint>(OPAL_PREFIX_SIP);
+}
+#endif
+
 #if OPAL_HAS_MIXER
 OpalConsoleMixerEndPoint * MyManager::CreateMixerEndPoint()
 {
@@ -354,16 +383,16 @@ OpalConsoleEndPoint * MyManager::GetConsoleEndPoint(const PString & prefix)
       ep = CreateH323EndPoint();
     else
 #endif // OPAL_H323
-/*#if OPAL_SIP
+#if OPAL_SIP
     if (prefix == OPAL_PREFIX_SIP)
       ep = CreateSIPEndPoint();
     else
-#endif // OPAL_SIP*/
+#endif // OPAL_SIP
 #if OPAL_HAS_MIXER
     if (prefix == OPAL_PREFIX_MIXER)
       ep = CreateMixerEndPoint();
     else
-#endif
+#endif // OPAL_HAS_MIXER
     {
       PTRACE(1, "Unknown prefix " << prefix);
       return NULL;
