@@ -9,7 +9,8 @@
 #define _HTML_H
 
 #include "call.h"
-#include "main.h" 
+#include "main.h"
+#include "h323.h" 
 #include <stdio.h>
 #include <string.h>
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,6 +55,77 @@ class BaseStatusPage : public PServiceHTTPString
     unsigned m_refreshRate;
     MyCallDetailRecord * m_cdr;
 };
+
+class RegistrationStatusPage : public BaseStatusPage
+{
+    PCLASSINFO(RegistrationStatusPage, BaseStatusPage);
+  public:
+    RegistrationStatusPage(MyManager & mgr, const PHTTPAuthority & auth);
+
+    typedef map<PString, PString> StatusMap;
+#if OPAL_H323
+    void GetH323(StatusMap & copy) const;
+    size_t GetH323Count() const { return m_h323.size(); }
+#endif
+#if OPAL_SIP
+    void GetSIP(StatusMap & copy) const;
+    size_t GetSIPCount() const { return m_sip.size(); }
+#endif
+
+  protected:
+    virtual PString LoadText(PHTTPRequest & request);
+    virtual const char * GetTitle() const;
+    virtual void CreateContent(PHTML & html, const PStringToString & query) const;
+
+#if OPAL_H323
+    StatusMap m_h323;
+#endif
+#if OPAL_SIP
+    StatusMap m_sip;
+#endif
+    PDECLARE_MUTEX(m_mutex);
+};
+
+#if OPAL_H323
+
+class GkStatusPage : public BaseStatusPage
+{
+    PCLASSINFO(GkStatusPage, BaseStatusPage);
+  public:
+    GkStatusPage(MyManager & mgr, const PHTTPAuthority & auth);
+
+  protected:
+    virtual const char * GetTitle() const;
+    virtual void CreateContent(PHTML & html, const PStringToString & query) const;
+    virtual bool OnPostControl(const PStringToString & data, PHTML & msg);
+
+    MyGatekeeperServer & m_gkServer;
+
+    friend class PServiceMacro_H323EndPointStatus;
+};
+
+#endif // OPAL_H323
+
+#if OPAL_SIP
+
+class RegistrarStatusPage : public BaseStatusPage
+{
+    PCLASSINFO(RegistrarStatusPage, BaseStatusPage);
+  public:
+    RegistrarStatusPage(MyManager & mgr, const PHTTPAuthority & auth);
+
+  protected:
+    virtual const char * GetTitle() const;
+    virtual void CreateContent(PHTML & html, const PStringToString & query) const;
+    virtual bool OnPostControl(const PStringToString & data, PHTML & msg);
+
+    MySIPEndPoint & m_registrar;
+
+    friend class PServiceMacro_SIPEndPointStatus;
+};
+
+#endif // OPAL_SIP
+
 
 class CallStatusPage : public BaseStatusPage
 {
@@ -108,6 +180,7 @@ class InvitePage : public PServiceHTTPString
     void CreateHTML(PHTML & html);
   private:
     MyProcess & app;
+    PHTTPAuthority & m_authorityInvite;
     
     
 };

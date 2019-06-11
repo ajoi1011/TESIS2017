@@ -30,6 +30,42 @@ struct NATInfo {
 };
 #endif // OPAL_PTLIB_NAT
 
+#if OPAL_SIP
+
+void ExpandWildcards(const PStringArray & input, const PString & defaultServer, PStringArray & names, PStringArray & servers)
+{
+  for (PINDEX i = 0; i < input.GetSize(); ++i) {
+    PString str = input[i];
+
+    PIntArray starts(4), ends(4);
+    static PRegularExpression const Wildcards("([0-9]+)\\.\\.([0-9]+)(@.*)?$", PRegularExpression::Extended);
+    if (Wildcards.Execute(str, starts, ends)) {
+      PString server = (ends[3] - starts[3]) > 2 ? str(starts[3] + 1, ends[3] - 1) : defaultServer;
+      uint64_t number = str(starts[1], ends[1] - 1).AsUnsigned64();
+      uint64_t lastNumber = str(starts[2], ends[2] - 1).AsUnsigned64();
+      unsigned digits = ends[1] - starts[1];
+      str.Delete(starts[1], P_MAX_INDEX);
+      while (number <= lastNumber) {
+        names.AppendString(PSTRSTRM(str << setfill('0') << setw(digits) << number++));
+        servers.AppendString(server);
+      }
+    }
+    else {
+      PString name, server;
+      if (str.Split('@', name, server)) {
+        names.AppendString(name);
+        servers.AppendString(server);
+      }
+      else {
+        names.AppendString(str);
+        servers.AppendString(defaultServer);
+      }
+    }
+  }
+}
+
+#endif // OPAL_SIP
+
 MyManager::MyManager()
   : OpalManagerConsole(OPAL_CONSOLE_PREFIXES OPAL_PREFIX_MIXER)
   , m_savedProductInfo(GetProductInfo())
@@ -38,9 +74,12 @@ MyManager::MyManager()
   , m_verbose(false)
   , m_cdrListMax(100)
 {
+  OpalMediaFormat::RegisterKnownMediaFormats(); // Make sure codecs are loaded
+  DisableDetectInBandDTMF(true);
+
 #if OPAL_VIDEO
-  for (OpalVideoFormat::ContentRole role = OpalVideoFormat::BeginContentRole; role < OpalVideoFormat::EndContentRole; ++role)
-    m_videoInputDevice[role].deviceName = m_videoPreviewDevice[role].deviceName = m_videoOutputDevice[role].deviceName = P_NULL_VIDEO_DEVICE;
+  /*for (OpalVideoFormat::ContentRole role = OpalVideoFormat::BeginContentRole; role < OpalVideoFormat::EndContentRole; ++role)
+    m_videoInputDevice[role].deviceName = */m_videoPreviewDevice[OpalVideoFormat::eNoRole].deviceName = m_videoOutputDevice[OpalVideoFormat::eNoRole].deviceName = P_NULL_VIDEO_DEVICE;
   
   PStringArray devices = PVideoOutputDevice::GetDriversDeviceNames("*"); // Get all devices on all drivers
   PINDEX i;
@@ -102,35 +141,6 @@ bool MyManager::Initialise(PArgList & args, bool verbose, const PString & defaul
 
 }
 
-/*#if OPAL_PTLIB_NAT
-bool MyManager::SetNATServer(const PString & method, const PString & server, bool activate, unsigned priority)
-{
-  PNatMethod * natMethod = m_natMethods->GetMethodByName(method);
-  if (natMethod == NULL) {
-    PTRACE(2, "Unknown NAT method \"" << method << '"');
-    return false;
-  }
-
-  natMethod->Activate(activate);
-  m_natMethods->SetMethodPriority(method, priority);
-
-  natMethod->SetPortRanges(GetUDPPortRange().GetBase(), GetUDPPortRange().GetMax(),
-                           GetRtpIpPortRange().GetBase(), GetRtpIpPortRange().GetMax());
-  if (!natMethod->SetServer(server)) {
-    PTRACE(2, "Invalid server \"" << server << "\" for " << method << " NAT method");
-    return false;
-  }
-
-  if (!natMethod->Open(PIPSocket::GetDefaultIpAny())) {
-    PTRACE(2, "Could not open server \"" << server << " for " << method << " NAT method");
-    return false;
-  }
-
-  PTRACE(3, "NAT " << *natMethod);
-  return true;
-}
-#endif*/
-
 PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
 {
   // Make sure all endpoints created (4)
@@ -165,7 +175,7 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
       PString key = "Auto Start";
       key &= it->c_str();
       
-      if (key == "Auto Start audio" || key == "Auto Start video") {
+      if (key == "Auto Start audio" || key == "Auto Start video" || key == "Auto Start presentation") {
       (*it)->SetAutoStart(cfg.GetEnum<OpalMediaType::AutoStartMode::Enumeration>(key, (*it)->GetAutoStart()));
       static const char * const AutoStartValues[] = { "Inactive", "Receive only", "Send only", "Send & Receive", "Don't offer" };
       rsrc->Add(new PHTTPEnumField<OpalMediaType::AutoStartMode::Enumeration>(key,
@@ -202,7 +212,40 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
         SetNATServer(it->m_method, (*fields)[1].GetValue(), (*fields)[0].GetValue() *= "true", 0, (*fields)[2].GetValue());
     }
   }
-#endif // P_NAT
+#endif // OPAL_PTLIB_NAT
+
+  {
+    OpalMediaFormatList allFormats;
+    PList<OpalEndPoint> endpoints = GetEndPoints();
+    for (PList<OpalEndPoint>::iterator it = endpoints.begin(); it != endpoints.end(); ++it)
+      allFormats += it->GetMediaFormats();
+    OpalMediaFormatList transportableFormats;
+    for (OpalMediaFormatList::iterator it = allFormats.begin(); it != allFormats.end(); ++it) {
+      if (it->IsTransportable())
+        transportableFormats += *it;
+    }
+    PStringStream help;
+    help << "Preference order for codecs to be offered to remotes.<p>"
+      "Note, these are not regular expressions, just simple "
+      "wildcards where '*' matches any number of characters.<p>"
+      "Known media formats are:<br>";
+    for (OpalMediaFormatList::iterator it = transportableFormats.begin(); it != transportableFormats.end(); ++it) {
+      if (it != transportableFormats.begin())
+        help << ", ";
+      help << *it;
+    }
+    SetMediaFormatOrder(rsrc->AddStringArrayField("PreferredMediaKey", true, 25, GetMediaFormatOrder(), help));
+  }
+
+  SetMediaFormatMask(rsrc->AddStringArrayField("RemovedMediaKey", true, 25, GetMediaFormatMask(),
+    "Codecs to be prevented from being used.<p>"
+    "These are wildcards as in the above Preferred Media, with "
+    "the addition of preceding the expression with a '!' which "
+    "removes all formats <i>except</i> the indicated wildcard. "
+    "Also, the '@' character may also be used to indicate a "
+    "media type, e.g. <code>@video</code> removes all video "
+    "codecs."));
+
 
 #if OPAL_H323
   PSYSTEMLOG(Info, "Configuring H.323");
@@ -217,9 +260,10 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
 #endif // OPAL_SIP
 
 #if OPAL_HAS_MIXER
+  PSYSTEMLOG(Info, "Configuring Mixer");
   if (!GetMixerEndPoint().Configure(cfg, rsrc))
    return false;
-#endif
+#endif // OPAL_HAS_MIXER
   
   return ConfigureCDR(cfg, rsrc);
 }
@@ -274,16 +318,6 @@ void MyManager::OnStartMediaPatch(OpalConnection & connection, OpalMediaPatch & 
    stream->PrintDetail(output, "Started");
   }
 
-
-  /*PSafePtr<OpalConnection> other = connection.GetOtherPartyConnection();
-  if (other != NULL) {
-    // Detect if we have loopback endpoint, and start pas thro on the other connection
-    if (connection.GetPrefixName() == LoopbackPrefix)
-      SetMediaPassThrough(*other, *other, true, patch.GetSource().GetSessionID());
-    else if (other->GetPrefixName() == LoopbackPrefix)
-      SetMediaPassThrough(connection, connection, true, patch.GetSource().GetSessionID());
-  }*/
-
   dynamic_cast<MyCall &>(connection.GetCall()).OnStartMediaPatch(connection, patch);
   OpalManager::OnStartMediaPatch(connection, patch);
 }
@@ -336,6 +370,27 @@ bool MyManager::NotEndCDR(const CDRList::const_iterator & it)
 
   m_cdrMutex.Signal();
   return false;
+}
+
+void MyManager::OnChangedRegistrarAoR(const PURL & aor, bool registering)
+{
+#if OPAL_H323
+  if (aor.GetScheme() == "h323") {
+    if (aor.GetUserName().IsEmpty())
+      GetH323EndPoint().AutoRegister(aor.GetHostName(), PString::Empty(), registering);
+    else if (aor.GetHostName().IsEmpty())
+      GetH323EndPoint().AutoRegister(aor.GetUserName(), PString::Empty(), registering);
+    else if (aor.GetParamVars()("type") *= "gk")
+      GetH323EndPoint().AutoRegister(aor.GetUserName(), aor.GetHostName(), registering);
+    else
+      GetH323EndPoint().AutoRegister(PSTRSTRM(aor.GetUserName() << '@' << aor.GetHostName()), PString::Empty(), registering);
+  }
+  else if (GetSIPEndPoint().GetAutoRegisterH323() && aor.GetScheme().NumCompare("sip") == EqualTo)
+    GetH323EndPoint().AutoRegister(aor.GetUserName(), PString::Empty(), registering);
+#endif // OPAL_H323
+
+  if (aor.GetScheme() == "sip" && (aor.GetParamVars()("type") *= "cisco"))
+    GetSIPEndPoint().AutoRegisterCisco(aor.GetHostPort(), aor.GetUserName(), aor.GetParamVars()("device"), registering);
 }
 
 #if OPAL_H323

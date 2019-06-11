@@ -35,6 +35,11 @@ MyProcess::~MyProcess()
 
 PBoolean MyProcess::OnStart()
 {
+  // Set log level as early as possible
+  Params params(NULL);
+  params.m_forceRotate = true;
+  InitialiseBase(params);  
+
   m_manager = new MyManager();
   new MyPCSSEndPoint(*m_manager);
   m_manager->Initialise(GetArguments(), true, OPAL_PREFIX_MIXER":<du>");
@@ -44,6 +49,8 @@ PBoolean MyProcess::OnStart()
 
 void MyProcess::OnStop()
 {
+  if (m_manager != NULL)
+    m_manager->ShutDownEndpoints();
   PHTTPServiceProcess::OnStop();
 }
 
@@ -179,16 +186,15 @@ PBoolean MyProcess::Initialise(const char * initMsg)
   m_pageConfigure = (MyPConfigPage*)params.m_configPage;
   m_pageConfigure->BuildHTML(cfgHTML);
   
-  PHTTPMultiSimpAuth authSettings(GetName());
-  PHTTPMultiSimpAuth authConference(GetName());
-
- 
-  m_httpNameSpace.AddResource(new InvitePage(*this, authConference), PHTTPSpace::Overwrite);
-  m_httpNameSpace.AddResource(new CallStatusPage(*m_manager, params.m_authority), PHTTPSpace::Overwrite);
-  m_httpNameSpace.AddResource(new SelectRoomPage(*this, authConference), PHTTPSpace::Overwrite);
-  m_httpNameSpace.AddResource(new WelcomePage(*this, authConference), PHTTPSpace::Overwrite);
-  m_httpNameSpace.AddResource(new CDRListPage(*m_manager, params.m_authority), PHTTPSpace::Overwrite);
-  m_httpNameSpace.AddResource(new CDRPage(*m_manager, params.m_authority), PHTTPSpace::Overwrite);
+  CreateHTTPResource("Invite");
+  CreateHTTPResource("CallStatus");
+  CreateHTTPResource("Select");
+  CreateHTTPResource("HomePage");
+  CreateHTTPResource("CallDetailRecords");
+  CreateHTTPResource("CallDetailRecord");
+  CreateHTTPResource("RegistrationStatus");
+  CreateHTTPResource("RegistrarStatus");
+  CreateHTTPResource("GkStatus");
   
 
 #ifdef SYS_RESOURCE_DIR
@@ -209,126 +215,44 @@ PBoolean MyProcess::Initialise(const char * initMsg)
   // set up the HTTP port for listening & start the first HTTP thread
   if (ListenForHTTP(DefaultHTTPPort))
    PSYSTEMLOG(Info, "Opened master socket for HTTP: " << m_httpListeningSockets.front().GetPort());
-  /*else {
-    PSYSTEMLOG(Fatal, "Cannot run without HTTP port: " *//*<< httpListeningSocket->GetErrorText());
+  else {
+    PSYSTEMLOG(Fatal, "Cannot run without HTTP port");
     return false;
-  }*/
+  }
 
-  //PSYSTEMLOG(Info, "Service " << GetName() << ' ' << initMsg);
+  PSYSTEMLOG(Info, "Completed configuring service " << GetName() << " (" << initMsg << ')');
   return true;
 }
 
 void MyProcess::CreateHTTPResource(const PString & name)
 {
-  // Get the HTTP authentication info
-  /*MCUConfig("Managing Groups").SetString("administrator", "");
-  MCUConfig("Managing Groups").SetString("conference manager", "");
-
-  PHTTPMultiSimpAuth authSettings(GetName());
+  
   PHTTPMultiSimpAuth authConference(GetName());
-  PStringList keysUsers = MCUConfig("Managing Users").GetKeys();
-  for(PINDEX i = 0; i < keysUsers.GetSize(); i++)
-  {
-    PStringArray params = MCUConfig("Managing Users").GetString(keysUsers[i]).Tokenise(",");
-    if(params.GetSize() < 2) continue;
-    if(params[1] == "administrator")
-    {
-      authSettings.AddUser(keysUsers[i], PHTTPPasswordField::Decrypt(params[0]));
-      authConference.AddUser(keysUsers[i], PHTTPPasswordField::Decrypt(params[0]));
-    }
-    if(params[1] == "conference manager")
-    {
-      authConference.AddUser(keysUsers[i], PHTTPPasswordField::Decrypt(params[0]));
-    }
-  }
 
-  if(name == "Parameters")
-    httpNameSpace.AddResource(new GeneralPConfigPage(*this, name, "Parameters", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "ConferenceParameters")
-    httpNameSpace.AddResource(new ConferencePConfigPage(*this, name, "Conference Parameters", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "ExportParameters")
-    httpNameSpace.AddResource(new ExportPConfigPage(*this, name, "Export Parameters", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "RegistrarParameters")
-    httpNameSpace.AddResource(new RegistrarPConfigPage(*this, name, "Registrar Parameters", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "ManagingUsers")
-    httpNameSpace.AddResource(new ManagingUsersPConfigPage(*this, name, "Managing Users", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "ManagingGroups")
-    httpNameSpace.AddResource(new ManagingGroupsPConfigPage(*this, name, "Managing Groups", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "ControlCodes")
-    httpNameSpace.AddResource(new ControlCodesPConfigPage(*this, name, "Control Codes", authSettings), PHTTPSpace::Overwrite);
-  //else if(name == "RoomCodes")
-  //  httpNameSpace.AddResource(new RoomCodesPConfigPage(*this, name, "Room Codes", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "TelnetServer")
-    httpNameSpace.AddResource(new TelnetServerPConfigPage(*this, name, "Telnet Server", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "H323Parameters")
-    httpNameSpace.AddResource(new H323PConfigPage(*this, name, "H323 Parameters", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "SIPParameters")
-    httpNameSpace.AddResource(new SIPPConfigPage(*this, name, "SIP Parameters", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "H323EndpointsParameters")
-    httpNameSpace.AddResource(new H323EndpointsPConfigPage(*this, name, "H323 Endpoints", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "SipEndpointsParameters")
-    httpNameSpace.AddResource(new SipEndpointsPConfigPage(*this, name, "SIP Endpoints", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "RtspParameters")
-    httpNameSpace.AddResource(new RtspPConfigPage(*this, name, "RTSP Parameters", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "RtspServers")
-    httpNameSpace.AddResource(new RtspServersPConfigPage(*this, name, "RTSP Servers", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "RtspEndpoints")
-    httpNameSpace.AddResource(new RtspEndpointsPConfigPage(*this, name, "RTSP Endpoints", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "VideoParameters")
-    httpNameSpace.AddResource(new VideoPConfigPage(*this, name, "Video", authSettings), PHTTPSpace::Overwrite);
-  //else if(name == "RoomAccess")
-  //  httpNameSpace.AddResource(new RoomAccessSIPPConfigPage(*this, name, "RoomAccess", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "ProxyServers")
-    httpNameSpace.AddResource(new ProxySIPPConfigPage(*this, name, "ProxyServers", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "ReceiveSoundCodecs")
-    httpNameSpace.AddResource(new CodecsPConfigPage(*this, name, "RECEIVE_SOUND", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "TransmitSoundCodecs")
-    httpNameSpace.AddResource(new CodecsPConfigPage(*this, name, "TRANSMIT_SOUND", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "ReceiveVideoCodecs")
-    httpNameSpace.AddResource(new CodecsPConfigPage(*this, name, "RECEIVE_VIDEO", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "TransmitVideoCodecs")
-    httpNameSpace.AddResource(new CodecsPConfigPage(*this, name, "TRANSMIT_VIDEO", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "SipSoundCodecs")
-    httpNameSpace.AddResource(new SIPCodecsPConfigPage(*this, name, "SIP Audio", authSettings), PHTTPSpace::Overwrite);
-  else if(name == "SipVideoCodecs")
-    httpNameSpace.AddResource(new SIPCodecsPConfigPage(*this, name, "SIP Video", authSettings), PHTTPSpace::Overwrite);
-
-  else if(name == "Status")
-    httpNameSpace.AddResource(new MainStatusPage(*this, authConference), PHTTPSpace::Overwrite);
+  if(name == "CallStatus")
+    m_httpNameSpace.AddResource(new CallStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
   else if(name == "Invite")
-    httpNameSpace.AddResource(new InvitePage(*this, authConference), PHTTPSpace::Overwrite);
+    m_httpNameSpace.AddResource(new InvitePage(*this, authConference), PHTTPSpace::Overwrite);
   else if(name == "Select")
-    httpNameSpace.AddResource(new SelectRoomPage(*this, authConference), PHTTPSpace::Overwrite);
-  else if(name == "Records")
-    httpNameSpace.AddResource(new RecordsBrowserPage(*this, authConference), PHTTPSpace::Overwrite);
-  else if(name == "Jpeg")
-    httpNameSpace.AddResource(new JpegFrameHTTP(*this, authConference), PHTTPSpace::Overwrite);
-  else if(name == "Comm")
-    httpNameSpace.AddResource(new InteractiveHTTP(*this, authConference), PHTTPSpace::Overwrite);
-
-  else if(name == "welcome.html")
-    httpNameSpace.AddResource(new WelcomePage(*this, authConference), PHTTPSpace::Overwrite);
-  else if(name == "monitor.txt")
-  {
-    PString monitorText =
-#ifdef GIT_REVISION
-                        (PString(PRODUCT_NAME_TEXT) + " REVISION " + MCU_STRINGIFY(GIT_REVISION) +"\n\n") +
-#endif
-                        "<!--#equival monitorinfo-->"
-                        "<!--#equival mcuinfo-->";
-    httpNameSpace.AddResource(new PServiceHTTPString("monitor.txt", monitorText, "text/plain", authConference), PHTTPSpace::Overwrite);
-  }*/
-
-  // Add log file links
-/*
-  if (!systemLogFileName && (systemLogFileName != "-")) {
-    httpNameSpace.AddResource(new PHTTPFile("logfile.txt", systemLogFileName, authority));
-    httpNameSpace.AddResource(new PHTTPTailFile("tail_logfile", systemLogFileName, authority));
-  }
-*/
+    m_httpNameSpace.AddResource(new SelectRoomPage(*this, authConference), PHTTPSpace::Overwrite);
+  else if(name == "CallDetailRecords")
+    m_httpNameSpace.AddResource(new CDRListPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+  else if(name == "CallDetailRecord")
+    m_httpNameSpace.AddResource(new CDRPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+  else if(name == "HomePage")
+    m_httpNameSpace.AddResource(new WelcomePage(*this, authConference), PHTTPSpace::Overwrite);
+  else if(name == "RegistrationStatus")
+    m_httpNameSpace.AddResource(new RegistrationStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+#if OPAL_SIP
+  else if(name == "RegistrarStatus")
+    m_httpNameSpace.AddResource(new RegistrarStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+#endif // OPAL_SIP
+#if OPAL_H323
+  else if(name == "GkStatus")
+    m_httpNameSpace.AddResource(new GkStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+#endif // OPAL_H323
 
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 

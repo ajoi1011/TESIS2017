@@ -91,7 +91,6 @@ OpalMediaStream * MyMixerConnection::CreateMediaStream(const OpalMediaFormat & m
                                                          unsigned sessionID,
                                                          PBoolean isSource)
 {
-  cout << mediaFormat.GetDescription() << endl;
   
   PVideoOutputDevice * previewDevice;
   PBoolean autoDeletePreview;
@@ -145,7 +144,7 @@ PBoolean MyMixerMediaStream::Open()
     return false;
   }
 
-  InternalAdjustDevices();
+  //InternalAdjustDevices();
   
   SetPaused(IsSink() && m_listenOnly);
   
@@ -163,13 +162,13 @@ PBoolean MyMixerMediaStream::WritePacket(RTP_DataFrame & packet)
 
 PBoolean MyMixerMediaStream::WriteData(const BYTE * data, PINDEX length, PINDEX & written)
 {
-  /*if (!IsOpen())
+  if (!IsOpen())
     return false;
   
   if (IsSource()) {
     cout << "Tried to write to source media stream" << endl;
     return false;
-  }*/
+  }
 
   PWaitAndSignal mutex(m_devicesMutex);
 
@@ -182,8 +181,8 @@ PBoolean MyMixerMediaStream::WriteData(const BYTE * data, PINDEX length, PINDEX 
 
   const OpalVideoTranscoder::FrameHeader * frame = (const OpalVideoTranscoder::FrameHeader *)data;
 
-  if (m_outputDevice != NULL) 
-    cout << "Creating device"<< m_outputDevice->GetDeviceName()<< "with format"  <<  frame->width << " x " << frame->height << endl;
+  if (m_outputDevice == NULL) 
+    return false;
 
   if (!m_outputDevice->SetFrameSize(frame->width, frame->height)) {
     PTRACE(1, "Could not resize video display device to " << frame->width << 'x' << frame->height);
@@ -202,7 +201,7 @@ PBoolean MyMixerMediaStream::WriteData(const BYTE * data, PINDEX length, PINDEX 
     return false;
   if (keyFrameNeeded)
     ExecuteCommand(OpalVideoUpdatePicture());
-  cout << "Writing packets" << endl;
+  
   return true;
 }
 
@@ -218,7 +217,7 @@ bool MyMixerMediaStream::InternalAdjustDevices()
       return false;
     }
   }
-  cout << "Adjusted video devices to " << video << " on " << *this << endl;
+  
   return true;
 }
 

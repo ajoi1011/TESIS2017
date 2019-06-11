@@ -11,6 +11,8 @@
 #include "precompile.h"
 #include "call.h"
 
+void ExpandWildcards(const PStringArray & input, const PString & defaultServer, PStringArray & names, PStringArray & servers);
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 class MyH323EndPoint;
 class MySIPEndPoint;
@@ -38,8 +40,6 @@ class MyManager : public MyManagerParent
 
     bool ConfigureCommon(OpalEndPoint * ep, const PString & cfgPrefix, PConfig & cfg, PConfigPage * rsrc);
 
-    //bool SetNATServer(const PString & method, const PString & server, bool activate, unsigned priority);
-
     virtual void OnStartMediaPatch(OpalConnection & connection, OpalMediaPatch & patch);
 
     virtual void OnStopMediaPatch(OpalConnection & connection, OpalMediaPatch & patch);
@@ -57,9 +57,13 @@ class MyManager : public MyManagerParent
     
     bool FindCDR(const PString & guid, MyCallDetailRecord & cdr);
 
+#if OPAL_SIP && OPAL_H323
+    void OnChangedRegistrarAoR(const PURL & aor, bool registering);
+#endif
+
 #if OPAL_H323
     virtual H323ConsoleEndPoint * CreateH323EndPoint();
-    
+
     MyH323EndPoint & GetH323EndPoint() const;
 #endif
 

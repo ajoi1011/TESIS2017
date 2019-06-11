@@ -8,6 +8,9 @@
 #include "html.h"
 #include "manager.h"
 #include "mixer.h"
+#include "h323.h"
+#include "sip.h"
+
 
 static unsigned long html_template_size; // count on zero initialization
 char * html_template_buffer;
@@ -157,6 +160,431 @@ PBoolean BaseStatusPage::Post(PHTTPRequest & request,
                               PServiceHTML::LoadFromFile | PServiceHTML::NoSignatureForFile);
   return TRUE;
 }
+
+RegistrationStatusPage::RegistrationStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
+  : BaseStatusPage(mgr, auth, "RegistrationStatus")
+{
+}
+
+
+#if OPAL_H323
+void RegistrationStatusPage::GetH323(StatusMap & copy) const
+{
+  PWaitAndSignal lock(m_mutex);
+  copy = m_h323;
+}
+#endif
+
+#if OPAL_SIP
+void RegistrationStatusPage::GetSIP(StatusMap & copy) const
+{
+  PWaitAndSignal lock(m_mutex);
+  copy = m_sip;
+}
+#endif
+
+PString RegistrationStatusPage::LoadText(PHTTPRequest & request)
+{
+  m_mutex.Wait();
+
+#if OPAL_SIP
+  m_sip.clear();
+  MySIPEndPoint & sipEP = m_manager.GetSIPEndPoint();
+  const PStringList & registrations = sipEP.GetRegistrations(true);
+  for (PStringList::const_iterator it = registrations.begin(); it != registrations.end(); ++it)
+    m_sip[*it] = sipEP.IsRegistered(*it) ? "Registered" : (sipEP.IsRegistered(*it, true) ? "Offline" : "Failed");
+
+#endif
+
+
+  m_mutex.Signal();
+
+  return BaseStatusPage::LoadText(request);
+}
+
+
+const char * RegistrationStatusPage::GetTitle() const
+{
+  return "OPAL Server Registration Status";
+}
+
+
+void RegistrationStatusPage::CreateContent(PHTML & html, const PStringToString &) const
+{
+  html << PHTML::TableStart(PHTML::Border1, PHTML::CellPad4)
+       << PHTML::TableRow()
+       << PHTML::TableHeader() << ' '
+       << PHTML::TableHeader(PHTML::NoWrap) << "Name/Address"
+       << PHTML::TableHeader(PHTML::NoWrap) << "Status"
+#if OPAL_H323
+       << PHTML::TableRow()
+       << PHTML::TableHeader(PHTML::NoWrap, "rowspan=<!--#macro H323ListenerCount-->")
+       << " H.323 Listeners"
+       << "<!--#macrostart H323ListenerStatus-->"
+           << PHTML::TableRow()
+           << PHTML::TableData(PHTML::NoWrap)
+           << "<!--#status Address-->"
+           << PHTML::TableData(PHTML::NoWrap, PHTML::AlignCentre)
+           << "<!--#status Status-->"
+       << "<!--#macroend H323ListenerStatus-->"
+       << PHTML::TableRow()
+       << PHTML::TableHeader(PHTML::NoWrap, "rowspan=<!--#macro H323RegistrationCount-->")
+       << " H.323 Gatekeeper"
+       << "<!--#macrostart H323RegistrationStatus-->"
+           << PHTML::TableRow()
+           << PHTML::TableData(PHTML::NoWrap)
+           << "<!--#status Name-->"
+           << PHTML::TableData(PHTML::NoWrap)
+           << "<!--#status Status-->"
+       << "<!--#macroend H323RegistrationStatus-->"
+#endif // OPAL_H323
+
+#if OPAL_SIP
+       << PHTML::TableRow()
+       << PHTML::TableHeader(PHTML::NoWrap, "rowspan=<!--#macro SIPListenerCount-->")
+       << " SIP Listeners "
+       << "<!--#macrostart SIPListenerStatus-->"
+           << PHTML::TableRow()
+           << PHTML::TableData(PHTML::NoWrap)
+           << "<!--#status Address-->"
+           << PHTML::TableData(PHTML::NoWrap, PHTML::AlignCentre)
+           << "<!--#status Status-->"
+       << "<!--#macroend SIPListenerStatus-->"
+       << PHTML::TableRow()
+       << PHTML::TableHeader(PHTML::NoWrap, "rowspan=<!--#macro SIPRegistrationCount-->")
+       << " SIP Registrars "
+       << "<!--#macrostart SIPRegistrationStatus-->"
+           << PHTML::TableRow()
+           << PHTML::TableData(PHTML::NoWrap)
+           << "<!--#status Name-->"
+           << PHTML::TableData(PHTML::NoWrap)
+           << "<!--#status Status-->"
+       << "<!--#macroend SIPRegistrationStatus-->"
+#endif // OPAL_SIP
+
+#if OPAL_PTLIB_NAT
+       << PHTML::TableRow()
+       << PHTML::TableHeader(PHTML::NoWrap)
+       << " STUN Server "
+       << PHTML::TableData(PHTML::NoWrap)
+       << "<!--#macro STUNServer-->"
+       << PHTML::TableData(PHTML::NoWrap)
+       << "<!--#macro STUNStatus-->"
+#endif // OPAL_PTLIB_NAT
+
+       << PHTML::TableEnd();
+}
+
+
+static PINDEX GetListenerCount(PHTTPRequest & resource, const char * prefix)
+{
+  RegistrationStatusPage * status = dynamic_cast<RegistrationStatusPage *>(resource.m_resource);
+  if (PAssertNULL(status) == NULL)
+    return 2;
+
+  OpalEndPoint * ep = status->m_manager.FindEndPoint(prefix);
+  if (ep == NULL)
+    return 2;
+
+  return ep->GetListeners().GetSize() + 1;
+}
+
+
+static PString GetListenerStatus(PHTTPRequest & resource, const PString htmlBlock, const char * prefix)
+{
+  PString substitution;
+
+  RegistrationStatusPage * status = dynamic_cast<RegistrationStatusPage *>(resource.m_resource);
+  if (PAssertNULL(status) != NULL) {
+    OpalEndPoint * ep = status->m_manager.FindEndPoint(prefix);
+    if (ep != NULL) {
+      const OpalListenerList & listeners = ep->GetListeners();
+      for (OpalListenerList::const_iterator it = listeners.begin(); it != listeners.end(); ++it) {
+        PString insert = htmlBlock;
+        PServiceHTML::SpliceMacro(insert, "status Address", it->GetLocalAddress());
+        PServiceHTML::SpliceMacro(insert, "status Status", it->IsOpen() ? "Active" : "Offline");
+        substitution += insert;
+      }
+    }
+  }
+
+  if (substitution.IsEmpty()) {
+    substitution = htmlBlock;
+    PServiceHTML::SpliceMacro(substitution, "status Address", PHTML::GetNonBreakSpace());
+    PServiceHTML::SpliceMacro(substitution, "status Status", "Not listening");
+  }
+
+  return substitution;
+}
+
+
+static PINDEX GetRegistrationCount(PHTTPRequest & resource, size_t (RegistrationStatusPage::*func)() const)
+{
+  RegistrationStatusPage * status = dynamic_cast<RegistrationStatusPage *>(resource.m_resource);
+  if (PAssertNULL(status) == NULL)
+    return 2;
+
+  PINDEX count = (status->*func)();
+  if (count == 0)
+    return 2;
+
+  return count+1;
+}
+
+
+static PString GetRegistrationStatus(PHTTPRequest & resource,
+                                     const PString htmlBlock,
+                                     void (RegistrationStatusPage::*func)(RegistrationStatusPage::StatusMap &) const)
+{
+  PString substitution;
+
+  RegistrationStatusPage * status = dynamic_cast<RegistrationStatusPage *>(resource.m_resource);
+  if (PAssertNULL(status) != NULL) {
+    RegistrationStatusPage::StatusMap statuses;
+    (status->*func)(statuses);
+    for (RegistrationStatusPage::StatusMap::const_iterator it = statuses.begin(); it != statuses.end(); ++it) {
+      PString insert = htmlBlock;
+      PServiceHTML::SpliceMacro(insert, "status Name", it->first);
+      PServiceHTML::SpliceMacro(insert, "status Status", it->second);
+      substitution += insert;
+    }
+  }
+
+  if (substitution.IsEmpty()) {
+    substitution = htmlBlock;
+    PServiceHTML::SpliceMacro(substitution, "status Name", PHTML::GetNonBreakSpace());
+    PServiceHTML::SpliceMacro(substitution, "status Status", "Not registered");
+  }
+
+  return substitution;
+}
+
+
+#if OPAL_H323
+PCREATE_SERVICE_MACRO(H323ListenerCount, resource, P_EMPTY)
+{
+  return GetListenerCount(resource, OPAL_PREFIX_H323);
+}
+
+
+PCREATE_SERVICE_MACRO_BLOCK(H323ListenerStatus, resource, P_EMPTY, htmlBlock)
+{
+  return GetListenerStatus(resource, htmlBlock, OPAL_PREFIX_H323);
+}
+
+
+PCREATE_SERVICE_MACRO(H323RegistrationCount, resource, P_EMPTY)
+{
+  return GetRegistrationCount(resource, &RegistrationStatusPage::GetH323Count);
+}
+
+
+PCREATE_SERVICE_MACRO_BLOCK(H323RegistrationStatus, resource, P_EMPTY, htmlBlock)
+{
+  return GetRegistrationStatus(resource, htmlBlock, &RegistrationStatusPage::GetH323);
+}
+#endif // OPAL_H323
+
+#if OPAL_SIP
+PCREATE_SERVICE_MACRO(SIPListenerCount, resource, P_EMPTY)
+{
+  return GetListenerCount(resource, OPAL_PREFIX_SIP);
+}
+
+
+PCREATE_SERVICE_MACRO_BLOCK(SIPListenerStatus, resource, P_EMPTY, htmlBlock)
+{
+  return GetListenerStatus(resource, htmlBlock, OPAL_PREFIX_SIP);
+}
+
+
+PCREATE_SERVICE_MACRO(SIPRegistrationCount, resource, P_EMPTY)
+{
+  return GetRegistrationCount(resource, &RegistrationStatusPage::GetSIPCount);
+}
+
+
+PCREATE_SERVICE_MACRO_BLOCK(SIPRegistrationStatus, resource, P_EMPTY, htmlBlock)
+{
+  return GetRegistrationStatus(resource, htmlBlock, &RegistrationStatusPage::GetSIP);
+}
+#endif // OPAL_SIP
+
+#if OPAL_PTLIB_NAT
+static bool GetSTUN(PHTTPRequest & resource, PSTUNClient * & stun)
+{
+  RegistrationStatusPage * status = dynamic_cast<RegistrationStatusPage *>(resource.m_resource);
+  if (PAssertNULL(status) == NULL)
+    return false;
+
+  stun = dynamic_cast<PSTUNClient *>(status->m_manager.GetNatMethods().GetMethodByName(PSTUNClient::MethodName()));
+  return stun != NULL;
+}
+
+
+PCREATE_SERVICE_MACRO(STUNServer, resource, P_EMPTY)
+{
+  PSTUNClient * stun;
+  if (!GetSTUN(resource, stun))
+    return PString::Empty();
+
+  PHTML html(PHTML::InBody);
+  html << stun->GetServer();
+
+  PIPAddressAndPort ap;
+  if (stun->GetServerAddress(ap))
+    html << PHTML::BreakLine() << ap;
+
+  return html;
+}
+
+
+PCREATE_SERVICE_MACRO(STUNStatus, resource, P_EMPTY)
+{
+  PSTUNClient * stun;
+  if (!GetSTUN(resource, stun))
+    return PString::Empty();
+
+  PHTML html(PHTML::InBody);
+  PNatMethod::NatTypes type = stun->GetNatType();
+  html << type;
+
+  PIPAddress ip;
+  if (stun->GetExternalAddress(ip))
+    html << PHTML::BreakLine() << ip;
+
+  return html;
+}
+#endif // OPAL_PTLIB_NAT
+
+#if OPAL_H323
+
+GkStatusPage::GkStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
+  : BaseStatusPage(mgr, auth, "GkStatus")
+  , m_gkServer(mgr.FindEndPointAs<MyH323EndPoint>(OPAL_PREFIX_H323)->GetGatekeeperServer())
+{
+}
+
+
+const char * GkStatusPage::GetTitle() const
+{
+  return "OPAL Gatekeeper Status";
+}
+
+
+void GkStatusPage::CreateContent(PHTML & html, const PStringToString &) const
+{
+  html << PHTML::TableStart(PHTML::Border1)
+       << PHTML::TableRow()
+       << PHTML::TableHeader()
+       << PHTML::NonBreakSpace() << "End" << PHTML::NonBreakSpace() << "Point" << PHTML::NonBreakSpace() << "Identifier" << PHTML::NonBreakSpace()
+       << PHTML::TableHeader()
+       << PHTML::NonBreakSpace() << "Call" << PHTML::NonBreakSpace() << "Signal" << PHTML::NonBreakSpace() << "Addresses" << PHTML::NonBreakSpace()
+       << PHTML::TableHeader()
+       << PHTML::NonBreakSpace() << "Aliases" << PHTML::NonBreakSpace()
+       << PHTML::TableHeader()
+       << PHTML::NonBreakSpace() << "Application" << PHTML::NonBreakSpace()
+       << PHTML::TableHeader()
+       << PHTML::NonBreakSpace() << "Active" << PHTML::NonBreakSpace() << "Calls" << PHTML::NonBreakSpace()
+       << "<!--#macrostart H323EndPointStatus-->"
+       << PHTML::TableRow()
+       << PHTML::TableData()
+       << "<!--#status EndPointIdentifier-->"
+       << PHTML::TableData()
+       << "<!--#status CallSignalAddresses-->"
+       << PHTML::TableData(PHTML::NoWrap)
+       << "<!--#status EndPointAliases-->"
+       << PHTML::TableData(PHTML::NoWrap)
+       << "<!--#status Application-->"
+       << PHTML::TableData("align=center")
+       << "<!--#status ActiveCalls-->"
+       << PHTML::TableData()
+       << PHTML::SubmitButton("Unregister", "!--#status EndPointIdentifier--")
+       << "<!--#macroend H323EndPointStatus-->"
+       << PHTML::TableEnd();
+}
+
+
+PBoolean GkStatusPage::OnPostControl(const PStringToString & data, PHTML & msg)
+{
+  bool gotOne = false;
+
+  for (PStringToString::const_iterator it = data.begin(); it != data.end(); ++it) {
+    PString id = it->first;
+    if (it->second == "Unregister" && m_gkServer.ForceUnregister(id)) {
+      msg << PHTML::Heading(2) << "Unregistered " << id << PHTML::Heading(2);
+      gotOne = true;
+    }
+  }
+
+  return gotOne;
+}
+
+
+#endif //OPAL_H323
+
+
+
+#if OPAL_SIP
+
+RegistrarStatusPage::RegistrarStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
+  : BaseStatusPage(mgr, auth, "RegistrarStatus")
+  , m_registrar(*mgr.FindEndPointAs<MySIPEndPoint>(OPAL_PREFIX_SIP))
+{
+}
+
+
+const char * RegistrarStatusPage::GetTitle() const
+{
+  return "OPAL Registrar Status";
+}
+
+
+void RegistrarStatusPage::CreateContent(PHTML & html, const PStringToString &) const
+{
+  html << PHTML::TableStart(PHTML::Border1)
+       << PHTML::TableRow()
+       << PHTML::TableHeader()
+       << PHTML::NonBreakSpace() << "End" << PHTML::NonBreakSpace() << "Point" << PHTML::NonBreakSpace() << "Identifier" << PHTML::NonBreakSpace()
+       << PHTML::TableHeader()
+       << PHTML::NonBreakSpace() << "Call" << PHTML::NonBreakSpace() << "Signal" << PHTML::NonBreakSpace() << "Addresses" << PHTML::NonBreakSpace()
+       << PHTML::TableHeader()
+       << PHTML::NonBreakSpace() << "Application" << PHTML::NonBreakSpace()
+       << PHTML::TableHeader()
+       << PHTML::NonBreakSpace() << "Active" << PHTML::NonBreakSpace() << "Calls" << PHTML::NonBreakSpace()
+       << "<!--#macrostart SIPEndPointStatus-->"
+       << PHTML::TableRow()
+       << PHTML::TableData()
+       << "<!--#status EndPointIdentifier-->"
+       << PHTML::TableData()
+       << "<!--#status CallSignalAddresses-->"
+       << PHTML::TableData(PHTML::NoWrap)
+       << "<!--#status Application-->"
+       << PHTML::TableData("align=center")
+       << "<!--#status ActiveCalls-->"
+       << PHTML::TableData()
+       << PHTML::SubmitButton("Unregister", "!--#status EndPointIdentifier--")
+       << "<!--#macroend SIPEndPointStatus-->"
+       << PHTML::TableEnd();
+}
+
+
+PBoolean RegistrarStatusPage::OnPostControl(const PStringToString & data, PHTML & msg)
+{
+  bool gotOne = false;
+
+  for (PStringToString::const_iterator it = data.begin(); it != data.end(); ++it) {
+    PString aor = it->first;
+    if (it->second == "Unregister" && m_registrar.ForceUnregister(aor)) {
+      msg << PHTML::Heading(2) << "Unregistered " << aor << PHTML::Heading(2);
+      gotOne = true;
+    }
+  }
+
+  return gotOne;
+}
+
+#endif //OPAL_SIP
 
 
 CallStatusPage::CallStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
@@ -340,9 +768,10 @@ void CDRPage::CreateContent(PHTML & html, const PStringToString & query) const
     html << "No records found.";
 }
 
-InvitePage::InvitePage(MyProcess & _app, PHTTPAuthority & auth)
-  : PServiceHTTPString("Invite", "", "text/html; charset=utf-8", auth),
-    app(_app)
+InvitePage::InvitePage(MyProcess & app, PHTTPAuthority & auth)
+  : PServiceHTTPString("Invite", "", "text/html; charset=utf-8", auth)
+  , app(app)
+  , m_authorityInvite(auth)
 {
   PStringStream html_begin, html_end, html_page, meta_page;
   PHTML html;
@@ -386,16 +815,16 @@ void InvitePage::CreateHTML(PHTML & msg)
        << PHTML::Form("POST")
 
        << "<div style='overflow-x:auto;overflow-y:hidden;'>" << PHTML::TableStart()
-         << PHTML::TableRow()
+         << PHTML::TableRow("align='left' style='background-color:#d9e5e3;padding:0px 4px 0px 4px;border-bottom:2px solid white;border-right:2px solid white;'")
           << PHTML::TableHeader()
           << "&nbsp;Room&nbsp;Name&nbsp;"
-          << PHTML::TableData()
-          << PHTML::InputText("room", 40, "TelemedicinaUCV", 40)
-         << PHTML::TableRow()
+          << PHTML::TableData("align='middle' style='background-color:#d9e5e3;padding:0px;border-bottom:2px solid white;border-right:2px solid white;'")
+          << PHTML::InputText("room", 40, "TelemedicinaUCV", "style='margin-top:5px;margin-bottom:5px;padding-left:5px;padding-right:5px;'")
+         << PHTML::TableRow("align='left' style='background-color:#d9e5e3;padding:0px 4px 0px 4px;border-bottom:2px solid white;border-right:2px solid white;'")
           << PHTML::TableHeader()
           << "&nbsp;Address&nbsp;"
-          << PHTML::TableData()
-          << PHTML::InputText("address", 40)
+          << PHTML::TableData("align='middle' style='background-color:#d9e5e3;padding:0px;border-bottom:2px solid white;border-right:2px solid white;'")
+          << PHTML::InputText("address", 40,NULL,"style='margin-top:5px;margin-bottom:5px;padding-left:5px;padding-right:5px;'")
        << PHTML::TableEnd() << "</div>"
        << PHTML::Paragraph()
        << PHTML::SubmitButton("Invite") 
@@ -412,15 +841,15 @@ PBoolean InvitePage::Post(PHTTPRequest & request,
                           const PStringToString & data,
                           PHTML & msg)
 {
-  /*PString room    = data("room");
+  PString room    = data("room");
   PString address = data("address");
-
+  
   if (room.IsEmpty() || address.IsEmpty()) {
    CreateHTML(msg);
    return true; 
   }
   
-  MyProcess::Current().addressBook.push_back(address);
+  //MyProcess::Current().addressBook.push_back(address);
   MyMixerEndPoint & m_mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
   PString token;
   CreateHTML(msg);  
@@ -435,7 +864,7 @@ PBoolean InvitePage::Post(PHTTPRequest & request,
   if (MyProcess::Current().GetManager().SetUpCall("mcu:"+node->GetGUID().AsString(), address, token))
     cout << "Adding" << " new member \"" << address << "\" to conference " << *node << endl;
   else
-    cout << "Could not add" << " new member \"" << address << "\" to conference " << *node << endl;*/
+    cout << "Could not add" << " new member \"" << address << "\" to conference " << *node << endl;
 
   
   return true;
@@ -453,11 +882,6 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
     if(!CheckAuthority(server, *req, connectInfo)) {delete req; return FALSE;}
     delete req;
   }
-
-  /*{ PHTTPRequest * req = CreateRequest(connectInfo.GetURL(), connectInfo.GetMIME(), connectInfo.GetMultipartFormInfo(), server); // check authorization
-    if(!CheckAuthority(server, *req, connectInfo)) {delete req; return FALSE;}
-    delete req;
-  }*/
 
   PStringToString data;
   { PString request=connectInfo.GetURL().AsString(); PINDEX q;
@@ -581,7 +1005,6 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
   server.flush();
   return TRUE;
 }
-
 
 WelcomePage::WelcomePage(MyProcess & app, PHTTPAuthority & auth)
   : PServiceHTTPString("welcome.html", "", "text/html; charset=utf-8", auth)

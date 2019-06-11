@@ -5,6 +5,29 @@
  *
 */
 
+  /*************************************************************************/
+  /*************************************************************************/
+  /*                                                                       */
+  /*                 B A S E   O B J E C T   C L A S S E S                 */
+  /*                                                                       */
+  /*************************************************************************/
+  /*************************************************************************/
+
+  /*************************************************************************/
+  /*                                                                       */
+  /* <Type>                                                                */
+  /*    FT_Face_Internal                                                   */
+  /*                                                                       */
+  /* <Description>                                                         */
+  /*    An opaque handle to an `FT_Face_InternalRec' structure that models */
+  /*    the private data of a given @FT_Face object.                       */
+  /*                                                                       */
+  /*    This structure might change between releases of FreeType~2 and is  */
+  /*    not generally available to client applications.                    */
+  /*                                                                       */
+  /*************************************************************************/
+
+
 #ifndef _MAIN_H
 #define _MAIN_H
 
