@@ -261,12 +261,12 @@ void MyPConfigPage::BuildHTML(PHTML & html, BuildOptions option)
   PStringStream html_begin, html_end, html_page, meta_page;
   html.Set(PHTML::InBody);
   html <<PHTML::Form("POST");
-  html << PHTML::TableStart("cellspacing=8; align='center' style='border:1px solid black;'");
+  html << PHTML::TableStart("style='border:1px solid black;'");
   for (PINDEX fld = 0; fld < m_fields.GetSize(); fld++) {
     PHTTPField & field = m_fields[fld];
     bool isDivider = dynamic_cast<PHTTPDividerField *>(&field) != NULL;
     if (field.NotYetInHTML()) {
-      html <<PHTML::TableRow("align='left' style='background-color:#d9e5e3; padding:0px 4px 0px 4px; border-bottom:1px solid black;'")
+      html <<PHTML::TableRow("style='border-bottom:1px solid black;'")
            << PHTML::TableData("align='middle' style='background-color:#d9e5e3; padding:0px; border-right:1px solid black;'");
       if (isDivider)
         html << PHTML::HRule();

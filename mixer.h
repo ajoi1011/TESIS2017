@@ -60,7 +60,9 @@ class MyMixerEndPoint : public OpalConsoleMixerEndPoint
 
     virtual OpalVideoStreamMixer * CreateVideoMixer(const OpalMixerNodeInfo & info);
 
+    PStringArray GetRoomBook() { return m_roomBook;}
   protected:
+    PStringArray m_roomBook;
 
 };
 

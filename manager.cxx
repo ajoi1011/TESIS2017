@@ -78,8 +78,8 @@ MyManager::MyManager()
   DisableDetectInBandDTMF(true);
 
 #if OPAL_VIDEO
-  /*for (OpalVideoFormat::ContentRole role = OpalVideoFormat::BeginContentRole; role < OpalVideoFormat::EndContentRole; ++role)
-    m_videoInputDevice[role].deviceName = */m_videoPreviewDevice[OpalVideoFormat::eNoRole].deviceName = m_videoOutputDevice[OpalVideoFormat::eNoRole].deviceName = P_NULL_VIDEO_DEVICE;
+  for (OpalVideoFormat::ContentRole role = OpalVideoFormat::BeginContentRole; role < OpalVideoFormat::EndContentRole; ++role)
+    m_videoInputDevice[role].deviceName = m_videoPreviewDevice[role].deviceName = m_videoOutputDevice[role].deviceName = P_NULL_VIDEO_DEVICE;
   
   PStringArray devices = PVideoOutputDevice::GetDriversDeviceNames("*"); // Get all devices on all drivers
   PINDEX i;
@@ -98,6 +98,11 @@ MyManager::MyManager()
 
 MyManager::~MyManager()
 {
+}
+
+void MyManager::EndRun(bool)
+{
+  PServiceProcess::Current().OnStop();
 }
 
 void MyManager::PrintVersion() const 
@@ -134,9 +139,9 @@ bool MyManager::Initialise(PArgList & args, bool verbose, const PString & defaul
      return false;
    }
   }
-
+  
   cout << "Rutas predefinidas: " << GetRouteTable() << endl;
-
+  //addressBook.push_back("pc:");
   return true;
 
 }
@@ -213,6 +218,53 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
     }
   }
 #endif // OPAL_PTLIB_NAT
+
+#if OPAL_VIDEO
+  {
+    unsigned prefWidth = 0, prefHeight = 0;
+    PVideoFrameInfo::ParseSize(rsrc->AddStringField("ConfVideoManagerKey", 10,"CIF",
+      "Manager video frame resolution"), prefWidth, prefHeight); 
+
+    if (m_verbose)
+      cout << "Preferred video size: " << PVideoFrameInfo::AsString(prefWidth, prefHeight) << '\n';
+
+    unsigned maxWidth = 0, maxHeight = 0;
+    PVideoFrameInfo::ParseSize(rsrc->AddStringField("ConfVideoMaxManagerKey", 10,"HD1080",
+      "Manager video max frame resolution"), maxWidth, maxHeight); 
+    if (m_verbose)
+      cout << "Maximum video size: " << PVideoFrameInfo::AsString(maxWidth, maxHeight) << '\n';
+
+    double rate = rsrc->AddIntegerField("Ratekey", 1, 60, 15, "", "Video frame rate parameter");
+    if (rate < 1 || rate > 60) {
+      cout << "Invalid video frame rate parameter." << endl;
+    }
+    if (m_verbose)
+      cout << "Video frame rate: " << rate << " fps\n";
+
+    unsigned frameTime = (unsigned)(OpalMediaFormat::VideoClockRate/rate);
+    OpalBandwidth bitrate(rsrc->AddStringField("BitRateManagerKey", 10,"1Mbps",
+      "Manager bitrate"));
+    if (bitrate < 10000) {
+      cout << "Invalid video bit rate parameter." << endl;
+    }
+    if (m_verbose)
+      cout << "Video target bit rate: " << bitrate << '\n';
+
+    OpalMediaFormatList formats = OpalMediaFormat::GetAllRegisteredMediaFormats();
+    for (OpalMediaFormatList::iterator it = formats.begin(); it != formats.end(); ++it) {
+      if (it->GetMediaType() == OpalMediaType::Video()) {
+        OpalMediaFormat format = *it;
+        format.SetOptionInteger(OpalVideoFormat::FrameWidthOption(), prefWidth);
+        format.SetOptionInteger(OpalVideoFormat::FrameHeightOption(), prefHeight);
+        format.SetOptionInteger(OpalVideoFormat::MaxRxFrameWidthOption(), maxWidth);
+        format.SetOptionInteger(OpalVideoFormat::MaxRxFrameHeightOption(), maxHeight);
+        format.SetOptionInteger(OpalVideoFormat::FrameTimeOption(), frameTime);
+        format.SetOptionInteger(OpalVideoFormat::TargetBitRateOption(), bitrate);
+        OpalMediaFormat::SetRegisteredMediaFormat(format);
+      }
+    }
+  }
+#endif
 
   {
     OpalMediaFormatList allFormats;
@@ -307,6 +359,64 @@ bool MyManager::ConfigureCommon(OpalEndPoint * ep,
   return true;
 }
 
+bool MyManager::OnChangedPresentationRole(OpalConnection & connection, const PString & newChairURI, bool request)
+{
+  PStringStream output;
+  //if(m_verbose)
+  output << '\n' << connection.GetCall().GetToken() << ": presentation role token now owned by ";
+  if (newChairURI.IsEmpty())
+    output << "nobody";
+  else if (newChairURI == connection.GetLocalPartyURL())
+    output << "local user";
+  else
+    output << '"' << newChairURI << '"';
+  output << '.';
+  cout << output << endl;
+
+  return OpalManager::OnChangedPresentationRole(connection, newChairURI, request);
+}
+
+struct OpalCmdPresentationToken
+{
+  P_DECLARE_STREAMABLE_ENUM(Cmd, request, release);
+};
+
+void MyManager::CmdPresentationToken()
+{
+  /*PSafePtr<OpalRTPConnection> connection;
+  if (GetConnectionFromArgs(args, connection)) {
+    if (args.GetCount() == 0)
+      args.GetContext() << "Presentation token is " << (connection->HasPresentationRole() ? "acquired." : "released.") << endl;
+    else {
+      switch (OpalCmdPresentationToken::CmdFromString(args[0], false)) {
+        case OpalCmdPresentationToken::request :
+          if (connection->HasPresentationRole())
+            args.GetContext() << "Presentation token is already acquired." << endl;
+          else if (connection->RequestPresentationRole(false))
+            args.GetContext() << "Presentation token requested." << endl;
+          else
+            args.WriteError("Presentation token not supported by remote.");
+          break;
+
+        case OpalCmdPresentationToken::release :
+          if (!connection->HasPresentationRole())
+            args.GetContext() << "Presentation token is already released." << endl;
+          else if (connection->RequestPresentationRole(true))
+            args.GetContext() << "Presentation token released." << endl;
+          else
+            args.WriteError("Presentation token release failed.");
+          break;
+
+        default :
+          args.WriteUsage();
+      }
+    }
+  }*/
+}
+
+void MyManager::StartRecordingCall(MyCall & call) const
+{
+}
 
 void MyManager::OnStartMediaPatch(OpalConnection & connection, OpalMediaPatch & patch)
 {

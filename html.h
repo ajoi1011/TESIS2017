@@ -177,10 +177,11 @@ class InvitePage : public PServiceHTTPString
       const PStringToString & data, // Variables in the POST data.
       PHTML & replyMessage          // Reply message for post.
     );
+    PBoolean OnGET (PHTTPServer & server, const PHTTPConnectionInfo & connectInfo);
     void CreateHTML(PHTML & html);
   private:
     MyProcess & app;
-    PHTTPAuthority & m_authorityInvite;
+    
     
     
 };

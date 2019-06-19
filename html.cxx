@@ -771,102 +771,119 @@ void CDRPage::CreateContent(PHTML & html, const PStringToString & query) const
 InvitePage::InvitePage(MyProcess & app, PHTTPAuthority & auth)
   : PServiceHTTPString("Invite", "", "text/html; charset=utf-8", auth)
   , app(app)
-  , m_authorityInvite(auth)
 {
-  PStringStream html_begin, html_end, html_page, meta_page;
+}
+
+PBoolean InvitePage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo & connectInfo)
+{
+  { PHTTPRequest * req = CreateRequest(server, connectInfo); // check authorization
+    if(!CheckAuthority(server, *req, connectInfo)) {delete req; return FALSE;}
+    delete req;
+  }
+
+  PStringToString data;
+  { PString request=connectInfo.GetURL().AsString(); PINDEX q;
+    if((q=request.Find("?"))!=P_MAX_INDEX) { request=request.Mid(q+1,P_MAX_INDEX); PURL::SplitQueryVars(request,data); }
+  }
+
   PHTML html;
-  html.Set(PHTML::InBody);
- 
-  html << PHTML::Paragraph() << "<center>"
-
-       << PHTML::Form("POST")
-
+  CreateHTML(html);
+       
+  
+  { PStringStream message; PTime now; message
+      << "HTTP/1.1 200 OK\r\n"
+      << "Date: " << now.AsString(PTime::RFC1123, PTime::GMT) << "\r\n"
+      << "Server: OpalServer\r\n"
+      << "MIME-Version: 1.0\r\n"
+      << "Cache-Control: no-cache, must-revalidate\r\n"
+      << "Expires: Sat, 26 Jul 1997 05:00:00 GMT\r\n"
+      << "Content-Type: text/html;charset=utf-8\r\n"
+      << "Content-Length: " << html.GetLength() << "\r\n"
+      << "Connection: Close\r\n"
+      << "\r\n";  //that's the last time we need to type \r\n instead of just \n
+    server.Write((const char*)message,message.GetLength());
+  }
+  server.Write((const char*)html,html.GetLength());
+  server.flush();
+  return true;
+}
+void InvitePage::CreateHTML(PHTML & html)
+{
+  PStringStream meta_page;
+  PStringArray myAddressBook = MyProcess::Current().GetManager().GetAddressBook();
+  MyMixerEndPoint & mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
+  
+  PHTML html_page;
+  BeginPage(html_page,meta_page,"Invite","window.l_invite","window.l_info_invite");
+  html_page.Set(PHTML::InBody);
+  
+  html_page << PHTML::Paragraph() << "<center>"
+       
+       << PHTML::Form("POST") 
+       << "<b>Room Name</b>" << PHTML::Select("room");
+ for (PSafePtr<OpalMixerNode> node = mixer.GetFirstNode(PSafeReadOnly); node != NULL; ++node)
+   html_page << PHTML::Option(node != NULL ? PHTML::Selected : PHTML::NotSelected)
+        << PHTML::Escaped(node->GetNodeInfo().m_name);
+  html_page << PHTML::Select()
        << PHTML::TableStart()
          << PHTML::TableRow("align='left' style='background-color:#d9e5e3;padding:0px 4px 0px 4px;border-bottom:2px solid white;border-right:2px solid white;'")
           << PHTML::TableHeader()
-          << "&nbsp;Room&nbsp;Name&nbsp;"
-          << PHTML::TableData("align='middle' style='background-color:#d9e5e3;padding:0px;border-bottom:2px solid white;border-right:2px solid white;'")
-          << PHTML::InputText("room", 40, "TelemedicinaUCV", "style='margin-top:5px;margin-bottom:5px;padding-left:5px;padding-right:5px;'")
-         << PHTML::TableRow("align='left' style='background-color:#d9e5e3;padding:0px 4px 0px 4px;border-bottom:2px solid white;border-right:2px solid white;'")
-          << PHTML::TableHeader()
           << "&nbsp;Address&nbsp;"
           << PHTML::TableData("align='middle' style='background-color:#d9e5e3;padding:0px;border-bottom:2px solid white;border-right:2px solid white;'")
           << PHTML::InputText("address", 40,NULL,"style='margin-top:5px;margin-bottom:5px;padding-left:5px;padding-right:5px;'")
+          << "<b>Registro de llamadas</b>" << PHTML::Select("book");
+ for (PINDEX i = 0; i < myAddressBook.GetSize(); i++)
+   html_page << PHTML::Option(i != 0 ? PHTML::Selected : PHTML::NotSelected)
+        << PHTML::Escaped(myAddressBook[i]);
+   html_page << PHTML::Select()
        << PHTML::TableEnd() 
        << PHTML::Paragraph()
        << PHTML::SubmitButton("Invite") 
-       << PHTML::Form()
+       << PHTML::Form() 
        << PHTML::HRule();
-  BeginPage(html_begin,meta_page,"Invite","window.l_invite","window.l_info_invite");
-  EndPage(html_end,MyProcess::Current().GetHtmlCopyright());
-  html_page << html_begin << html << html_end;
-  m_string = html_page;
-
-}
-
-void InvitePage::CreateHTML(PHTML & msg)
-{
-  PStringStream html_begin, html_end, html_page, meta_page;
-  PHTML html;
-  html.Set(PHTML::InBody);
- 
-  html << PHTML::Paragraph() << "<center>"
-
-       << PHTML::Form("POST")
-
-       << "<div style='overflow-x:auto;overflow-y:hidden;'>" << PHTML::TableStart()
-         << PHTML::TableRow("align='left' style='background-color:#d9e5e3;padding:0px 4px 0px 4px;border-bottom:2px solid white;border-right:2px solid white;'")
-          << PHTML::TableHeader()
-          << "&nbsp;Room&nbsp;Name&nbsp;"
-          << PHTML::TableData("align='middle' style='background-color:#d9e5e3;padding:0px;border-bottom:2px solid white;border-right:2px solid white;'")
-          << PHTML::InputText("room", 40, "TelemedicinaUCV", "style='margin-top:5px;margin-bottom:5px;padding-left:5px;padding-right:5px;'")
-         << PHTML::TableRow("align='left' style='background-color:#d9e5e3;padding:0px 4px 0px 4px;border-bottom:2px solid white;border-right:2px solid white;'")
-          << PHTML::TableHeader()
-          << "&nbsp;Address&nbsp;"
-          << PHTML::TableData("align='middle' style='background-color:#d9e5e3;padding:0px;border-bottom:2px solid white;border-right:2px solid white;'")
-          << PHTML::InputText("address", 40,NULL,"style='margin-top:5px;margin-bottom:5px;padding-left:5px;padding-right:5px;'")
-       << PHTML::TableEnd() << "</div>"
-       << PHTML::Paragraph()
-       << PHTML::SubmitButton("Invite") 
-       << PHTML::Form()
-       << PHTML::HRule();
-  BeginPage(html_begin,meta_page,"Invite","window.l_invite","window.l_info_invite");
-  EndPage(html_end,MyProcess::Current().GetHtmlCopyright());
-  html_page << html_begin << html << html_end;
-  msg = html_page;
-
+  
+  EndPage(html_page,MyProcess::Current().GetHtmlCopyright());
+  html = html_page;
 }
 
 PBoolean InvitePage::Post(PHTTPRequest & request,
                           const PStringToString & data,
                           PHTML & msg)
 {
+  PStringStream meta_page;
   PString room    = data("room");
   PString address = data("address");
-  
-  if (room.IsEmpty() || address.IsEmpty()) {
-   CreateHTML(msg);
-   return true; 
-  }
-  
-  //MyProcess::Current().addressBook.push_back(address);
-  MyMixerEndPoint & m_mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
-  PString token;
-  CreateHTML(msg);  
+  PString book    = data("book");
 
+  MyMixerEndPoint & m_mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
+  PStringArray addressBook = MyProcess::Current().GetManager().GetAddressBook();
+  PString token;
+
+  if(address.IsEmpty() || room.IsEmpty()){
+    BeginPage(msg,meta_page,"Invite","window.l_invite","window.l_info_invite");
+    msg.Set(PHTML::InBody);
+    msg << "<b>Invitacion fallida, no existe sala de conferencia o direccion de remoto</b>"
+        << PHTML::Paragraph()
+        << PHTML::HotLink(request.url.AsString()) << "Reload page" << PHTML::HotLink();
+    EndPage(msg,MyProcess::Current().GetHtmlCopyright());
+    return true;
+  }
+  else {
+   MyProcess::Current().GetManager().GetAddressBook().push_back(address);
+  }
   
   PSafePtr<OpalMixerNode> node = m_mixer.FindNode(room);
   if (node == NULL) {
     cout << "Conference \"" << room << "\" does not exist" << endl;
-    return true;
   }
-
-  if (MyProcess::Current().GetManager().SetUpCall("mcu:"+node->GetGUID().AsString(), address, token))
-    cout << "Adding" << " new member \"" << address << "\" to conference " << *node << endl;
-  else
-    cout << "Could not add" << " new member \"" << address << "\" to conference " << *node << endl;
-
   
+  if (MyProcess::Current().GetManager().SetUpCall("mcu:"+node->GetGUID().AsString(), address, token))
+    cout << "Adding new member \"" << address << "\" to conference " << *node << endl;
+  else
+    cout << "Could not add new member \"" << address << "\" to conference " << *node << endl;
+  
+  CreateHTML(msg);
+    
   return true;
 }
 
@@ -891,7 +908,6 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
   MyMixerEndPoint & m_mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
   MyManager & manager = MyProcess::Current().GetManager();
  
-  
   PWaitAndSignal m(html_mutex);
   if(data.Contains("action") && !data("room").IsEmpty())
   {
@@ -908,9 +924,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
        OpalMixerNodeInfo * info = new OpalMixerNodeInfo();
        info->m_name = room;
        PSafePtr<OpalMixerNode> node = m_mixer.AddNode(info);
-       if (!node->AddName(room))
-        cout << "Could not add conference alias \"" << room << '"' << endl;
-       cout << "Added conference " << *node << endl;   
+       cout << "Added conference " << *node << endl; 
       }
     
     }
@@ -923,9 +937,8 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
       }
       else {
       m_mixer.RemoveNode(*node);
-      cout << "Removed conference " << *node << endl;
+      cout << "Removed conference \"" << room << "\" " << *node << endl;
       }
-
     }
   }
   
@@ -936,7 +949,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
 
   if(data.Contains("action")) html << "<script language='javascript'>location.href='Select';</script>";
 
-  PString nextRoom;
+  PString nextRoom = "OpalServer";
 
   html
     << "<form method=\"post\" onsubmit=\"javascript:{if(document.getElementById('newroom').value!='')location.href='?action=create&room='+encodeURIComponent(document.getElementById('newroom').value);return false;}\"><input name='room' id='room' type=hidden>"
@@ -948,43 +961,24 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
 
     << "<tr>"
     << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_enter);</script><br></th>"
-    << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_record);</script><br></th>"
-    << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_moderated);</script><br></th>"
     << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_visible);</script><br></th>"
+    //<< "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_record);</script><br></th>"
     << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_delete);</script><br></th>"
     << "</tr>"
   ;
-  
-    for (PSafePtr<OpalMixerNode> node = m_mixer.GetFirstNode(PSafeReadOnly); node != NULL; ++node) 
-    {
-      
-      //PString roomNumber = "casa";
-      //BOOL controlled = TRUE;
-      //BOOL moderated=FALSE; PString charModerated = "-";
-      /*if(controlled) { charModerated = MyProcess::Current().GetManager().IsModerated(); moderated=(charModerated=="+"); }
-      if(charModerated=="-") charModerated = "<script type=\"text/javascript\">document.write(window.l_select_moderated_no);</script>";
-      else charModerated = "<script type=\"text/javascript\">document.write(window.l_select_moderated_yes);</script>";*/
-      //PINDEX   visibleMemberCount = 1;
-      //PINDEX unvisibleMemberCount = 2;*/
-
-      /*PString roomButton = "<span class=\"btn btn-large btn-";
-      if(moderated) roomButton+="success";
-      else if(controlled) roomButton+="primary";
-      else roomButton+="inverse";
-      roomButton += "\"";
-      if(controlled) roomButton+=" onclick='document.forms[0].submit();'";
-      roomButton += "></span>";*/
     
+    for (PSafePtr<OpalMixerNode> node = m_mixer.GetFirstNode(PSafeReadOnly); node != NULL; ++node){
+      
       html << "<tr>"
         << "<td style='text-align:left'><a href='Invite'>"+  node->GetNodeInfo().m_name  +"</a></td>"
-        //<< "<td style='text-align:center'>" << recordButton                            << "</td>"
-        //<< "<td style='text-align:center'>" << charModerated                         << "</td>"
-        //<< "<td style='text-align:right'>"  << visibleMemberCount                    << "</td>"
-        << "<td style='text-align:center'><span class=\"btn btn-large btn-danger\" onclick=\"if(confirm('Вы уверены? Are you sure?')){ location.href='?action=delete&room="+node->GetNodeInfo().m_name+"';}\">X</td>"
+        << "<td style='text-align:right'>";
+      for (PSafePtr<OpalConnection> connection = node->GetFirstConnection(); connection != NULL; ++connection) {
+      html <<  connection->GetCall().GetPartyB() << '\n'; }
+      html << "</td>"
+      //<< "<td style='text-align:center'>" << recordButton                            << "</td>"
+      << "<td style='text-align:center'><span class=\"btn btn-large btn-danger\" onclick=\"if(confirm('Вы уверены? Are you sure?')){ location.href='?action=delete&room="+node->GetNodeInfo().m_name+"';}\">X</td>"
         << "</tr>";
     }
- 
-
   html << "</table></form>";
        
   EndPage(html,MyProcess::Current().GetHtmlCopyright());

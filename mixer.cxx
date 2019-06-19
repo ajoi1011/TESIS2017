@@ -10,6 +10,7 @@
 MyMixerEndPoint::MyMixerEndPoint(MyManager & manager)
   : OpalConsoleMixerEndPoint(manager)
 {
+  m_roomBook.push_back("OPALSERVER");
 }
 
 bool MyMixerEndPoint::Initialise(PArgList & args, bool verbose, const PString &)
@@ -65,7 +66,7 @@ OpalMixerConnection * MyMixerEndPoint::CreateConnection(PSafePtr<OpalMixerNode> 
 
 OpalMixerNode * MyMixerEndPoint::CreateNode(OpalMixerNodeInfo * info)
 {
-  cout << "Created new conference \"" << info->m_name << '"';
+  cout << "Created new conference \"" << info->m_name << '"' << endl;
 
   return OpalMixerEndPoint::CreateNode(info);
 }

@@ -26,6 +26,8 @@ class MyManager : public MyManagerParent
 
     ~MyManager();
 
+    virtual void EndRun(bool interrupt);
+
     virtual void PrintVersion() const ;
 
     virtual bool PreInitialise(PArgList & args, bool verbose = false);
@@ -57,6 +59,12 @@ class MyManager : public MyManagerParent
     
     bool FindCDR(const PString & guid, MyCallDetailRecord & cdr);
 
+    virtual bool OnChangedPresentationRole(OpalConnection & connection, const PString & newChairURI, bool request);
+   
+    void CmdPresentationToken();
+
+    void StartRecordingCall(MyCall & call) const;
+
 #if OPAL_SIP && OPAL_H323
     void OnChangedRegistrarAoR(const PURL & aor, bool registering);
 #endif
@@ -79,13 +87,20 @@ class MyManager : public MyManagerParent
     MyMixerEndPoint & GetMixerEndPoint() const ;
 #endif
 
- 
+    PStringArray GetAddressBook() { return addressBook; }
+
   protected:
     OpalConsoleEndPoint * GetConsoleEndPoint(const PString & prefix);
     OpalProductInfo   m_savedProductInfo;
     unsigned          m_maxCalls;
     MediaTransferMode m_mediaTransferMode;
     PBoolean          m_verbose;
+#if OPAL_HAS_MIXER
+    bool                       m_recordingEnabled;
+    PString                    m_recordingTemplate;
+    OpalRecordManager::Options m_recordingOptions;
+#endif
+    PStringArray addressBook;
 
     CDRList   m_cdrList;
     size_t    m_cdrListMax;
