@@ -26,11 +26,11 @@ static const PConstString ProductVersionKey("Version");
 static const PConstString MaxSimultaneousCallsKey("N° Llamadas");
 static const PConstString MediaTransferModeKey("Transferencia de Media");
 static const PConstString AutoStartKeyPrefix("Auto Start");
-static const PConstString PreferredMediaKey("Preferred Media");
-static const PConstString RemovedMediaKey("Removed Media");
+static const PConstString PreferredMediaKey("Codecs Preferidos");
+static const PConstString RemovedMediaKey("Codecs Removidos");
 static const PConstString MinJitterKey("Mínimo Jitter");
 static const PConstString MaxJitterKey("Máximo Jitter");
-static const PConstString InBandDTMFKey("Deshabilita In-DTMF");
+static const PConstString InBandDTMFKey("Deshabilitar In-DTMF");
 static const PConstString NoMediaTimeoutKey("Timeout RX Media");
 static const PConstString TxMediaTimeoutKey("Timeout TX Media");
 static const PConstString TCPPortBaseKey("Puerto TCP Base");
@@ -44,6 +44,12 @@ static const PConstString RTPTOSKey("Tipo de Servicio RTP");
 static const PConstString NATActiveKey("Activo");
 static const PConstString NATServerKey("Servidor");
 static const PConstString NATInterfaceKey("Interfaz");
+#endif
+#if OPAL_VIDEO
+static const PConstString ConfVideoManagerKey("Resolución de Video");
+static const PConstString ConfVideoMaxManagerKey("Resolución max de Video");
+static const PConstString FrameRateManagerKey("Video Frame Rate");
+static const PConstString BitRateManagerKey("Video Bit Rate");
 #endif
 #if OPAL_HAS_MIXER
 static const PConstString ConfAudioOnlyKey("Conference Audio Only");

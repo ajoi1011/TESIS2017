@@ -102,8 +102,8 @@ class MyManager : public OpalManagerConsole                              //
     virtual OpalConsoleMixerEndPoint * CreateMixerEndPoint();            //
     MyMixerEndPoint & GetMixerEndPoint() const ;                         //
 #endif                                                                   //
-    PStringArray GetAddressBook() { return m_addressBook; }              //
     //@}                                                                 //
+    PStringArray GetAddressBook() { return m_addressBook; }              //
                                                                          //
   protected:                                                             //
     OpalConsoleEndPoint * GetConsoleEndPoint(const PString & prefix);    //

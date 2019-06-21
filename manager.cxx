@@ -194,6 +194,23 @@ void MyManager::OnStopMediaPatch(OpalConnection & connection, OpalMediaPatch & p
   OpalManager::OnStopMediaPatch(connection, patch);
 }
 
+bool MyManager::OnChangedPresentationRole(OpalConnection & connection, const PString & newChairURI, bool request)
+{
+  PStringStream output;
+  if(m_verbose)
+    output << '\n' << connection.GetCall().GetToken() << ": token de rol de presentation adquirido ahora por ";
+  if (newChairURI.IsEmpty())
+    output << "nadie";
+  else if (newChairURI == connection.GetLocalPartyURL())
+    output << "usuario local";
+  else
+    output << '"' << newChairURI << '"';
+  output << '.';
+  cout << output << endl;
+
+  return OpalManager::OnChangedPresentationRole(connection, newChairURI, request);
+}
+
 bool MyManager::PreInitialise(PArgList & args, bool verbose)
 {
   PrintVersion();
@@ -285,7 +302,7 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
 
     for (std::set<NATInfo>::iterator it = natInfo.begin(); it != natInfo.end(); ++it) {
       PHTTPCompositeField * fields = new PHTTPCompositeField("NAT\\" + it->m_method, it->m_method,
-                   "Enable flag and Server IP/hostname for NAT traversal using " + it->m_friendly);
+                   "Habilitar flag y Servidor IP/hostname para NAT traversal usando " + it->m_friendly);
       fields->Append(new PHTTPBooleanField(NATActiveKey, it->m_active));
       fields->Append(new PHTTPStringField(NATServerKey, 0, 0, it->m_server, NULL, 1, 15));
       fields->Append(new PHTTPStringField(NATInterfaceKey, 0, 0, it->m_interface, NULL, 1, 15));
@@ -299,30 +316,28 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
 #if OPAL_VIDEO
   {
     unsigned prefWidth = 0, prefHeight = 0;
-    PVideoFrameInfo::ParseSize(rsrc->AddStringField("ConfVideoManagerKey", 10,"CIF",
-                                                    "Manager video frame resolution"), prefWidth, prefHeight); 
-
+    PVideoFrameInfo::ParseSize(rsrc->AddStringField(ConfVideoManagerKey, 30,"CIF",
+                                                    "Resolución de video preferida del manager."), prefWidth, prefHeight); 
     if (m_verbose)
-      cout << "Tamaño de video preferido: " << PVideoFrameInfo::AsString(prefWidth, prefHeight) << '\n';
+      cout << "Resolución de video preferida: " << PVideoFrameInfo::AsString(prefWidth, prefHeight) << endl;
 
     unsigned maxWidth = 0, maxHeight = 0;
-    PVideoFrameInfo::ParseSize(rsrc->AddStringField("ConfVideoMaxManagerKey", 10,"HD1080",
-      "Manager video max frame resolution"), maxWidth, maxHeight); 
+    PVideoFrameInfo::ParseSize(rsrc->AddStringField(ConfVideoMaxManagerKey, 30,"HD1080",
+                                                    "Resolución de video máxima del manager"), maxWidth, maxHeight); 
     if (m_verbose)
-      cout << "Maximum video size: " << PVideoFrameInfo::AsString(maxWidth, maxHeight) << '\n';
+      cout << "Resolución de video máxima: " << PVideoFrameInfo::AsString(maxWidth, maxHeight) << endl;
 
-    double rate = rsrc->AddIntegerField("Ratekey", 1, 60, 15, "", "Video frame rate parameter");
+    double rate = rsrc->AddIntegerField(FrameRateManagerKey, 1, 60, 15, "", "Video Frame Rate");
     if (rate < 1 || rate > 60) {
-      cout << "Invalid video frame rate parameter." << endl;
+      cout << "Inválido video frame rate." << endl;
     }
     if (m_verbose)
       cout << "Video frame rate: " << rate << " fps\n";
 
     unsigned frameTime = (unsigned)(OpalMediaFormat::VideoClockRate/rate);
-    OpalBandwidth bitrate(rsrc->AddStringField("BitRateManagerKey", 10,"1Mbps",
-      "Manager bitrate"));
+    OpalBandwidth bitrate(rsrc->AddStringField(BitRateManagerKey, 30,"1Mbps", "Video Bit Rate"));
     if (bitrate < 10000) {
-      cout << "Invalid video bit rate parameter." << endl;
+      cout << "Inválido video bit rate." << endl;
     }
     if (m_verbose)
       cout << "Video target bit rate: " << bitrate << '\n';
@@ -354,44 +369,34 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
         transportableFormats += *it;
     }
     PStringStream help;
-    help << "Preference order for codecs to be offered to remotes.<p>"
-      "Note, these are not regular expressions, just simple "
-      "wildcards where '*' matches any number of characters.<p>"
-      "Known media formats are:<br>";
+    help << "Orden de codecs preferidos para ofrecer a terminales remotos.<p>"
+      "Formatos de codecs:<br>";
     for (OpalMediaFormatList::iterator it = transportableFormats.begin(); it != transportableFormats.end(); ++it) {
       if (it != transportableFormats.begin())
         help << ", ";
       help << *it;
     }
-    SetMediaFormatOrder(rsrc->AddStringArrayField("PreferredMediaKey", true, 25, GetMediaFormatOrder(), help));
+    SetMediaFormatOrder(rsrc->AddStringArrayField(PreferredMediaKey, true, 15, GetMediaFormatOrder(), help));
   }
 
-  SetMediaFormatMask(rsrc->AddStringArrayField("RemovedMediaKey", true, 25, GetMediaFormatMask(),
-    "Codecs to be prevented from being used.<p>"
-    "These are wildcards as in the above Preferred Media, with "
-    "the addition of preceding the expression with a '!' which "
-    "removes all formats <i>except</i> the indicated wildcard. "
-    "Also, the '@' character may also be used to indicate a "
-    "media type, e.g. <code>@video</code> removes all video "
-    "codecs."));
-
+  SetMediaFormatMask(rsrc->AddStringArrayField(RemovedMediaKey, true, 15, GetMediaFormatMask(), "Codecs no usados o removidos."));
 
 #if OPAL_H323
   PSYSTEMLOG(Info, "Configuring H.323");
   if (!GetH323EndPoint().Configure(cfg, rsrc))
-   return false;
+    return false;
 #endif // OPAL_H323
 
 #if OPAL_SIP
   PSYSTEMLOG(Info, "Configuring SIP");
   if (!GetSIPEndPoint().Configure(cfg, rsrc))
-   return false;
+    return false;
 #endif // OPAL_SIP
 
 #if OPAL_HAS_MIXER
   PSYSTEMLOG(Info, "Configuring Mixer");
   if (!GetMixerEndPoint().Configure(cfg, rsrc))
-   return false;
+    return false;
 #endif // OPAL_HAS_MIXER
   
   return ConfigureCDR(cfg, rsrc);
@@ -407,54 +412,39 @@ bool MyManager::ConfigureCommon(OpalEndPoint * ep,
   bool enabled = rsrc->AddBooleanField(cfgPrefix & "Enabled", true);
   
   if (cfgPrefix == "H.323" && enabled) { 
-   PString defaultH323Interfaces = "*:1720";
+    PString defaultH323Interfaces = "*:1720";
     if (!ep->StartListeners(defaultH323Interfaces)) {
-     if (m_verbose)
-      cout <<"No se pudo abrir listeners para " << defaultH323Interfaces << endl;
-     return false;
-     }
+      if (m_verbose)
+        cout << "No se pudo abrir listeners para " << defaultH323Interfaces << endl;
+      return false;
+    }
     else if (m_verbose)
-     cout  <<"Listeners " << cfgPrefix << ':' << ep->GetListeners() << endl;
+      cout  << "Listeners " << cfgPrefix << ':' << ep->GetListeners() << endl;
   }
   else if (cfgPrefix == "SIP" && enabled) { 
-   PString defaultSIPInterfaces = "*:5060";
+    PString defaultSIPInterfaces = "*:5060";
     if (!ep->StartListeners(defaultSIPInterfaces)) {
-     if (m_verbose)
-      cout <<"No se pudo abrir listeners para " << defaultSIPInterfaces << endl;
-     return false;
-     }
+      if (m_verbose)
+        cout << "No se pudo abrir listeners para " << defaultSIPInterfaces << endl;
+        return false;
+    }
     else if (m_verbose)
-     cout  <<"Listeners " << cfgPrefix << ':' << ep->GetListeners() << endl;
+      cout  << "Listeners " << cfgPrefix << ':' << ep->GetListeners() << endl;
   }
   else if (!enabled) {
-   PSYSTEMLOG(Info, "Disabled " << cfgPrefix);
-   ep->RemoveListener(NULL);
-   if (m_verbose)
-    cout << "Disable " << cfgPrefix << endl;
+    PSYSTEMLOG(Info, "Disabled " << cfgPrefix);
+    ep->RemoveListener(NULL);
+    if (m_verbose)
+      cout << "Disable " << cfgPrefix << endl;
   }
   
   return true;
 }
 
-bool MyManager::OnChangedPresentationRole(OpalConnection & connection, const PString & newChairURI, bool request)
+MyManager::CDRList::const_iterator MyManager::BeginCDR()
 {
-  PStringStream output;
-  //if(m_verbose)
-  output << '\n' << connection.GetCall().GetToken() << ": presentation role token now owned by ";
-  if (newChairURI.IsEmpty())
-    output << "nobody";
-  else if (newChairURI == connection.GetLocalPartyURL())
-    output << "local user";
-  else
-    output << '"' << newChairURI << '"';
-  output << '.';
-  cout << output << endl;
-
-  return OpalManager::OnChangedPresentationRole(connection, newChairURI, request);
-}
-
-void MyManager::StartRecordingCall(MyCall & call) const
-{
+  m_cdrMutex.Wait();
+  return m_cdrList.begin();
 }
 
 bool MyManager::FindCDR(const PString & guid, MyCallDetailRecord & cdr)
@@ -471,12 +461,6 @@ bool MyManager::FindCDR(const PString & guid, MyCallDetailRecord & cdr)
   return false;
 }
 
-MyManager::CDRList::const_iterator MyManager::BeginCDR()
-{
-  m_cdrMutex.Wait();
-  return m_cdrList.begin();
-}
-
 bool MyManager::NotEndCDR(const CDRList::const_iterator & it)
 {
   if (it != m_cdrList.end())
@@ -484,6 +468,11 @@ bool MyManager::NotEndCDR(const CDRList::const_iterator & it)
 
   m_cdrMutex.Signal();
   return false;
+}
+
+void MyManager::StartRecordingCall(MyCall & call) const
+{
+  // A Implementar
 }
 
 void MyManager::OnChangedRegistrarAoR(const PURL & aor, bool registering)
@@ -570,5 +559,4 @@ OpalConsoleEndPoint * MyManager::GetConsoleEndPoint(const PString & prefix)
 
   return dynamic_cast<OpalConsoleEndPoint *>(ep);
 }
-
-
+//Final del Archivo/////////////////////////////////////////////////////////////////////////////////////////////////////
