@@ -1,15 +1,10 @@
-/*
- * manager.cxx
- *
- * Project manager class
- *
- */
 
+#include "config.h"
 #include "call.h"
 #include "h323.h"
-#include "sip.h"
 #include "manager.h"
 #include "mixer.h"
+#include "sip.h"
 
 #if OPAL_PTLIB_NAT
 struct NATInfo {
@@ -31,8 +26,10 @@ struct NATInfo {
 #endif // OPAL_PTLIB_NAT
 
 #if OPAL_SIP
-
-void ExpandWildcards(const PStringArray & input, const PString & defaultServer, PStringArray & names, PStringArray & servers)
+void ExpandWildcards(const PStringArray & input, 
+                     const PString & defaultServer, 
+                     PStringArray & names, 
+                     PStringArray & servers)
 {
   for (PINDEX i = 0; i < input.GetSize(); ++i) {
     PString str = input[i];
@@ -63,7 +60,6 @@ void ExpandWildcards(const PStringArray & input, const PString & defaultServer, 
     }
   }
 }
-
 #endif // OPAL_SIP
 
 MyManager::MyManager()
@@ -74,21 +70,21 @@ MyManager::MyManager()
   , m_verbose(false)
   , m_cdrListMax(100)
 {
-  OpalMediaFormat::RegisterKnownMediaFormats(); // Make sure codecs are loaded
+  OpalMediaFormat::RegisterKnownMediaFormats(); 
   DisableDetectInBandDTMF(true);
 
 #if OPAL_VIDEO
   for (OpalVideoFormat::ContentRole role = OpalVideoFormat::BeginContentRole; role < OpalVideoFormat::EndContentRole; ++role)
     m_videoInputDevice[role].deviceName = m_videoPreviewDevice[role].deviceName = m_videoOutputDevice[role].deviceName = P_NULL_VIDEO_DEVICE;
   
-  PStringArray devices = PVideoOutputDevice::GetDriversDeviceNames("*"); // Get all devices on all drivers
+  PStringArray devices = PVideoOutputDevice::GetDriversDeviceNames("*");
   PINDEX i;
   for (i = 0; i < devices.GetSize(); ++i) {
     PCaselessString dev = devices[i];
     if (dev[0] != '*' && dev != P_NULL_VIDEO_DEVICE) {
       m_videoOutputDevice[OpalVideoFormat::ePresentation].deviceName = dev;
       SetAutoStartReceiveVideo(true);
-      cout << "Default video output/preview device set to \"" << devices[i] << '"' << endl;
+      PTRACE(3, "Default video output/preview device set to \"" << devices[i] << '"');
       break;
     }
   }
@@ -100,9 +96,110 @@ MyManager::~MyManager()
 {
 }
 
+OpalCall * MyManager::CreateCall(void *)
+{
+  if (m_activeCalls.GetSize() < m_maxCalls) { 
+   return new MyCall(*this);
+  }
+
+  if (m_verbose)
+   cout << "Maximum simultaneous calls (" << m_maxCalls << ") exceeeded." << endl;
+
+  PTRACE(2, "Maximum simultaneous calls (" << m_maxCalls << ") exceeeded.");
+  return NULL;
+}
+
+struct OpalCmdPresentationToken
+{
+  P_DECLARE_STREAMABLE_ENUM(Cmd, request, release);
+};
+
+void MyManager::CmdPresentationToken()
+{
+  /*PSafePtr<OpalRTPConnection> connection;
+  if (GetConnectionFromArgs(args, connection)) {
+    if (args.GetCount() == 0)
+      args.GetContext() << "Presentation token is " << (connection->HasPresentationRole() ? "acquired." : "released.") << endl;
+    else {
+      switch (OpalCmdPresentationToken::CmdFromString(args[0], false)) {
+        case OpalCmdPresentationToken::request :
+          if (connection->HasPresentationRole())
+            args.GetContext() << "Presentation token is already acquired." << endl;
+          else if (connection->RequestPresentationRole(false))
+            args.GetContext() << "Presentation token requested." << endl;
+          else
+            args.WriteError("Presentation token not supported by remote.");
+          break;
+
+        case OpalCmdPresentationToken::release :
+          if (!connection->HasPresentationRole())
+            args.GetContext() << "Presentation token is already released." << endl;
+          else if (connection->RequestPresentationRole(true))
+            args.GetContext() << "Presentation token released." << endl;
+          else
+            args.WriteError("Presentation token release failed.");
+          break;
+
+        default :
+          args.WriteUsage();
+      }
+    }
+  }*/
+}
+
 void MyManager::EndRun(bool)
 {
   PServiceProcess::Current().OnStop();
+}
+
+bool MyManager::Initialise(PArgList & args, bool verbose, const PString & defaultRoute)
+{
+  if (!PreInitialise(args, verbose))
+    return false;
+
+  if (verbose)
+    cout << "Manager creado." << endl;
+  
+  for (PINDEX i = 0; i < m_endpointPrefixes.GetSize(); ++i) {
+    OpalConsoleEndPoint * ep = GetConsoleEndPoint(m_endpointPrefixes[i]);
+    if (ep != NULL) {
+      if (!ep->Initialise(args, verbose, defaultRoute))
+        return false;
+    }
+  }
+  
+  if(verbose)
+    cout << "Rutas predefinidas: " << GetRouteTable() << endl;
+  
+  return true;
+}
+
+void MyManager::OnStartMediaPatch(OpalConnection & connection, OpalMediaPatch & patch)
+{
+  ostream & output(cout);
+  if (connection.IsNetworkConnection()) {
+    OpalMediaStreamPtr stream(patch.GetSink());
+    if (stream == NULL || &stream->GetConnection() != &connection)
+      stream = &patch.GetSource();
+    stream->PrintDetail(output, "Started");
+  }
+
+  dynamic_cast<MyCall &>(connection.GetCall()).OnStartMediaPatch(connection, patch);
+  OpalManager::OnStartMediaPatch(connection, patch);
+}
+
+void MyManager::OnStopMediaPatch(OpalConnection & connection, OpalMediaPatch & patch)
+{
+  dynamic_cast<MyCall &>(connection.GetCall()).OnStopMediaPatch(patch);
+  OpalManager::OnStopMediaPatch(connection, patch);
+}
+
+bool MyManager::PreInitialise(PArgList & args, bool verbose)
+{
+  PrintVersion();
+  PTRACE_INITIALISE(args);
+  m_verbose = verbose;
+  return true;
 }
 
 void MyManager::PrintVersion() const 
@@ -116,68 +213,35 @@ void MyManager::PrintVersion() const
        << "\n*Trabajo Final de Grado \n**************************************************" << endl;
 }
 
-bool MyManager::PreInitialise(PArgList & args, bool verbose)
-{
-  PrintVersion();
-  PTRACE_INITIALISE(args);
-  m_verbose = verbose;
-  return true;
-}
-
-bool MyManager::Initialise(PArgList & args, bool verbose, const PString & defaultRoute)
-{
-  if(!PreInitialise(args, verbose))
-   return false;
-
-  if(verbose)
-   cout << "Manager OPAL creado" << endl;
-  
-  for (PINDEX i = 0; i < m_endpointPrefixes.GetSize(); ++i) {
-   OpalConsoleEndPoint * ep = GetConsoleEndPoint(m_endpointPrefixes[i]);
-   if (ep != NULL) {
-    if (!ep->Initialise(args, verbose, defaultRoute))
-     return false;
-   }
-  }
-  
-  cout << "Rutas predefinidas: " << GetRouteTable() << endl;
-  //addressBook.push_back("pc:");
-  return true;
-
-}
-
 PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
 {
-  // Make sure all endpoints created (4)
   for (PINDEX i = 0; i < m_endpointPrefixes.GetSize(); ++i)
     GetConsoleEndPoint(m_endpointPrefixes[i]);
 
   PString defaultSection = cfg.GetDefaultSection();
   PSYSTEMLOG(Info, "Configuring Globals");
 
-  // General parameters for all endpoint types
-  SetDefaultDisplayName(rsrc->AddStringField("Display", 30, GetDefaultDisplayName(), "Display name used in various protocols"));
-
-  bool overrideProductInfo = rsrc->AddBooleanField("Info de aplicacion", false, "Override the default product information");
-  m_savedProductInfo.vendor = rsrc->AddStringField("Desarrollador", 30, m_savedProductInfo.vendor);
-  m_savedProductInfo.name = rsrc->AddStringField("Nombre", 30, m_savedProductInfo.name);
-  m_savedProductInfo.version = rsrc->AddStringField("Version", 30, m_savedProductInfo.version);
+  SetDefaultDisplayName(rsrc->AddStringField(DisplayNameKey, 30, GetDefaultDisplayName(), "Display usado en varios protocolos."));
+  bool overrideProductInfo = rsrc->AddBooleanField(OverrideProductInfoKey, false, "Anula información del producto.");
+  m_savedProductInfo.vendor = rsrc->AddStringField(DeveloperNameKey, 30, m_savedProductInfo.vendor);
+  m_savedProductInfo.name = rsrc->AddStringField(ProductNameKey, 30, m_savedProductInfo.name);
+  m_savedProductInfo.version = rsrc->AddStringField(ProductVersionKey, 30, m_savedProductInfo.version);
   if (overrideProductInfo) 
     SetProductInfo(m_savedProductInfo);
-
-  m_maxCalls = rsrc->AddIntegerField("Llamadas Simultaneas", 1, 9999, m_maxCalls, "", "Maximum simultaneous calls");
-
-  m_mediaTransferMode = cfg.GetEnum("MediaTransferModeKey", m_mediaTransferMode);
+  
+  m_maxCalls = rsrc->AddIntegerField(MaxSimultaneousCallsKey, 1, 9999, m_maxCalls, "", "N° max de llamadas simultáneas.");
+  
+  m_mediaTransferMode = cfg.GetEnum(MediaTransferModeKey, m_mediaTransferMode);
   static const char * const MediaTransferModeValues[] = { "0", "1", "2" };
   static const char * const MediaTransferModeTitles[] = { "Bypass", "Forward", "Transcode" };
-  rsrc->Add(new PHTTPRadioField("MediaTransferModeKey",
+  rsrc->Add(new PHTTPRadioField(MediaTransferModeKey,
     PARRAYSIZE(MediaTransferModeValues), MediaTransferModeValues, MediaTransferModeTitles,
-    m_mediaTransferMode, "How media is to be routed between the endpoints."));
+    m_mediaTransferMode, "Modo de transferencia entre los terminales."));
 
   {
     OpalMediaTypeList mediaTypes = OpalMediaType::GetList();
     for (OpalMediaTypeList::iterator it = mediaTypes.begin(); it != mediaTypes.end(); ++it) {
-      PString key = "Auto Start";
+      PString key = AutoStartKeyPrefix;
       key &= it->c_str();
       
       if (key == "Auto Start audio" || key == "Auto Start video" || key == "Auto Start presentation") {
@@ -185,33 +249,46 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
       static const char * const AutoStartValues[] = { "Inactive", "Receive only", "Send only", "Send & Receive", "Don't offer" };
       rsrc->Add(new PHTTPEnumField<OpalMediaType::AutoStartMode::Enumeration>(key,
                         PARRAYSIZE(AutoStartValues), AutoStartValues, (*it)->GetAutoStart(),
-                        "Initial start up mode for media type."));
+                        "Inicio automático para tipos de media."));
      }
     }
   }
 
-  SetAudioJitterDelay(rsrc->AddIntegerField("Minimo Jitter", 20, 2000, GetMinAudioJitterDelay(), "ms", "Minimum jitter buffer size"),
-                      rsrc->AddIntegerField("Maximo Jitter", 20, 2000, GetMaxAudioJitterDelay(), "ms", "Maximum jitter buffer size"));
+  SetAudioJitterDelay(rsrc->AddIntegerField(MinJitterKey, 20, 2000, GetMinAudioJitterDelay(), "ms", "Tamaño min buffer jitter."),
+                      rsrc->AddIntegerField(MaxJitterKey, 20, 2000, GetMaxAudioJitterDelay(), "ms", "Tamaño max buffer jitter."));
 
-  DisableDetectInBandDTMF(rsrc->AddBooleanField("InBandaDTMF", DetectInBandDTMFDisabled(),
-                                                "Disable digital filter for in-band DTMF detection (saves CPU usage)"));
+  DisableDetectInBandDTMF(rsrc->AddBooleanField(InBandDTMFKey, DetectInBandDTMFDisabled(),
+                                                "Deshabilita filtro digital para detección in-band DTMF (reduce uso CPU)."));
+  
+  SetNoMediaTimeout(PTimeInterval(0, rsrc->AddIntegerField(NoMediaTimeoutKey, 1, 365*24*60*60, GetNoMediaTimeout().GetSeconds(),
+                                                           "segs", "Terminar llamada cuando no se recibe media desde remoto en este tiempo.")));
+  SetTxMediaTimeout(PTimeInterval(0, rsrc->AddIntegerField(TxMediaTimeoutKey, 1, 365*24*60*60, GetTxMediaTimeout().GetSeconds(),
+                                                           "segs", "Terminar llamada cuando no se transmite media al remoto en este tiempo.")));
+
+  /*SetTCPPorts(rsrc->AddIntegerField(TCPPortBaseKey, 0, 65535, GetTCPPortBase(), "", "Rango de puerto base para streams TCP, ej. canal de señalización H.323."),
+              rsrc->AddIntegerField(TCPPortMaxKey, 0, 65535, GetTCPPortMax(), "", "Rango de puerto máx para streams TCP."));
+  SetUDPPorts(rsrc->AddIntegerField(UDPPortBaseKey, 0, 65535, GetUDPPortBase(), "", "Rango de puerto base para streams UDP, ej. canal de señalización SIP."),
+              rsrc->AddIntegerField(UDPPortMaxKey, 0, 65535, GetUDPPortMax(), "", "Rango de puerto máx para streams UDP."));
+  SetRtpIpPorts(rsrc->AddIntegerField(RTPPortBaseKey, 0, 65535, GetRtpIpPortBase(), "", "Rango de puerto base para streams RTP/UDP."),
+                rsrc->AddIntegerField(RTPPortMaxKey, 0, 65535, GetRtpIpPortMax(), "", "Rango de puerto máx para streams RTP/UDP."));
+
+  SetMediaTypeOfService(rsrc->AddIntegerField(RTPTOSKey, 0, 255, GetMediaTypeOfService(), "", "Valor para calidad de servicio (QoS)"));
+  */
   
 #if OPAL_PTLIB_NAT
   PSYSTEMLOG(Info, "Configuring NAT");
 
   {
     std::set<NATInfo> natInfo;
-
-    // Need to make a copy of info as call SetNATServer alters GetNatMethods() so iterator fails
     for (PNatMethods::iterator it = GetNatMethods().begin(); it != GetNatMethods().end(); ++it)
       natInfo.insert(*it);
 
     for (std::set<NATInfo>::iterator it = natInfo.begin(); it != natInfo.end(); ++it) {
       PHTTPCompositeField * fields = new PHTTPCompositeField("NAT\\" + it->m_method, it->m_method,
                    "Enable flag and Server IP/hostname for NAT traversal using " + it->m_friendly);
-      fields->Append(new PHTTPBooleanField("NATActiveKey", it->m_active));
-      fields->Append(new PHTTPStringField("NATServerKey", 0, 0, it->m_server, NULL, 1, 15));
-      fields->Append(new PHTTPStringField("NATInterfaceKey", 0, 0, it->m_interface, NULL, 1, 15));
+      fields->Append(new PHTTPBooleanField(NATActiveKey, it->m_active));
+      fields->Append(new PHTTPStringField(NATServerKey, 0, 0, it->m_server, NULL, 1, 15));
+      fields->Append(new PHTTPStringField(NATInterfaceKey, 0, 0, it->m_interface, NULL, 1, 15));
       rsrc->Add(fields);
       if (!fields->LoadFromConfig(cfg))
         SetNATServer(it->m_method, (*fields)[1].GetValue(), (*fields)[0].GetValue() *= "true", 0, (*fields)[2].GetValue());
@@ -223,10 +300,10 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
   {
     unsigned prefWidth = 0, prefHeight = 0;
     PVideoFrameInfo::ParseSize(rsrc->AddStringField("ConfVideoManagerKey", 10,"CIF",
-      "Manager video frame resolution"), prefWidth, prefHeight); 
+                                                    "Manager video frame resolution"), prefWidth, prefHeight); 
 
     if (m_verbose)
-      cout << "Preferred video size: " << PVideoFrameInfo::AsString(prefWidth, prefHeight) << '\n';
+      cout << "Tamaño de video preferido: " << PVideoFrameInfo::AsString(prefWidth, prefHeight) << '\n';
 
     unsigned maxWidth = 0, maxHeight = 0;
     PVideoFrameInfo::ParseSize(rsrc->AddStringField("ConfVideoMaxManagerKey", 10,"HD1080",
@@ -376,82 +453,9 @@ bool MyManager::OnChangedPresentationRole(OpalConnection & connection, const PSt
   return OpalManager::OnChangedPresentationRole(connection, newChairURI, request);
 }
 
-struct OpalCmdPresentationToken
-{
-  P_DECLARE_STREAMABLE_ENUM(Cmd, request, release);
-};
-
-void MyManager::CmdPresentationToken()
-{
-  /*PSafePtr<OpalRTPConnection> connection;
-  if (GetConnectionFromArgs(args, connection)) {
-    if (args.GetCount() == 0)
-      args.GetContext() << "Presentation token is " << (connection->HasPresentationRole() ? "acquired." : "released.") << endl;
-    else {
-      switch (OpalCmdPresentationToken::CmdFromString(args[0], false)) {
-        case OpalCmdPresentationToken::request :
-          if (connection->HasPresentationRole())
-            args.GetContext() << "Presentation token is already acquired." << endl;
-          else if (connection->RequestPresentationRole(false))
-            args.GetContext() << "Presentation token requested." << endl;
-          else
-            args.WriteError("Presentation token not supported by remote.");
-          break;
-
-        case OpalCmdPresentationToken::release :
-          if (!connection->HasPresentationRole())
-            args.GetContext() << "Presentation token is already released." << endl;
-          else if (connection->RequestPresentationRole(true))
-            args.GetContext() << "Presentation token released." << endl;
-          else
-            args.WriteError("Presentation token release failed.");
-          break;
-
-        default :
-          args.WriteUsage();
-      }
-    }
-  }*/
-}
-
 void MyManager::StartRecordingCall(MyCall & call) const
 {
 }
-
-void MyManager::OnStartMediaPatch(OpalConnection & connection, OpalMediaPatch & patch)
-{
-  ostream & output(cout);
-  if (connection.IsNetworkConnection()) {
-   OpalMediaStreamPtr stream(patch.GetSink());
-   if (stream == NULL || &stream->GetConnection() != &connection)
-    stream = &patch.GetSource();
-   stream->PrintDetail(output, "Started");
-  }
-
-  dynamic_cast<MyCall &>(connection.GetCall()).OnStartMediaPatch(connection, patch);
-  OpalManager::OnStartMediaPatch(connection, patch);
-}
-
-
-void MyManager::OnStopMediaPatch(OpalConnection & connection, OpalMediaPatch & patch)
-{
-  dynamic_cast<MyCall &>(connection.GetCall()).OnStopMediaPatch(patch);
-  OpalManager::OnStopMediaPatch(connection, patch);
-}
-
-OpalCall * MyManager::CreateCall(void *)
-{
-  if (m_activeCalls.GetSize() < m_maxCalls) { 
-   return new MyCall(*this);
-  }
-
-  if (m_verbose)
-   cout << "Maximum simultaneous calls (" << m_maxCalls << ") exceeeded." << endl;
-
-  PTRACE(2, "Maximum simultaneous calls (" << m_maxCalls << ") exceeeded.");
-  return NULL;
-}
-
 
 bool MyManager::FindCDR(const PString & guid, MyCallDetailRecord & cdr)
 {

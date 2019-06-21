@@ -13,7 +13,5 @@
 #include <opal/patch.h>
 #include <h323/gkclient.h>
 #include <h323/gkserver.h>
-typedef PHTTPServiceProcess MyProcessHTTP;
-typedef OpalManagerConsole  MyManagerParent;
 
 // End of File ///////////////////////////////////////////////////////////////

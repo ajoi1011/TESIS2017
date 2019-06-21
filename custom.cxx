@@ -42,7 +42,7 @@
 ////////////////////////////////////////////////////
 
 #ifndef PRODUCT_NAME_TEXT
-#define	PRODUCT_NAME_TEXT	"Servidor"
+#define	PRODUCT_NAME_TEXT	"Servidor OpalServer"
 #endif
 
 #ifndef EXE_NAME_TEXT
@@ -50,7 +50,7 @@
 #endif
 
 #ifndef MANUFACTURER_TEXT
-#define	MANUFACTURER_TEXT	"Br.Angel Oramas"
+#define	MANUFACTURER_TEXT	"Angel Oramas"
 #endif
 
 #ifndef COPYRIGHT_HOLDER
