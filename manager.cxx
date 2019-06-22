@@ -409,7 +409,7 @@ bool MyManager::ConfigureCommon(OpalEndPoint * ep,
 {
   PString normalPrefix = ep->GetPrefixName();
   
-  bool enabled = rsrc->AddBooleanField(cfgPrefix & "Enabled", true);
+  bool enabled = rsrc->AddBooleanField("Habilitar" & cfgPrefix, true, "Habilita protocolo" & cfgPrefix & ".");
   
   if (cfgPrefix == "H.323" && enabled) { 
     PString defaultH323Interfaces = "*:1720";
@@ -558,5 +558,4 @@ OpalConsoleEndPoint * MyManager::GetConsoleEndPoint(const PString & prefix)
   }
 
   return dynamic_cast<OpalConsoleEndPoint *>(ep);
-}
-//Final del Archivo/////////////////////////////////////////////////////////////////////////////////////////////////////
+} // Final del Archivo

@@ -205,7 +205,10 @@ PBoolean MyProcess::OnStart()
   InitialiseBase(params);  
 
   m_manager = new MyManager();
+#if OPAL_HAS_PCSS
   new MyPCSSEndPoint(*m_manager);
+#endif // OPAL_HAS_PCSS
+
   m_manager->Initialise(GetArguments(), true, OPAL_PREFIX_MIXER":<du>");
 
   return PHTTPServiceProcess::OnStart();
@@ -296,5 +299,4 @@ void MyPConfigPage::BuildHTML(PHTML & html, BuildOptions option)
     m_string = html_page;
   }
 
-}  
-//Final del Archivo/////////////////////////////////////////////////////////////////////////////////////////////////////
+} // Final del Archivo

@@ -17,8 +17,8 @@
 /* <clase MyPConfigPage>                                                 */
 /*                                                                       */
 /* <Descripcion>                                                         */
-/*   Clase derivada de PConfigPage para crear un objeto que representa   */
-/*  una instancia de configuración para la aplicación.                   */
+/*   Clase derivada de PConfigPage que representa una instancia de       */
+/*  configuración para la aplicación.                                    */
 /*                                                                       */
 /*************************************************************************/
 class MyPConfigPage : public PConfigPage                                 //
@@ -42,8 +42,8 @@ class MyPConfigPage : public PConfigPage                                 //
 /* <clase MyProcess>                                                     */
 /*                                                                       */
 /* <Descripción>                                                         */
-/*   Clase derivada de PHTTPServiceProcess para crear un objeto que      */
-/*  representa un servidor HTTP.                                         */
+/*   Clase derivada de PHTTPServiceProcess que representa un servidor    */
+/*  HTTP.                                                                */
 /*                                                                       */
 /*************************************************************************/
 class MyProcess : public PHTTPServiceProcess                             //
@@ -90,6 +90,6 @@ class MyProcess : public PHTTPServiceProcess                             //
     MyPConfigPage    * m_pageConfigure;                                  //
                                                                          //
 };                                                                       //
-#endif                                                                   //
-                                                                         //
+/*************************************************************************/
+#endif // _MAIN_H
 /************************Final del Header*********************************/

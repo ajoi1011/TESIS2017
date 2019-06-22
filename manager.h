@@ -32,9 +32,9 @@ class MyMixerEndPoint;
 /* <clase MyManager>                                                     */
 /*                                                                       */
 /* <Descripcion>                                                         */
-/*   Clase derivada de OpalManagerConsole para crear un objeto que       */
-/*  representa un gestor de terminales H.323, SIP, MCU, PCSS y establece */
-/*  los parámetros para la llamada en un sistema OPAL.                   */
+/*   Clase derivada de OpalManagerConsole que representa un gestor de    */
+/*  terminales H.323, SIP, MCU, PCSS y establece los parámetros para una */
+/*  llamada en el sistema OPAL.                                          */
 /*                                                                       */
 /*************************************************************************/ 
 class MyManager : public OpalManagerConsole                              //
@@ -134,10 +134,10 @@ class MyManager : public OpalManagerConsole                              //
 /* <clase MyPCSSEndPoint>                                                */
 /*                                                                       */
 /* <Descripcion>                                                         */
-/*   Clase derivada de OpalConsolePCSSEndPoint para crear un objeto que  */
-/*  representa un terminal PCSS (PC Sound System).                       */
+/*   Clase derivada de OpalConsolePCSSEndPoint que representa un terminal*/
+/*  PCSS (PC Sound System).                                              */
 /*                                                                       */
-/*************************************************************************/ 
+/*************************************************************************/
 class MyPCSSEndPoint : public OpalConsolePCSSEndPoint                    //
 {                                                                        //
   PCLASSINFO(MyPCSSEndPoint, OpalConsolePCSSEndPoint);                   //
@@ -153,7 +153,8 @@ class MyPCSSEndPoint : public OpalConsolePCSSEndPoint                    //
     }                                                                    //
                                                                          //
 };                                                                       //
-#endif                                                                   //
-#endif // _MANAGER_H                                                     //
-                                                                         //
+/*************************************************************************/
+#endif // _OPAL_HAS_PCSS
+
+#endif // _MANAGER_H
 /************************Final del Header*********************************/

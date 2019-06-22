@@ -51,6 +51,58 @@ static const PConstString ConfVideoMaxManagerKey("Resolución max de Video");
 static const PConstString FrameRateManagerKey("Video Frame Rate");
 static const PConstString BitRateManagerKey("Video Bit Rate");
 #endif
+//MyH323EndPoint
+#define H323RegistrationSection "H.323 Registration\\"
+#define H323RegistrationNewSection H323RegistrationSection"New"
+#define H323RegistrationEncryptedSection H323RegistrationSection"Encrypted"
+static const PINDEX H323GatekeeperPasswordSize = 30;
+static const PConstString H323AliasesKey("Alias H.323");
+static const PConstString DisableFastStartKey("Deshabilitar Fast Start");
+static const PConstString DisableH245TunnelingKey("Deshabilitar H.245 Tunneling");
+static const PConstString DisableH245inSetupKey("Deshabilitar H.245 en Setup");
+static const PConstString ForceSymmetricTCSKey("Forzar TCS Simétrico");
+static const PConstString H239ControlKey("Habilitar Control H.239");
+static const PConstString H323BandwidthKey("Ancho de Banda H.323");
+static const PConstString GatekeeperEnableKey("Habilitar GK Remoto");
+static const PConstString GatekeeperAddressKey("Dirección GK Remoto");
+static const PConstString RemoteGatekeeperIdentifierKey("ID GK Remoto");
+static const PConstString GatekeeperInterfaceKey("Interfaz GK Remoto");
+static const PConstString GatekeeperPasswordKey("Contraseña GK Remoto");
+static const PConstString GatekeeperTokenOIDKey("Token OID GK Remoto");
+static const PConstString GatekeeperTimeToLiveKey("Tiempo GK Remoto");
+static const PConstString GatekeeperAliasLimitKey("Limite Alias GK Remoto");
+static const PConstString GatekeeperRegistrationDelayKey("Delay en Registro GK Remoto");
+static const PConstString GatekeeperSimulatePatternKey("Patrón simulado GK Remoto");
+static const PConstString GatekeeperRasRedirectKey("Redirección RAS GK Remoto");
+static const PConstString ServerGatekeeperEnableKey("Habilitar Servidor GK");
+static const PConstString ServerGatekeeperIdentifierKey("ID Servidor GK");
+static const PConstString AvailableBandwidthKey("Ancho de Banda Total GK");
+static const PConstString DefaultBandwidthKey("Designar Ancho de Banda Por Defecto");
+static const PConstString MaximumBandwidthKey("Designar Ancho de Banda Máximo");
+static const PConstString DefaultTimeToLiveKey("Tiempo GK Por Defecto");
+static const PConstString CallHeartbeatTimeKey("Tiempo de validación llamada GK");
+static const PConstString DisengageOnHearbeatFailKey("Disengage On Hearbeat Fail");
+static const PConstString OverwriteOnSameSignalAddressKey("Sobreescritura de registro GK");
+static const PConstString CanHaveDuplicateAliasKey("Duplicar Alias GK");
+static const PConstString CanOnlyCallRegisteredEPKey("Solo LLamada de Terminales Registrados");
+static const PConstString CanOnlyAnswerRegisteredEPKey("Solo Respuesta de Terminales Registrados");
+static const PConstString AnswerCallPreGrantedARQKey("Responder Pregarantizando ARQ");
+static const PConstString MakeCallPreGrantedARQKey("Llamar Pregarantizando ARQ");
+static const PConstString IsGatekeeperRoutedKey("GK Enrutado");
+static const PConstString AliasCanBeHostNameKey("Alias H.323 como Host Name");
+static const PConstString MinAliasToAllocateKey("Alias Mínimos a Designar");
+static const PConstString MaxAliasToAllocateKey("Alias Máximos a Designar");
+static const PConstString RequireH235Key("GK Requiere Autentificación H.235");
+static const PConstString UserNameH235Key("Usuario");
+static const PConstString PasswordH235Key("Password");
+static const PConstString RouteAliasKey("Alias");
+static const PConstString RouteHostKey("Host");
+static const PConstString GkServerListenersKey("Interfaces Servidor GK");
+static const PConstString AuthenticationCredentialsName("Usuarios Autentificados GK");
+static const PConstString AuthenticationCredentialsKey("Credentials %u\\");
+static const PConstString AliasRouteMapsName("Mapas de Alias");
+static const PConstString AliasRouteMapsKey("Mapa de Rutas Maps\\Mapping %u\\");
+
 #if OPAL_HAS_MIXER
 static const PConstString ConfAudioOnlyKey("Conference Audio Only");
 static const PConstString ConfMediaPassThruKey("Conference Media Pass Through");
@@ -76,13 +128,6 @@ static const PConstString RecordAudioFormatKey("Record Audio Format");
 // specify the path for built-in web server resources
 //#define SYS_RESOURCE_DIR "/usr/local/share/opalserver/resource"
 #define SYS_RESOURCE_DIR "/home/ajoi1011/proyecto/project/resource"
-// specify server logs folder
-#define SERVER_LOGS "/usr/local/share/opalserver/log"
-
-/*#ifndef SYS_CONFIG_DIR
-#  define SYS_CONFIG_DIR "."
-#endif
-#define CONFIG_PATH PString(SYS_CONFIG_DIR)+PATH_SEPARATOR+"openmcu.ini"*/
 
 
 #endif // CONFIG_H
