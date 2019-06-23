@@ -1,22 +1,15 @@
-/*
- * mixer.cxx
- *
- * Project mixer class
- *
- */
 
 #include "mixer.h"
 
 MyMixerEndPoint::MyMixerEndPoint(MyManager & manager)
   : OpalConsoleMixerEndPoint(manager)
 {
-  m_roomBook.push_back("OPALSERVER");
 }
 
 bool MyMixerEndPoint::Initialise(PArgList & args, bool verbose, const PString &)
 {
   if (verbose)
-   cout << "Terminal MCU inicializado" << endl;
+    cout << "Terminal MCU inicializado" << endl;
   
   SetDeferredAnswer(false);
   return true;
@@ -25,19 +18,16 @@ bool MyMixerEndPoint::Initialise(PArgList & args, bool verbose, const PString &)
 bool MyMixerEndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
 {
   OpalMixerNodeInfo adHoc;
-    if (GetAdHocNodeInfo() != NULL)
-      adHoc = *GetAdHocNodeInfo();
-    adHoc.m_name = "OpalServer";
-    adHoc.m_mediaPassThru = rsrc->AddBooleanField("ConfMediaPassThruKey", adHoc.m_mediaPassThru, "Conference media pass though optimisation");
+  if (GetAdHocNodeInfo() != NULL)
+    adHoc = *GetAdHocNodeInfo();
+  adHoc.m_name = "OpalServer";
+  adHoc.m_mediaPassThru = rsrc->AddBooleanField("ConfMediaPassThruKey", adHoc.m_mediaPassThru, "Conference media pass though optimisation");
 
 #if OPAL_VIDEO
-    adHoc.m_audioOnly = rsrc->AddBooleanField("ConfAudioOnlyKey", adHoc.m_audioOnly, "Conference is audio only");
+  adHoc.m_audioOnly = rsrc->AddBooleanField("ConfAudioOnlyKey", adHoc.m_audioOnly, "Conference is audio only");
 
-    PVideoFrameInfo::ParseSize(rsrc->AddStringField("ConfVideoResolutionKey", 10,
-      PVideoFrameInfo::AsString(adHoc.m_width, adHoc.m_height),
-      "Conference video frame resolution"),
-      adHoc.m_width, adHoc.m_height);
-
+  PVideoFrameInfo::ParseSize(rsrc->AddStringField("ConfVideoResolutionKey", 10, PVideoFrameInfo::AsString(adHoc.m_width, adHoc.m_height),
+                                                  "Conference video frame resolution"), adHoc.m_width, adHoc.m_height);
 
   static const char * const MixingModes[] = { "SideBySideLetterbox", "SideBySideScaled", "StackedPillarbox", "StackedScaled", "Grid" };
   PString mode = rsrc->AddSelectField("VideoMixingModeKey", PStringArray(PARRAYSIZE(MixingModes), MixingModes),
@@ -48,7 +38,8 @@ bool MyMixerEndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
       break;
     }
   }
-#endif
+#endif // OPAL_VIDEO
+  
   adHoc.m_closeOnEmpty = true;
   SetAdHocNodeInfo(adHoc);
   
@@ -92,20 +83,17 @@ OpalMediaStream * MyMixerConnection::CreateMediaStream(const OpalMediaFormat & m
                                                          unsigned sessionID,
                                                          PBoolean isSource)
 {
-  
   PVideoOutputDevice * previewDevice;
   PBoolean autoDeletePreview;
   if (CreateVideoOutputDevice(mediaFormat, false, previewDevice, autoDeletePreview))
-     PTRACE(4, "OpalCon\tCreated preview device \"" << previewDevice->GetDeviceName() << '"');
+    PTRACE(4, "OpalCon\tCreated preview device \"" << previewDevice->GetDeviceName() << '"');
   else
      previewDevice = NULL;
   
-     
-  MyMixerMediaStream * stream = new MyMixerMediaStream(*this, mediaFormat, sessionID, isSource, m_node, m_listenOnly, previewDevice, autoDeletePreview);
+  MyMixerMediaStream * stream = new MyMixerMediaStream(*this, mediaFormat, sessionID, isSource, m_node, 
+                                                       m_listenOnly, previewDevice, autoDeletePreview);
 
-  
    return stream; 
-
 }
 
 MyMixerMediaStream::MyMixerMediaStream(OpalConnection & conn,
@@ -122,12 +110,10 @@ MyMixerMediaStream::MyMixerMediaStream(OpalConnection & conn,
 {
 }
 
-
 MyMixerMediaStream::~MyMixerMediaStream()
 {
   Close();
 }
-
 
 PBoolean MyMixerMediaStream::Open()
 {

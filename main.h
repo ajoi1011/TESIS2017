@@ -17,7 +17,7 @@
 /* <clase MyPConfigPage>                                                 */
 /*                                                                       */
 /* <Descripcion>                                                         */
-/*   Clase derivada de PConfigPage que representa una instancia de       */
+/*   Clase derivada de PConfigPage que describe una instancia de         */
 /*  configuración para la aplicación.                                    */
 /*                                                                       */
 /*************************************************************************/
@@ -42,7 +42,7 @@ class MyPConfigPage : public PConfigPage                                 //
 /* <clase MyProcess>                                                     */
 /*                                                                       */
 /* <Descripción>                                                         */
-/*   Clase derivada de PHTTPServiceProcess que representa un servidor    */
+/*   Clase derivada de PHTTPServiceProcess que describe un servidor      */
 /*  HTTP.                                                                */
 /*                                                                       */
 /*************************************************************************/

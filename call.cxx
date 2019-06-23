@@ -1,11 +1,6 @@
-/*
- * call.cxx
- *
- * Project call class
- *
- */
 
 #include "call.h"
+#include "config.h"
 #include "manager.h"
 
 static struct
@@ -64,16 +59,17 @@ static PString GetDefaultTextFormats()
   return strm;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 bool MyManager::ConfigureCDR(PConfig & cfg, PConfigPage * rsrc)
 {
   m_cdrMutex.Wait();
 
   m_cdrTextFile.Close();
 
-  PString filename = rsrc->AddStringField("CDRTextFileKey", 0, m_cdrTextFile.GetFilePath(), "Call Detail Record text file name", 1, 30);
-  PString cdrHeadings = rsrc->AddStringField("CDRTextHeadingsKey", 0, GetDefaultTextHeadings(), "Call Detail Record text output headings", 1, 30);
-  m_cdrFormat = rsrc->AddStringField("CDRTextFormatKey", 0, GetDefaultTextFormats(), "Call Detail Record text output format", 1, 30);
+  PString filename = rsrc->AddStringField(CDRTextFileKey, 0, m_cdrTextFile.GetFilePath(), "Nombre archivo de texto del CDR.", 1, 30);
+  PString cdrHeadings = rsrc->AddStringField(CDRTextHeadingsKey, 0, GetDefaultTextHeadings(), "Headers del CDR en el texto de salida.", 1, 30);
+  m_cdrFormat = rsrc->AddStringField(CDRTextFormatKey, 0, GetDefaultTextFormats(), "Formato de salida de texto CDR.", 1, 30);
 
   if (!filename.IsEmpty()) {
     if (m_cdrTextFile.Open(filename, PFile::WriteOnly, PFile::Create)) {
@@ -85,16 +81,13 @@ bool MyManager::ConfigureCDR(PConfig & cfg, PConfigPage * rsrc)
       PSYSTEMLOG(Error, "Could not open CDR text file \"" << filename << '"');
   }
 
-
-
-  m_cdrListMax = rsrc->AddIntegerField("Web Page CDR Limit", 1, 1000000, m_cdrListMax,
-                                       "", "Maximum number of CDR records saved for display on web page.");
+  m_cdrListMax = rsrc->AddIntegerField(CDRWebPageLimitKey, 1, 1000000, m_cdrListMax,
+                                       "", "Máximo número de registros CDR guardados para mostrar en página web.");
 
   m_cdrMutex.Signal();
 
   return true;
 }
-
 
 void MyManager::DropCDR(const MyCall & call, bool final)
 {
@@ -113,29 +106,56 @@ void MyManager::DropCDR(const MyCall & call, bool final)
 
   m_cdrMutex.Signal();
 }
-///////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 MyCallDetailRecord::MyCallDetailRecord()
-: m_ConnectTime(0)
-, m_EndTime(0)
-, m_CallState(CallSetUp)
-, m_Bandwidth(0)
+  : m_ConnectTime(0)
+  , m_EndTime(0)
+  , m_CallState(CallSetUp)
+  , m_Bandwidth(0)
 {
 }
 
-void MyCallDetailRecord::OutputSummaryHTML(PHTML & html) const
+PString MyCallDetailRecord::ListMedia() const
 {
-  html << PHTML::TableRow()
-       << PHTML::TableData() << PHTML::HotLink("CallDetailRecord?guid=" + m_GUID.AsString()) << "<span style='color:blue'>" << m_GUID << "</span>" <<PHTML::HotLink()
-       << PHTML::TableData() << PHTML::Escape(m_OriginatorURI)
-       << PHTML::TableData() << PHTML::Escape(m_DestinationURI)
-       << PHTML::TableData() << m_StartTime.AsString(PTime::LoggingFormat)
-       << PHTML::TableData() << m_EndTime.AsString(PTime::LoggingFormat)
-       << PHTML::TableData();
-  if (m_CallState != CallCompleted)
-    html << "Active";
-  else
-    html << OpalConnection::GetCallEndReasonText(m_CallResult);
+  PStringStream strm;
+
+  for (MediaMap::const_iterator it = m_media.begin(); it != m_media.end(); ++it) {
+    if (!strm.IsEmpty())
+      strm << ", ";
+    if (it->second.m_closed)
+      strm << '(' << it->second.m_Codec << ')';
+    else
+      strm << it->second.m_Codec;
+  }
+
+  if (strm.IsEmpty())
+    strm << "None";
+
+  return strm;
+}
+
+PString MyCallDetailRecord::GetCallState() const
+{
+  static const char * const CallStates[] = {
+    "Completed", "Setting Up", "Proceeding", "Alerting", "Connected", "Established"
+  };
+
+  if (m_CallState < PARRAYSIZE(CallStates))
+    return CallStates[m_CallState];
+
+  return psprintf("CallState=%u", m_CallState);
+}
+
+MyCall::Media MyCallDetailRecord::GetMedia(const OpalMediaType & mediaType) const
+{
+  for (MediaMap::const_iterator it = m_media.begin(); it != m_media.end(); ++it) {
+    if (it->second.m_Codec.GetMediaType() == mediaType)
+      return it->second;
+  }
+
+  return Media();
 }
 
 void MyCallDetailRecord::OutputDetailedHTML(PHTML & html) const
@@ -218,6 +238,20 @@ void MyCallDetailRecord::OutputDetailedHTML(PHTML & html) const
   html << PHTML::TableEnd();
 }
 
+void MyCallDetailRecord::OutputSummaryHTML(PHTML & html) const
+{
+  html << PHTML::TableRow()
+       << PHTML::TableData() << PHTML::HotLink("CallDetailRecord?guid=" + m_GUID.AsString()) << "<span style='color:blue'>" << m_GUID << "</span>" <<PHTML::HotLink()
+       << PHTML::TableData() << PHTML::Escape(m_OriginatorURI)
+       << PHTML::TableData() << PHTML::Escape(m_DestinationURI)
+       << PHTML::TableData() << m_StartTime.AsString(PTime::LoggingFormat)
+       << PHTML::TableData() << m_EndTime.AsString(PTime::LoggingFormat)
+       << PHTML::TableData();
+  if (m_CallState != CallCompleted)
+    html << "Active";
+  else
+    html << OpalConnection::GetCallEndReasonText(m_CallResult);
+}
 
 void MyCallDetailRecord::OutputText(ostream & strm, const PString & format) const
 {
@@ -328,54 +362,64 @@ void MyCallDetailRecord::OutputText(ostream & strm, const PString & format) cons
   strm << format.Mid(last) << endl;
 }
 
-
-PString MyCallDetailRecord::ListMedia() const
-{
-  PStringStream strm;
-
-  for (MediaMap::const_iterator it = m_media.begin(); it != m_media.end(); ++it) {
-    if (!strm.IsEmpty())
-      strm << ", ";
-    if (it->second.m_closed)
-      strm << '(' << it->second.m_Codec << ')';
-    else
-      strm << it->second.m_Codec;
-  }
-
-  if (strm.IsEmpty())
-    strm << "None";
-
-  return strm;
-}
-
-
-PString MyCallDetailRecord::GetCallState() const
-{
-  static const char * const CallStates[] = {
-    "Completed", "Setting Up", "Proceeding", "Alerting", "Connected", "Established"
-  };
-
-  if (m_CallState < PARRAYSIZE(CallStates))
-    return CallStates[m_CallState];
-
-  return psprintf("CallState=%u", m_CallState);
-}
-
-
-MyCall::Media MyCallDetailRecord::GetMedia(const OpalMediaType & mediaType) const
-{
-  for (MediaMap::const_iterator it = m_media.begin(); it != m_media.end(); ++it) {
-   if (it->second.m_Codec.GetMediaType() == mediaType)
-    return it->second;
-  }
-
-  return Media();
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 MyCall::MyCall(MyManager & manager)
   : OpalCall(manager)
   , m_manager(manager)
 {
+}
+
+PBoolean MyCall::OnAlerting(OpalConnection & connection)
+{
+  m_CallState = MyCall::CallAlerting;
+  connection.GetRemoteAddress().GetIpAndPort(m_DestinationSignalAddress);
+
+  m_manager.DropCDR(*this, false);
+
+  return OpalCall::OnAlerting(connection);
+}
+
+void MyCall::OnCleared()
+{
+  m_CallState = MyCall::CallCompleted;
+  m_CallResult = GetCallEndReason();
+  m_EndTime.SetCurrentTime();
+
+  m_manager.DropCDR(*this, true);
+
+  OpalCall::OnCleared();
+}
+
+PBoolean MyCall::OnConnected(OpalConnection & connection)
+{
+  m_ConnectTime.SetCurrentTime();
+  m_CallState = MyCall::CallConnected;
+  connection.GetRemoteAddress().GetIpAndPort(m_DestinationSignalAddress);
+
+  m_manager.DropCDR(*this, false);
+
+  return OpalCall::OnConnected(connection);
+}
+
+void MyCall::OnEstablishedCall()
+{
+  m_CallState = MyCall::CallEstablished;
+
+  m_manager.DropCDR(*this, false);
+
+  OpalCall::OnEstablishedCall();
+}
+
+void MyCall::OnProceeding(OpalConnection & connection)
+{
+  m_CallState = MyCall::CallProceeding;
+  m_DestinationURI = GetPartyB();
+  connection.GetRemoteAddress().GetIpAndPort(m_DestinationSignalAddress);
+
+  m_manager.DropCDR(*this, false);
+
+  OpalCall::OnProceeding(connection);
 }
 
 PBoolean MyCall::OnSetUp(OpalConnection & connection)
@@ -402,52 +446,6 @@ PBoolean MyCall::OnSetUp(OpalConnection & connection)
   return true;
 }
 
-
-void MyCall::OnProceeding(OpalConnection & connection)
-{
-  m_CallState = MyCall::CallProceeding;
-  m_DestinationURI = GetPartyB();
-  connection.GetRemoteAddress().GetIpAndPort(m_DestinationSignalAddress);
-
-  m_manager.DropCDR(*this, false);
-
-  OpalCall::OnProceeding(connection);
-}
-
-
-PBoolean MyCall::OnAlerting(OpalConnection & connection)
-{
-  m_CallState = MyCall::CallAlerting;
-  connection.GetRemoteAddress().GetIpAndPort(m_DestinationSignalAddress);
-
-  m_manager.DropCDR(*this, false);
-
-  return OpalCall::OnAlerting(connection);
-}
-
-
-PBoolean MyCall::OnConnected(OpalConnection & connection)
-{
-  m_ConnectTime.SetCurrentTime();
-  m_CallState = MyCall::CallConnected;
-  connection.GetRemoteAddress().GetIpAndPort(m_DestinationSignalAddress);
-
-  m_manager.DropCDR(*this, false);
-
-  return OpalCall::OnConnected(connection);
-}
-
-
-void MyCall::OnEstablishedCall()
-{
-  m_CallState = MyCall::CallEstablished;
-
-  m_manager.DropCDR(*this, false);
-
-  OpalCall::OnEstablishedCall();
-}
-
-
 void MyCall::OnStartMediaPatch(OpalConnection & connection, OpalMediaPatch & patch)
 {
   OpalMediaStream & stream = patch.GetSource();
@@ -466,7 +464,6 @@ void MyCall::OnStartMediaPatch(OpalConnection & connection, OpalMediaPatch & pat
   session->GetRemoteAddress().GetIpAndPort(&connection == GetConnection(0) ? media.m_OriginatorAddress : media.m_DestinationAddress);
 }
 
-
 void MyCall::OnStopMediaPatch(OpalMediaPatch & patch)
 {
   OpalMediaStream & stream = patch.GetSource();
@@ -481,15 +478,3 @@ void MyCall::OnStopMediaPatch(OpalMediaPatch & patch)
     m_Bandwidth += stats.m_totalBytes * 8 / duration;
 #endif
 }
-
-void MyCall::OnCleared()
-{
-  m_CallState = MyCall::CallCompleted;
-  m_CallResult = GetCallEndReason();
-  m_EndTime.SetCurrentTime();
-
-  m_manager.DropCDR(*this, true);
-
-  OpalCall::OnCleared();
-}
-

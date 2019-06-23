@@ -32,7 +32,7 @@ class MyMixerEndPoint;
 /* <clase MyManager>                                                     */
 /*                                                                       */
 /* <Descripcion>                                                         */
-/*   Clase derivada de OpalManagerConsole que representa un gestor de    */
+/*   Clase derivada de OpalManagerConsole que describe un gestor de      */
 /*  terminales H.323, SIP, MCU, PCSS y establece los parámetros para una */
 /*  llamada en el sistema OPAL.                                          */
 /*                                                                       */
@@ -134,7 +134,7 @@ class MyManager : public OpalManagerConsole                              //
 /* <clase MyPCSSEndPoint>                                                */
 /*                                                                       */
 /* <Descripcion>                                                         */
-/*   Clase derivada de OpalConsolePCSSEndPoint que representa un terminal*/
+/*   Clase derivada de OpalConsolePCSSEndPoint que describe un terminal  */
 /*  PCSS (PC Sound System).                                              */
 /*                                                                       */
 /*************************************************************************/

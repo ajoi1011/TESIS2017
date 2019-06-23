@@ -1,125 +1,169 @@
-/*
- * mixer.h
- *
- * Project mixer header
- *
- */
+/*************************************************************************/
+/*************************************************************************/
+/*                                                                       */
+/*                       C L A S E S  M I X E R                          */
+/*                                                                       */
+/*************************************************************************/
+/*************************************************************************/
 
 #ifndef _MIXER_H
 #define _MIXER_H
 
-#include "precompile.h"
 #include "manager.h"
+#include "precompile.h"
 
+#if OPAL_HAS_MIXER
 class MyMixerEndPoint;
+/*************************************************************************/
+/*                                                                       */
+/* <clase MyMixerConnection>                                             */
+/*                                                                       */
+/* <Descripcion>                                                         */
+/*   Clase derivada de OpalMixerConnection que describe una conexión     */
+/*  creada por una Multipoint Control Unit (MCU) para una conferencia.   */
+/*                                                                       */
+/*************************************************************************/
+class MyMixerConnection : public OpalMixerConnection                     //
+{                                                                        //
+  PCLASSINFO(MyMixerConnection, OpalMixerConnection);                    //
+  public:                                                                //
+    MyMixerConnection(                                                   //
+      PSafePtr<OpalMixerNode> node,                                      //
+      OpalCall & call,                                                   //
+      MyMixerEndPoint & endpoint,                                        //
+      void * userData,                                                   //
+      unsigned options,                                                  //
+      OpalConnection::StringOptions * stringOptions                      //
+    );                                                                   //
+                                                                         //
+    virtual OpalMediaStream * CreateMediaStream(                         //
+      const OpalMediaFormat & mediaFormat,                               //
+      unsigned sessionID,                                                //
+      PBoolean isSource                                                  //
+    );                                                                   //
+                                                                         //
+  protected:                                                             //
+    MyMixerEndPoint & m_endpoint;                                        //
+                                                                         //
+};                                                                       //
+/*************************************************************************/
 
-class MyMixerConnection : public OpalMixerConnection
-{
-  PCLASSINFO(MyMixerConnection, OpalMixerConnection);
-  public:
-    MyMixerConnection(
-     PSafePtr<OpalMixerNode> node,
-     OpalCall & call,
-     MyMixerEndPoint & endpoint,
-     void * userData,
-     unsigned options,
-     OpalConnection::StringOptions * stringOptions
-    );
-    
-    virtual OpalMediaStream * CreateMediaStream(
-      const OpalMediaFormat & mediaFormat, ///<  Media format for stream
-      unsigned sessionID,                  ///<  Session number for stream
-      PBoolean isSource                    ///<  Is a source stream
-    );
-    
-  protected:
-    MyMixerEndPoint & m_endpoint;
-    
-};
+/*************************************************************************/
+/*                                                                       */
+/* <clase MyMixerEndPoint>                                               */
+/*                                                                       */
+/* <Descripcion>                                                         */
+/*   Clase derivada de OpalConsoleMixerEndPoint que describe una         */
+/*  Multipoint Control Unit (MCU).                                       */
+/*                                                                       */
+/*************************************************************************/
+class MyMixerEndPoint : public OpalConsoleMixerEndPoint                  //
+{                                                                        //
+  PCLASSINFO(MyMixerEndPoint, OpalConsoleMixerEndPoint);                 //
+  public:                                                                //
+    MyMixerEndPoint(MyManager & manager);                                //
+                                                                         //
+    virtual bool Initialise(                                             //
+      PArgList & args,                                                   //
+      bool verbose,                                                      //
+      const PString &                                                    //
+    );                                                                   //
+                                                                         //
+    virtual OpalMixerConnection * CreateConnection(                      //
+      PSafePtr<OpalMixerNode> node,                                      //
+      OpalCall & call,                                                   //
+      void * userData,                                                   //
+      unsigned options,                                                  //
+      OpalConnection::StringOptions * stringOptions                      //
+    );                                                                   //
+    virtual OpalMixerNode * CreateNode(OpalMixerNodeInfo * info);        //  
+    virtual OpalVideoStreamMixer * CreateVideoMixer(                     //
+      const OpalMixerNodeInfo & info                                     //
+    );                                                                   //
+    bool Configure(PConfig & cfg, PConfigPage * rsrc);                   //
+                                                                         //
+  protected:                                                             //
+                                                                         //
+};                                                                       //
+/*************************************************************************/
 
+/*************************************************************************/
+/*                                                                       */
+/* <clase MyMixerMediaStream>                                            */
+/*                                                                       */
+/* <Descripcion>                                                         */
+/*   Clase derivada de OpalMixerMediaStream que describe un media stream */
+/*  enviado/recibido por una Multipoint Control Unit (MCU).              */
+/*                                                                       */
+/*************************************************************************/
+class MyMixerMediaStream : public OpalMixerMediaStream                   //
+{                                                                        //
+  PCLASSINFO(MyMixerMediaStream, OpalMixerMediaStream);                  //
+  public:                                                                //
+    MyMixerMediaStream(                                                  //
+      OpalConnection & conn,                                             //
+      const OpalMediaFormat & mediaFormat,                               //
+      unsigned sessionID,                                                //
+      bool isSource,                                                     //
+      PSafePtr<OpalMixerNode> node,                                      //
+      bool listenOnly,                                                   //
+      PVideoOutputDevice * outputDevice,                                 //
+      bool autoDeleteOutput = true                                       //
+    );                                                                   //
+                                                                         //
+    ~MyMixerMediaStream();                                               //
+                                                                         //
+    virtual PVideoOutputDevice * GetVideoOutputDevice() const            //
+    {                                                                    //
+      return m_outputDevice;                                             //
+    }                                                                    //
+                                                                         //
+    virtual PBoolean Open();                                             //
+    virtual PBoolean WriteData(                                          //
+      const BYTE * data,                                                 //
+      PINDEX length,                                                     //
+      PINDEX & written                                                   //
+    );                                                                   //
+    virtual PBoolean WritePacket(                                        //
+      RTP_DataFrame & packet                                             //
+    );                                                                   //
+                                                                         //
+  protected:                                                             //
+    virtual void InternalClose();                                        //
+    bool InternalAdjustDevices();                                        //
+    PVideoOutputDevice * m_outputDevice;                                 //
+    bool                 m_autoDeleteOutput;                             //
+    PDECLARE_MUTEX(m_devicesMutex);                                      //
+                                                                         //
+};                                                                       //
+/*************************************************************************/
 
-class MyMixerEndPoint : public OpalConsoleMixerEndPoint
-{
-  PCLASSINFO(MyMixerEndPoint, OpalConsoleMixerEndPoint);
-  public:
-    MyMixerEndPoint(MyManager & manager);
-
-    virtual bool Initialise(PArgList & args, bool verbose, const PString &);
-
-    bool Configure(PConfig & cfg, PConfigPage * rsrc);
- 
-    virtual OpalMixerConnection * CreateConnection(
-     PSafePtr<OpalMixerNode> node,
-     OpalCall & call,
-     void * userData,
-     unsigned options,
-     OpalConnection::StringOptions * stringOptions
-    );
-
-    virtual OpalMixerNode * CreateNode(OpalMixerNodeInfo * info);  
-
-    virtual OpalVideoStreamMixer * CreateVideoMixer(const OpalMixerNodeInfo & info);
-
-    PStringArray GetRoomBook() { return m_roomBook;}
-  protected:
-    PStringArray m_roomBook;
-
-};
-
-class MyMixerMediaStream : public OpalMixerMediaStream
-{
-  PCLASSINFO(MyMixerMediaStream, OpalMixerMediaStream);
-  public:
-  MyMixerMediaStream(
-   OpalConnection & conn,               ///<  Connection for media stream
-   const OpalMediaFormat & mediaFormat, ///<  Media format for stream
-   unsigned sessionID,                  ///<  Session number for stream
-   bool isSource,                       ///<  Is a source stream
-   PSafePtr<OpalMixerNode> node,        ///<  Mixer node to send data
-   bool listenOnly,                     ///<  Effectively initial pause state
-   PVideoOutputDevice * outputDevice,   ///<  Device to use for video display
-   bool autoDeleteOutput = true         ///<  Automatically delete PVideoOutputDevice
-  );
-  
-  ~MyMixerMediaStream(); 
-  virtual PBoolean Open();
-
-  virtual PBoolean WriteData(
-      const BYTE * data,   ///<  Data to write
-      PINDEX length,       ///<  Length of data to read.
-      PINDEX & written     ///<  Length of data actually written
-    );
-
-  virtual PBoolean WritePacket(
-      RTP_DataFrame & packet
-    );
-
-    /** Get the output device (e.g. for statistics)
-      */
-    virtual PVideoOutputDevice * GetVideoOutputDevice() const
-    {
-      return m_outputDevice;
-    }
-    
-    virtual void InternalClose();
-    bool InternalAdjustDevices();
-    
-    PVideoOutputDevice * m_outputDevice;
-    bool                 m_autoDeleteOutput;
-    PDECLARE_MUTEX(m_devicesMutex); 
-  
-};
-
-class MyVideoStreamMixer : public OpalVideoStreamMixer
-{
-  PCLASSINFO(MyVideoStreamMixer, OpalVideoStreamMixer);
-  public:
-    MyVideoStreamMixer(const OpalMixerNodeInfo & info);
-    ~MyVideoStreamMixer();
-  virtual bool StartMix(unsigned & x, unsigned & y, unsigned & w, unsigned & h, unsigned & left);
-    
-};
-
-
+/*************************************************************************/
+/*                                                                       */
+/* <clase MyVideoStreamMixer>                                            */
+/*                                                                       */
+/* <Descripcion>                                                         */
+/*   Clase derivada de OpalVideoStreamMixer que describe un frame store  */
+/*  de video multiplexado.                                               */
+/*                                                                       */
+/*************************************************************************/
+class MyVideoStreamMixer : public OpalVideoStreamMixer                   //
+{                                                                        //
+  PCLASSINFO(MyVideoStreamMixer, OpalVideoStreamMixer);                  //
+  public:                                                                //
+    MyVideoStreamMixer(const OpalMixerNodeInfo & info);                  //
+    ~MyVideoStreamMixer();                                               //
+    virtual bool StartMix(                                               //
+      unsigned & x,                                                      //
+      unsigned & y,                                                      //
+      unsigned & w,                                                      //
+      unsigned & h,                                                      //
+      unsigned & left                                                    //
+    );                                                                   //
+                                                                         //
+};                                                                       //
+/*************************************************************************/
+#endif // OPAL_HAS_MIXER
 
 #endif // _MIXER_H
+/************************Final del Header*********************************/

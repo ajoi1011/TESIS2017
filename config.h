@@ -53,7 +53,7 @@ static const PConstString BitRateManagerKey("Video Bit Rate");
 #endif
 //MyH323EndPoint
 #define H323RegistrationSection "H.323 Registration\\"
-#define H323RegistrationNewSection H323RegistrationSection"New"
+#define H323RegistrationNewSection H323RegistrationSection "New"
 #define H323RegistrationEncryptedSection H323RegistrationSection"Encrypted"
 static const PINDEX H323GatekeeperPasswordSize = 30;
 static const PConstString H323AliasesKey("Alias H.323");
@@ -102,6 +102,30 @@ static const PConstString AuthenticationCredentialsName("Usuarios Autentificados
 static const PConstString AuthenticationCredentialsKey("Credentials %u\\");
 static const PConstString AliasRouteMapsName("Mapas de Alias");
 static const PConstString AliasRouteMapsKey("Mapa de Rutas Maps\\Mapping %u\\");
+//MySIPEndPoint
+#define REGISTRATIONS_SECTION "Registro SIP"
+#define REGISTRATIONS_KEY     REGISTRATIONS_SECTION"\\Registro %u\\"
+
+static const PConstString SIPUsernameKey("Usuario SIP");
+static const PConstString SIPPrackKey("Respuestas SIP Provisionales");
+static const PConstString SIPProxyKey("Proxy URL SIP");
+static const PConstString SIPLocalRegistrarKey("Registrar Dominios SIP");
+static const PConstString SIPCiscoDeviceTypeKey("Tipo Dispositivo SIP Cisco");
+static const PConstString SIPCiscoDevicePatternKey("Patrón Dispositivo SIP Cisco");
+#if OPAL_H323
+static const PConstString SIPAutoRegisterH323Key("Auto-Registro H.323");
+#endif
+
+static const PConstString SIPAddressofRecordKey("Dirección");
+static const PConstString SIPAuthIDKey("ID");
+static const PConstString SIPPasswordKey("Contraseña");
+static const PConstString SIPRegTTLKey("TTL");
+static const PConstString SIPCompatibilityKey("Compatibilidad");
+
+static const PConstString CDRTextFileKey("Archivo de Texto CDR");
+static const PConstString CDRTextHeadingsKey("Headings CDR");
+static const PConstString CDRTextFormatKey("Formato Texto CDR");
+static const PConstString CDRWebPageLimitKey("Limite CDR WebPage");
 
 #if OPAL_HAS_MIXER
 static const PConstString ConfAudioOnlyKey("Conference Audio Only");
@@ -113,12 +137,6 @@ static const PConstString RecordFileTemplateKey("Record File Template");
 static const PConstString RecordStereoKey("Record Stereo");
 static const PConstString RecordAudioFormatKey("Record Audio Format");
 #endif
-
-
-
-
-
-
 
 #define PATH_SEPARATOR   "/"
 // specify the path executable files

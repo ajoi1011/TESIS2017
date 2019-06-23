@@ -9,7 +9,7 @@ PCREATE_SERVICE_MACRO_BLOCK(H323EndPointStatus,resource,P_EMPTY,block)
   return PAssertNULL(status)->m_gkServer.OnLoadEndPointStatus(block);
 }
 
-///////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static PStringToString GetMyAliasPasswords(PConfig & cfg)
 {
@@ -32,6 +32,8 @@ static PStringToString GetMyAliasPasswords(PConfig & cfg)
   clearPwd.Merge(newPwd, PStringToString::e_MergeOverwrite);
   return clearPwd;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 MyH323EndPoint::MyH323EndPoint(MyManager & manager)
   : H323ConsoleEndPoint(manager)
@@ -159,6 +161,8 @@ bool MyH323EndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
 
   return m_gkServer.Configure(cfg, rsrc);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 MyGatekeeperServer::MyGatekeeperServer(H323EndPoint & ep)
   : H323GatekeeperServer(ep)
@@ -373,7 +377,7 @@ void MyGatekeeperServer::RouteMap::PrintOn(ostream & strm) const
   strm << '"' << m_alias << "\" => " << m_host;
 }
 
-///////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 MyGatekeeperCall::MyGatekeeperCall(MyGatekeeperServer & gk,
                                    const OpalGloballyUniqueID & id,
@@ -383,7 +387,9 @@ MyGatekeeperCall::MyGatekeeperCall(MyGatekeeperServer & gk,
 
 }
 
-
+MyGatekeeperCall::~MyGatekeeperCall()
+{
+}
 
 H323GatekeeperRequest::Response MyGatekeeperCall::OnAdmission(H323GatekeeperARQ & info)
 {
@@ -398,11 +404,3 @@ H323GatekeeperRequest::Response MyGatekeeperCall::OnAdmission(H323GatekeeperARQ 
 
   return H323GatekeeperCall::OnAdmission(info);
 }
-
-
-MyGatekeeperCall::~MyGatekeeperCall()
-{
-}
-
-
-

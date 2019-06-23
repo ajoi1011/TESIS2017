@@ -9,7 +9,6 @@
 #ifndef _H323_H
 #define _H323_H
 
-#include "main.h"
 #include "manager.h"
 #include "precompile.h"
 
@@ -20,7 +19,7 @@ class MyGatekeeperServer;
 /* <clase MyGatekeeperCall>                                              */
 /*                                                                       */
 /* <Descripcion>                                                         */
-/*   Clase derivada de H323GatekeeperCall que representa una llamada     */
+/*   Clase derivada de H323GatekeeperCall que describe una llamada       */
 /*  activa en un gatekeeper.                                             */
 /*                                                                       */
 /*************************************************************************/
@@ -47,7 +46,7 @@ class MyGatekeeperCall : public H323GatekeeperCall                       //
 /* <clase MyGatekeeperServer>                                            */
 /*                                                                       */
 /* <Descripcion>                                                         */
-/*   Clase derivada de H323GatekeeperServer que representa un servidor   */
+/*   Clase derivada de H323GatekeeperServer que describe un servidor     */
 /*  gatekeeper básico.                                                   */
 /*                                                                       */
 /*************************************************************************/
@@ -109,8 +108,8 @@ class MyGatekeeperServer : public H323GatekeeperServer                   //
 /* <clase MyH323EndPoint>                                                */
 /*                                                                       */
 /* <Descripcion>                                                         */
-/*   Clase derivada de H323ConsoleEndPoint que representa un terminal    */
-/*  H323.                                                                */
+/*   Clase derivada de H323ConsoleEndPoint que describe un terminal      */
+/*  H.323.                                                               */
 /*                                                                       */
 /*************************************************************************/
 class MyH323EndPoint : public H323ConsoleEndPoint                        //
