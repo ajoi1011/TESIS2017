@@ -408,11 +408,11 @@ bool MyManager::ConfigureCommon(OpalEndPoint * ep,
                                 PConfigPage * rsrc)
 {
   PString normalPrefix = ep->GetPrefixName();
-  
+  cout << ep->GetDefaultListeners() << endl;
   bool enabled = rsrc->AddBooleanField("Habilitar" & cfgPrefix, true, "Habilita protocolo" & cfgPrefix & ".");
   
   if (cfgPrefix == "H.323" && enabled) { 
-    PString defaultH323Interfaces = "*:1720";
+    PStringArray defaultH323Interfaces = "*:1720";
     if (!ep->StartListeners(defaultH323Interfaces)) {
       if (m_verbose)
         cout << "No se pudo abrir listeners para " << defaultH323Interfaces << endl;
@@ -422,7 +422,8 @@ bool MyManager::ConfigureCommon(OpalEndPoint * ep,
       cout  << "Listeners " << cfgPrefix << ':' << ep->GetListeners() << endl;
   }
   else if (cfgPrefix == "SIP" && enabled) { 
-    PString defaultSIPInterfaces = "*:5060";
+    PStringArray defaultSIPInterfaces = "udp$0.0.0.0:5060";
+    defaultSIPInterfaces.push_back("*:5060");
     if (!ep->StartListeners(defaultSIPInterfaces)) {
       if (m_verbose)
         cout << "No se pudo abrir listeners para " << defaultSIPInterfaces << endl;

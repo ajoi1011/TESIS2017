@@ -242,7 +242,7 @@ void MyProcess::CreateHTTPResource(const PString & name)
   else if (name == "CallDetailRecord")
     m_httpNameSpace.AddResource(new CDRPage(GetManager(), authConference), PHTTPSpace::Overwrite);
   else if (name == "HomePage")
-    m_httpNameSpace.AddResource(new WelcomePage(*this, authConference), PHTTPSpace::Overwrite);
+    m_httpNameSpace.AddResource(new HomePage(*this, authConference), PHTTPSpace::Overwrite);
   else if (name == "RegistrationStatus")
     m_httpNameSpace.AddResource(new RegistrationStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
 #if OPAL_SIP

@@ -1,9 +1,3 @@
-/*
- * html.cxx
- *
- * Project html class
- *
- */
 
 #include "html.h"
 #include "manager.h"
@@ -11,8 +5,7 @@
 #include "h323.h"
 #include "sip.h"
 
-
-static unsigned long html_template_size; // count on zero initialization
+static unsigned long html_template_size;
 char * html_template_buffer;
 char * html_quote_buffer;
 PMutex html_mutex;
@@ -73,216 +66,13 @@ void EndPage(PStringStream & html, PString copyr)
   html << html0;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-BaseStatusPage::BaseStatusPage(MyManager & mgr, const PHTTPAuthority & auth, const char * name)
-  : PServiceHTTPString(name, PString::Empty(), "text/html; charset=UTF-8", auth)
-  , m_manager(mgr)
-  , m_refreshRate(30)
-  , m_cdr(NULL)
-{
-}
-
-
-PString BaseStatusPage::LoadText(PHTTPRequest & request)
-{
-  PHTML page;
-  CreateHTML(page, request.url.GetQueryVars());
-  SetString(page);
-  PServiceHTML::ProcessMacros(request, m_string, "", PServiceHTML::LoadFromFile);
-
-  return m_string;
-}
-
-void BaseStatusPage::CreateHTML(PHTML & html_page, const PStringToString & query)
-{
-  PStringStream html_begin, html_end, meta_page;
-  PHTML html(PHTML::InBody);
-  
-  if (m_refreshRate > 0) {
-   meta_page << "<meta http-equiv=\"Refresh\" content=\"" << m_refreshRate << "\" />";
-   BeginPage(html_begin, meta_page, GetTitle(), "window.l_param_general","window.l_info_param_general");
-  }
-  else {
-   BeginPage(html_begin, meta_page, GetTitle(), "window.l_param_general","window.l_info_param_general");
-  }
-    
-  
-   html << PHTML::Form("POST");
-
-  CreateContent(html, query);
-
-  if (m_refreshRate > 0)
-    html << PHTML::TableStart()
-         << PHTML::TableRow()
-         << PHTML::TableData()
-         << "Refresh rate" 
-         << PHTML::TableData()
-         << PHTML::InputNumber("Page Refresh Time", 5, 3600, m_refreshRate)  
-         << PHTML::TableData()
-         << PHTML::SubmitButton("Set", "Set Page Refresh Time") 
-         << PHTML::TableEnd();
-
-  html << PHTML::Form()
-       << PHTML::HRule()
-       << "<p>Last update: <!--#macro LongDateTime--></p>";
-  
-  EndPage(html_end,MyProcess::Current().GetHtmlCopyright());
-  html_page << html_begin << html << html_end;
-}
-
-
-PBoolean BaseStatusPage::Post(PHTTPRequest & request,
-                              const PStringToString & data,
-                              PHTML & msg)
-{
-  PTRACE(2, "Main\tClear call POST received " << data);
-
-  if (data("Set Page Refresh Time") == "Set") {
-    m_refreshRate = data["Page Refresh Time"].AsUnsigned();
-    CreateHTML(msg, request.url.GetQueryVars());
-    PServiceHTML::ProcessMacros(request, msg, "", PServiceHTML::LoadFromFile);
-    return true;
-  }
-
-  msg << PHTML::Title() << "Accepted Control Command" << PHTML::Body()
-    << PHTML::Heading(1) << "Accepted Control Command" << PHTML::Heading(1);
-
-  if (!OnPostControl(data, msg))
-    msg << PHTML::Heading(2) << "No calls or endpoints!" << PHTML::Heading(2);
-
-  msg << PHTML::Paragraph()
-      << PHTML::HotLink(request.url.AsString()) << "Reload page" << PHTML::HotLink()
-      << PHTML::NonBreakSpace(4)
-      << PHTML::HotLink("/") << "Home page" << PHTML::HotLink();
-
-  PServiceHTML::ProcessMacros(request, msg, "html/status.html",
-                              PServiceHTML::LoadFromFile | PServiceHTML::NoSignatureForFile);
-  return TRUE;
-}
-
-RegistrationStatusPage::RegistrationStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
-  : BaseStatusPage(mgr, auth, "RegistrationStatus")
-{
-}
-
-
-#if OPAL_H323
-void RegistrationStatusPage::GetH323(StatusMap & copy) const
-{
-  PWaitAndSignal lock(m_mutex);
-  copy = m_h323;
-}
-#endif
-
-#if OPAL_SIP
-void RegistrationStatusPage::GetSIP(StatusMap & copy) const
-{
-  PWaitAndSignal lock(m_mutex);
-  copy = m_sip;
-}
-#endif
-
-PString RegistrationStatusPage::LoadText(PHTTPRequest & request)
-{
-  m_mutex.Wait();
-
-#if OPAL_SIP
-  m_sip.clear();
-  MySIPEndPoint & sipEP = m_manager.GetSIPEndPoint();
-  const PStringList & registrations = sipEP.GetRegistrations(true);
-  for (PStringList::const_iterator it = registrations.begin(); it != registrations.end(); ++it)
-    m_sip[*it] = sipEP.IsRegistered(*it) ? "Registered" : (sipEP.IsRegistered(*it, true) ? "Offline" : "Failed");
-
-#endif
-
-
-  m_mutex.Signal();
-
-  return BaseStatusPage::LoadText(request);
-}
-
-
-const char * RegistrationStatusPage::GetTitle() const
-{
-  return "OPAL Server Registration Status";
-}
-
-
-void RegistrationStatusPage::CreateContent(PHTML & html, const PStringToString &) const
-{
-  html << PHTML::TableStart(PHTML::Border1, PHTML::CellPad4)
-       << PHTML::TableRow()
-       << PHTML::TableHeader() << ' '
-       << PHTML::TableHeader(PHTML::NoWrap) << "Name/Address"
-       << PHTML::TableHeader(PHTML::NoWrap) << "Status"
-#if OPAL_H323
-       << PHTML::TableRow()
-       << PHTML::TableHeader(PHTML::NoWrap, "rowspan=<!--#macro H323ListenerCount-->")
-       << " H.323 Listeners"
-       << "<!--#macrostart H323ListenerStatus-->"
-           << PHTML::TableRow()
-           << PHTML::TableData(PHTML::NoWrap)
-           << "<!--#status Address-->"
-           << PHTML::TableData(PHTML::NoWrap, PHTML::AlignCentre)
-           << "<!--#status Status-->"
-       << "<!--#macroend H323ListenerStatus-->"
-       << PHTML::TableRow()
-       << PHTML::TableHeader(PHTML::NoWrap, "rowspan=<!--#macro H323RegistrationCount-->")
-       << " H.323 Gatekeeper"
-       << "<!--#macrostart H323RegistrationStatus-->"
-           << PHTML::TableRow()
-           << PHTML::TableData(PHTML::NoWrap)
-           << "<!--#status Name-->"
-           << PHTML::TableData(PHTML::NoWrap)
-           << "<!--#status Status-->"
-       << "<!--#macroend H323RegistrationStatus-->"
-#endif // OPAL_H323
-
-#if OPAL_SIP
-       << PHTML::TableRow()
-       << PHTML::TableHeader(PHTML::NoWrap, "rowspan=<!--#macro SIPListenerCount-->")
-       << " SIP Listeners "
-       << "<!--#macrostart SIPListenerStatus-->"
-           << PHTML::TableRow()
-           << PHTML::TableData(PHTML::NoWrap)
-           << "<!--#status Address-->"
-           << PHTML::TableData(PHTML::NoWrap, PHTML::AlignCentre)
-           << "<!--#status Status-->"
-       << "<!--#macroend SIPListenerStatus-->"
-       << PHTML::TableRow()
-       << PHTML::TableHeader(PHTML::NoWrap, "rowspan=<!--#macro SIPRegistrationCount-->")
-       << " SIP Registrars "
-       << "<!--#macrostart SIPRegistrationStatus-->"
-           << PHTML::TableRow()
-           << PHTML::TableData(PHTML::NoWrap)
-           << "<!--#status Name-->"
-           << PHTML::TableData(PHTML::NoWrap)
-           << "<!--#status Status-->"
-       << "<!--#macroend SIPRegistrationStatus-->"
-#endif // OPAL_SIP
-
-#if OPAL_PTLIB_NAT
-       << PHTML::TableRow()
-       << PHTML::TableHeader(PHTML::NoWrap)
-       << " STUN Server "
-       << PHTML::TableData(PHTML::NoWrap)
-       << "<!--#macro STUNServer-->"
-       << PHTML::TableData(PHTML::NoWrap)
-       << "<!--#macro STUNStatus-->"
-#endif // OPAL_PTLIB_NAT
-
-       << PHTML::TableEnd();
-}
-
-
 static PINDEX GetListenerCount(PHTTPRequest & resource, const char * prefix)
 {
   RegistrationStatusPage * status = dynamic_cast<RegistrationStatusPage *>(resource.m_resource);
   if (PAssertNULL(status) == NULL)
     return 2;
 
-  OpalEndPoint * ep = status->m_manager.FindEndPoint(prefix);
+  OpalEndPoint * ep = status->GetManager().FindEndPoint(prefix);
   if (ep == NULL)
     return 2;
 
@@ -296,7 +86,7 @@ static PString GetListenerStatus(PHTTPRequest & resource, const PString htmlBloc
 
   RegistrationStatusPage * status = dynamic_cast<RegistrationStatusPage *>(resource.m_resource);
   if (PAssertNULL(status) != NULL) {
-    OpalEndPoint * ep = status->m_manager.FindEndPoint(prefix);
+    OpalEndPoint * ep = status->GetManager().FindEndPoint(prefix);
     if (ep != NULL) {
       const OpalListenerList & listeners = ep->GetListeners();
       for (OpalListenerList::const_iterator it = listeners.begin(); it != listeners.end(); ++it) {
@@ -417,7 +207,7 @@ static bool GetSTUN(PHTTPRequest & resource, PSTUNClient * & stun)
   if (PAssertNULL(status) == NULL)
     return false;
 
-  stun = dynamic_cast<PSTUNClient *>(status->m_manager.GetNatMethods().GetMethodByName(PSTUNClient::MethodName()));
+  stun = dynamic_cast<PSTUNClient *>(status->GetManager().GetNatMethods().GetMethodByName(PSTUNClient::MethodName()));
   return stun != NULL;
 }
 
@@ -457,20 +247,289 @@ PCREATE_SERVICE_MACRO(STUNStatus, resource, P_EMPTY)
 }
 #endif // OPAL_PTLIB_NAT
 
-#if OPAL_H323
 
+
+PCREATE_SERVICE_MACRO(CallCount, resource, P_EMPTY)
+{
+  CallStatusPage * status = dynamic_cast<CallStatusPage *>(resource.m_resource);
+  return PAssertNULL(status) == NULL ? 0 : status->GetCallCount();
+}
+
+
+static PString BuildPartyStatus(const PString & party, const PString & name)
+{
+  if (name.IsEmpty())
+    return party;
+
+  return PSTRSTRM(name << "<BR>" << party);
+}
+
+
+PCREATE_SERVICE_MACRO_BLOCK(CallStatus,resource,P_EMPTY,htmlBlock)
+{
+  CallStatusPage * status = dynamic_cast<CallStatusPage *>(resource.m_resource);
+  if (PAssertNULL(status) == NULL)
+    return PString::Empty();
+
+  PString substitution;
+
+  PArray<PString> calls;
+  status->GetCalls(calls);
+  for (PINDEX i = 0; i < calls.GetSize(); ++i) {
+    PSafePtr<OpalCall> call = status->GetManager().FindCallWithLock(calls[i], PSafeReadOnly);
+    if (call == NULL)
+      continue;
+
+    // make a copy of the repeating html chunk
+    PString insert = htmlBlock;
+
+    PServiceHTML::SpliceMacro(insert, "status Token",    call->GetToken());
+    PServiceHTML::SpliceMacro(insert, "status A-Party",  BuildPartyStatus(call->GetPartyA(), call->GetNameA()));
+    PServiceHTML::SpliceMacro(insert, "status B-Party",  BuildPartyStatus(call->GetPartyB(), call->GetNameB()));
+
+    PStringStream duration;
+    duration.precision(0);
+    duration.width(5);
+    if (call->GetEstablishedTime().IsValid())
+      duration << call->GetEstablishedTime().GetElapsed();
+    else
+      duration << '(' << call->GetStartTime().GetElapsed() << ')';
+    PServiceHTML::SpliceMacro(insert, "status Duration", duration);
+
+    // Then put it into the page, moving insertion point along after it.
+    substitution += insert;
+  }
+
+  return substitution;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+BaseStatusPage::BaseStatusPage(MyManager & mgr, const PHTTPAuthority & auth, const char * name)
+  : PServiceHTTPString(name, PString::Empty(), "text/html; charset=UTF-8", auth)
+  , m_manager(mgr)
+  , m_refreshRate(30)
+  , m_cdr(NULL)
+{
+}
+
+PString BaseStatusPage::LoadText(PHTTPRequest & request)
+{
+  PHTML page;
+  CreateHTML(page, request.url.GetQueryVars());
+  SetString(page);
+  PServiceHTML::ProcessMacros(request, m_string, "", PServiceHTML::LoadFromFile);
+
+  return m_string;
+}
+
+PBoolean BaseStatusPage::Post(PHTTPRequest & request,
+                              const PStringToString & data,
+                              PHTML & msg)
+{
+  PTRACE(2, "Main\tClear call POST received " << data);
+
+  if (data("Set Page Refresh Time") == "Set") {
+    m_refreshRate = data["Page Refresh Time"].AsUnsigned();
+    CreateHTML(msg, request.url.GetQueryVars());
+    PServiceHTML::ProcessMacros(request, msg, "", PServiceHTML::LoadFromFile);
+    return true;
+  }
+  
+  PStringStream meta_page;
+  BeginPage(msg, meta_page, GetTitle(), "window.l_param_general","window.l_info_param_general");
+  msg.Set(PHTML::InBody);
+  msg << "<h2>" << "Accepted Control Command" << "</h2>";
+
+  if (!OnPostControl(data, msg))
+    msg << "<h2>" << "No calls or endpoints!" << "</h2>";
+
+  msg << PHTML::Paragraph()
+      << PHTML::HotLink(request.url.AsString()) << "Reload page" << PHTML::HotLink()
+      << PHTML::NonBreakSpace(4)
+      << PHTML::HotLink("/") << "Home page" << PHTML::HotLink();
+  
+  EndPage(msg,MyProcess::Current().GetHtmlCopyright());
+
+  PServiceHTML::ProcessMacros(request, msg, "html/status.html",
+                              PServiceHTML::LoadFromFile | PServiceHTML::NoSignatureForFile);
+  return true;
+}
+
+void BaseStatusPage::CreateHTML(PHTML & html_page, const PStringToString & query)
+{
+  PStringStream html_begin, html_end, meta_page;
+  PHTML html(PHTML::InBody);
+  
+  if (m_refreshRate > 0) {
+    meta_page << "<meta http-equiv=\"Refresh\" content=\"" << m_refreshRate << "\" />";
+    BeginPage(html_begin, meta_page, GetTitle(), "window.l_param_general","window.l_info_param_general");
+  }
+  else {
+    BeginPage(html_begin, meta_page, GetTitle(), "window.l_param_general","window.l_info_param_general");
+  }
+  
+  html << PHTML::Form("POST");
+
+  CreateContent(html, query);
+
+  if (m_refreshRate > 0)
+    html << PHTML::TableStart()
+         << PHTML::TableRow()
+         << PHTML::TableData()
+         << "Refresh rate" 
+         << PHTML::TableData()
+         << PHTML::InputNumber("Page Refresh Time", 5, 3600, m_refreshRate)  
+         << PHTML::TableData()
+         << PHTML::SubmitButton("Set", "Set Page Refresh Time") 
+         << PHTML::TableEnd();
+
+  html << PHTML::Form()
+       << PHTML::HRule()
+       << "<p>Last update: <!--#macro LongDateTime--></p>";
+  
+  EndPage(html_end,MyProcess::Current().GetHtmlCopyright());
+  html_page << html_begin << html << html_end;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+RegistrationStatusPage::RegistrationStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
+  : BaseStatusPage(mgr, auth, "RegistrationStatus")
+{
+}
+
+#if OPAL_H323
+void RegistrationStatusPage::GetH323(StatusMap & copy) const
+{
+  PWaitAndSignal lock(m_mutex);
+  copy = m_h323;
+}
+#endif
+
+#if OPAL_SIP
+void RegistrationStatusPage::GetSIP(StatusMap & copy) const
+{
+  PWaitAndSignal lock(m_mutex);
+  copy = m_sip;
+}
+#endif
+
+void RegistrationStatusPage::CreateContent(PHTML & html, const PStringToString &) const
+{
+  html << PHTML::TableStart(PHTML::Border1, PHTML::CellPad4)
+       << PHTML::TableRow()
+       << PHTML::TableHeader() << ' '
+       << PHTML::TableHeader(PHTML::NoWrap) << "Name/Address"
+       << PHTML::TableHeader(PHTML::NoWrap) << "Status"
+#if OPAL_H323
+       << PHTML::TableRow()
+       << PHTML::TableHeader(PHTML::NoWrap, "rowspan=<!--#macro H323ListenerCount-->")
+       << " H.323 Listeners"
+       << "<!--#macrostart H323ListenerStatus-->"
+           << PHTML::TableRow()
+           << PHTML::TableData(PHTML::NoWrap)
+           << "<!--#status Address-->"
+           << PHTML::TableData(PHTML::NoWrap, PHTML::AlignCentre)
+           << "<!--#status Status-->"
+       << "<!--#macroend H323ListenerStatus-->"
+       << PHTML::TableRow()
+       << PHTML::TableHeader(PHTML::NoWrap, "rowspan=<!--#macro H323RegistrationCount-->")
+       << " H.323 Gatekeeper"
+       << "<!--#macrostart H323RegistrationStatus-->"
+           << PHTML::TableRow()
+           << PHTML::TableData(PHTML::NoWrap)
+           << "<!--#status Name-->"
+           << PHTML::TableData(PHTML::NoWrap)
+           << "<!--#status Status-->"
+       << "<!--#macroend H323RegistrationStatus-->"
+#endif // OPAL_H323
+
+#if OPAL_SIP
+       << PHTML::TableRow()
+       << PHTML::TableHeader(PHTML::NoWrap, "rowspan=<!--#macro SIPListenerCount-->")
+       << " SIP Listeners "
+       << "<!--#macrostart SIPListenerStatus-->"
+           << PHTML::TableRow()
+           << PHTML::TableData(PHTML::NoWrap)
+           << "<!--#status Address-->"
+           << PHTML::TableData(PHTML::NoWrap, PHTML::AlignCentre)
+           << "<!--#status Status-->"
+       << "<!--#macroend SIPListenerStatus-->"
+       << PHTML::TableRow()
+       << PHTML::TableHeader(PHTML::NoWrap, "rowspan=<!--#macro SIPRegistrationCount-->")
+       << " SIP Registrars "
+       << "<!--#macrostart SIPRegistrationStatus-->"
+           << PHTML::TableRow()
+           << PHTML::TableData(PHTML::NoWrap)
+           << "<!--#status Name-->"
+           << PHTML::TableData(PHTML::NoWrap)
+           << "<!--#status Status-->"
+       << "<!--#macroend SIPRegistrationStatus-->"
+#endif // OPAL_SIP
+
+#if OPAL_PTLIB_NAT
+       << PHTML::TableRow()
+       << PHTML::TableHeader(PHTML::NoWrap)
+       << " STUN Server "
+       << PHTML::TableData(PHTML::NoWrap)
+       << "<!--#macro STUNServer-->"
+       << PHTML::TableData(PHTML::NoWrap)
+       << "<!--#macro STUNStatus-->"
+#endif // OPAL_PTLIB_NAT
+
+       << PHTML::TableEnd();
+}
+
+PString RegistrationStatusPage::LoadText(PHTTPRequest & request)
+{
+  m_mutex.Wait();
+
+#if OPAL_H323
+  m_h323.clear();
+  const PList<H323Gatekeeper> gkList = m_manager.GetH323EndPoint().GetGatekeepers();
+  for (PList<H323Gatekeeper>::const_iterator gk = gkList.begin(); gk != gkList.end(); ++gk) {
+    PString addr = '@' + gk->GetTransport().GetRemoteAddress().GetHostName(true);
+
+    PStringStream status;
+    if (gk->IsRegistered())
+      status << "Registered";
+    else
+      status << "Failed: " << gk->GetRegistrationFailReason();
+
+    const PStringList & aliases = gk->GetAliases();
+    for (PStringList::const_iterator it = aliases.begin(); it != aliases.end(); ++it)
+      m_h323[*it + addr] = status;
+  }
+#endif
+
+#if OPAL_SIP
+  m_sip.clear();
+  MySIPEndPoint & sipEP = m_manager.GetSIPEndPoint();
+  const PStringList & registrations = sipEP.GetRegistrations(true);
+  for (PStringList::const_iterator it = registrations.begin(); it != registrations.end(); ++it)
+    m_sip[*it] = sipEP.IsRegistered(*it) ? "Registered" : (sipEP.IsRegistered(*it, true) ? "Offline" : "Failed");
+
+#endif
+
+  m_mutex.Signal();
+
+  return BaseStatusPage::LoadText(request);
+}
+
+const char * RegistrationStatusPage::GetTitle() const
+{
+  return "OPAL Server Registration Status";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#if OPAL_H323
 GkStatusPage::GkStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
   : BaseStatusPage(mgr, auth, "GkStatus")
   , m_gkServer(mgr.FindEndPointAs<MyH323EndPoint>(OPAL_PREFIX_H323)->GetGatekeeperServer())
 {
 }
-
-
-const char * GkStatusPage::GetTitle() const
-{
-  return "OPAL Gatekeeper Status";
-}
-
 
 void GkStatusPage::CreateContent(PHTML & html, const PStringToString &) const
 {
@@ -504,6 +563,10 @@ void GkStatusPage::CreateContent(PHTML & html, const PStringToString &) const
        << PHTML::TableEnd();
 }
 
+const char * GkStatusPage::GetTitle() const
+{
+  return "OPAL Gatekeeper Status";
+}
 
 PBoolean GkStatusPage::OnPostControl(const PStringToString & data, PHTML & msg)
 {
@@ -519,26 +582,16 @@ PBoolean GkStatusPage::OnPostControl(const PStringToString & data, PHTML & msg)
 
   return gotOne;
 }
-
-
 #endif //OPAL_H323
 
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if OPAL_SIP
-
 RegistrarStatusPage::RegistrarStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
   : BaseStatusPage(mgr, auth, "RegistrarStatus")
   , m_registrar(*mgr.FindEndPointAs<MySIPEndPoint>(OPAL_PREFIX_SIP))
 {
 }
-
-
-const char * RegistrarStatusPage::GetTitle() const
-{
-  return "OPAL Registrar Status";
-}
-
 
 void RegistrarStatusPage::CreateContent(PHTML & html, const PStringToString &) const
 {
@@ -568,6 +621,10 @@ void RegistrarStatusPage::CreateContent(PHTML & html, const PStringToString &) c
        << PHTML::TableEnd();
 }
 
+const char * RegistrarStatusPage::GetTitle() const
+{
+  return "OPAL Registrar Status";
+}
 
 PBoolean RegistrarStatusPage::OnPostControl(const PStringToString & data, PHTML & msg)
 {
@@ -583,15 +640,14 @@ PBoolean RegistrarStatusPage::OnPostControl(const PStringToString & data, PHTML 
 
   return gotOne;
 }
-
 #endif //OPAL_SIP
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 CallStatusPage::CallStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
   : BaseStatusPage(mgr, auth, "CallStatus")
 {
 }
-
 
 void CallStatusPage::GetCalls(PArray<PString> & copy) const
 {
@@ -599,22 +655,6 @@ void CallStatusPage::GetCalls(PArray<PString> & copy) const
   copy = m_calls;
   copy.MakeUnique();
 }
-
-
-PString CallStatusPage::LoadText(PHTTPRequest & request)
-{
-  m_mutex.Wait();
-  m_calls = m_manager.GetAllCalls();
-  m_mutex.Signal();
-  return BaseStatusPage::LoadText(request);
-}
-
-
-const char * CallStatusPage::GetTitle() const
-{
-  return "OPAL Server Call Status";
-}
-
 
 void CallStatusPage::CreateContent(PHTML & html, const PStringToString &) const
 {
@@ -641,6 +681,18 @@ void CallStatusPage::CreateContent(PHTML & html, const PStringToString &) const
        << PHTML::TableEnd();
 }
 
+const char * CallStatusPage::GetTitle() const
+{
+  return "OPAL Server Call Status";
+}
+
+PString CallStatusPage::LoadText(PHTTPRequest & request)
+{
+  m_mutex.Wait();
+  m_calls = m_manager.GetAllCalls();
+  m_mutex.Signal();
+  return BaseStatusPage::LoadText(request);
+}
 
 bool CallStatusPage::OnPostControl(const PStringToString & data, PHTML & msg)
 {
@@ -662,72 +714,12 @@ bool CallStatusPage::OnPostControl(const PStringToString & data, PHTML & msg)
   return gotOne;
 }
 
-
-PCREATE_SERVICE_MACRO(CallCount, resource, P_EMPTY)
-{
-  CallStatusPage * status = dynamic_cast<CallStatusPage *>(resource.m_resource);
-  return PAssertNULL(status) == NULL ? 0 : status->GetCallCount();
-}
-
-
-static PString BuildPartyStatus(const PString & party, const PString & name)
-{
-  if (name.IsEmpty())
-    return party;
-
-  return PSTRSTRM(name << "<BR>" << party);
-}
-
-
-PCREATE_SERVICE_MACRO_BLOCK(CallStatus,resource,P_EMPTY,htmlBlock)
-{
-  CallStatusPage * status = dynamic_cast<CallStatusPage *>(resource.m_resource);
-  if (PAssertNULL(status) == NULL)
-    return PString::Empty();
-
-  PString substitution;
-
-  PArray<PString> calls;
-  status->GetCalls(calls);
-  for (PINDEX i = 0; i < calls.GetSize(); ++i) {
-    PSafePtr<OpalCall> call = status->m_manager.FindCallWithLock(calls[i], PSafeReadOnly);
-    if (call == NULL)
-      continue;
-
-    // make a copy of the repeating html chunk
-    PString insert = htmlBlock;
-
-    PServiceHTML::SpliceMacro(insert, "status Token",    call->GetToken());
-    PServiceHTML::SpliceMacro(insert, "status A-Party",  BuildPartyStatus(call->GetPartyA(), call->GetNameA()));
-    PServiceHTML::SpliceMacro(insert, "status B-Party",  BuildPartyStatus(call->GetPartyB(), call->GetNameB()));
-
-    PStringStream duration;
-    duration.precision(0);
-    duration.width(5);
-    if (call->GetEstablishedTime().IsValid())
-      duration << call->GetEstablishedTime().GetElapsed();
-    else
-      duration << '(' << call->GetStartTime().GetElapsed() << ')';
-    PServiceHTML::SpliceMacro(insert, "status Duration", duration);
-
-    // Then put it into the page, moving insertion point along after it.
-    substitution += insert;
-  }
-
-  return substitution;
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 CDRListPage::CDRListPage(MyManager & mgr, const PHTTPAuthority & auth)
   : BaseStatusPage(mgr, auth, "CallDetailRecords")
 {
 }
-
-
-const char * CDRListPage::GetTitle() const
-{
-  return "OPAL Server Call Detail Records";
-}
-
 
 void CDRListPage::CreateContent(PHTML & html, const PStringToString &) const
 {
@@ -745,19 +737,18 @@ void CDRListPage::CreateContent(PHTML & html, const PStringToString &) const
   html << PHTML::TableEnd();
 }
 
+const char * CDRListPage::GetTitle() const
+{
+  return "OPAL Server Call Detail Records";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 CDRPage::CDRPage(MyManager & mgr, const PHTTPAuthority & auth)
   : BaseStatusPage(mgr, auth, "CallDetailRecord")
 {
   m_refreshRate = 0;
 }
-
-
-const char * CDRPage::GetTitle() const
-{
-  return "OPAL Server Call Detail Record";
-}
-
 
 void CDRPage::CreateContent(PHTML & html, const PStringToString & query) const
 {
@@ -768,45 +759,19 @@ void CDRPage::CreateContent(PHTML & html, const PStringToString & query) const
     html << "No records found.";
 }
 
+const char * CDRPage::GetTitle() const
+{
+  return "OPAL Server Call Detail Record";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 InvitePage::InvitePage(MyProcess & app, PHTTPAuthority & auth)
   : PServiceHTTPString("Invite", "", "text/html; charset=utf-8", auth)
   , app(app)
 {
 }
 
-PBoolean InvitePage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo & connectInfo)
-{
-  { PHTTPRequest * req = CreateRequest(server, connectInfo); // check authorization
-    if(!CheckAuthority(server, *req, connectInfo)) {delete req; return FALSE;}
-    delete req;
-  }
-
-  PStringToString data;
-  { PString request=connectInfo.GetURL().AsString(); PINDEX q;
-    if((q=request.Find("?"))!=P_MAX_INDEX) { request=request.Mid(q+1,P_MAX_INDEX); PURL::SplitQueryVars(request,data); }
-  }
-
-  PHTML html;
-  CreateHTML(html);
-       
-  
-  { PStringStream message; PTime now; message
-      << "HTTP/1.1 200 OK\r\n"
-      << "Date: " << now.AsString(PTime::RFC1123, PTime::GMT) << "\r\n"
-      << "Server: OpalServer\r\n"
-      << "MIME-Version: 1.0\r\n"
-      << "Cache-Control: no-cache, must-revalidate\r\n"
-      << "Expires: Sat, 26 Jul 1997 05:00:00 GMT\r\n"
-      << "Content-Type: text/html;charset=utf-8\r\n"
-      << "Content-Length: " << html.GetLength() << "\r\n"
-      << "Connection: Close\r\n"
-      << "\r\n";  //that's the last time we need to type \r\n instead of just \n
-    server.Write((const char*)message,message.GetLength());
-  }
-  server.Write((const char*)html,html.GetLength());
-  server.flush();
-  return true;
-}
 void InvitePage::CreateHTML(PHTML & html)
 {
   PStringStream meta_page;
@@ -844,6 +809,40 @@ void InvitePage::CreateHTML(PHTML & html)
   
   EndPage(html_page,MyProcess::Current().GetHtmlCopyright());
   html = html_page;
+}
+
+PBoolean InvitePage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo & connectInfo)
+{
+  { PHTTPRequest * req = CreateRequest(server, connectInfo); // check authorization
+    if(!CheckAuthority(server, *req, connectInfo)) {delete req; return FALSE;}
+    delete req;
+  }
+
+  PStringToString data;
+  { PString request=connectInfo.GetURL().AsString(); PINDEX q;
+    if((q=request.Find("?"))!=P_MAX_INDEX) { request=request.Mid(q+1,P_MAX_INDEX); PURL::SplitQueryVars(request,data); }
+  }
+
+  PHTML html;
+  CreateHTML(html);
+       
+  
+  { PStringStream message; PTime now; message
+      << "HTTP/1.1 200 OK\r\n"
+      << "Date: " << now.AsString(PTime::RFC1123, PTime::GMT) << "\r\n"
+      << "Server: OpalServer\r\n"
+      << "MIME-Version: 1.0\r\n"
+      << "Cache-Control: no-cache, must-revalidate\r\n"
+      << "Expires: Sat, 26 Jul 1997 05:00:00 GMT\r\n"
+      << "Content-Type: text/html;charset=utf-8\r\n"
+      << "Content-Length: " << html.GetLength() << "\r\n"
+      << "Connection: Close\r\n"
+      << "\r\n";  //that's the last time we need to type \r\n instead of just \n
+    server.Write((const char*)message,message.GetLength());
+  }
+  server.Write((const char*)html,html.GetLength());
+  server.flush();
+  return true;
 }
 
 PBoolean InvitePage::Post(PHTTPRequest & request,
@@ -886,6 +885,8 @@ PBoolean InvitePage::Post(PHTTPRequest & request,
     
   return true;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 SelectRoomPage::SelectRoomPage(MyProcess & app, PHTTPAuthority & auth)
   : PServiceHTTPString("Select", "", "text/html; charset=utf-8", auth)
@@ -942,8 +943,6 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
     }
   }
   
-
-
   PStringStream html, meta_page;
   BeginPage(html,meta_page,"Rooms","window.l_rooms","window.l_info_rooms");
 
@@ -1000,7 +999,9 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
   return TRUE;
 }
 
-WelcomePage::WelcomePage(MyProcess & app, PHTTPAuthority & auth)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+HomePage::HomePage(MyProcess & app, PHTTPAuthority & auth)
   : PServiceHTTPString("welcome.html", "", "text/html; charset=utf-8", auth)
   , app(app)
 {
@@ -1030,3 +1031,4 @@ WelcomePage::WelcomePage(MyProcess & app, PHTTPAuthority & auth)
   EndPage(html, MyProcess::Current().GetHtmlCopyright());
   m_string = html;
 }
+// Final del Archivo
