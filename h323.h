@@ -18,7 +18,7 @@ class MyGatekeeperServer;
 /*                                                                       */
 /* <clase MyGatekeeperCall>                                              */
 /*                                                                       */
-/* <Descripcion>                                                         */
+/* <Descripción>                                                         */
 /*   Clase derivada de H323GatekeeperCall que describe una llamada       */
 /*  activa en un gatekeeper.                                             */
 /*                                                                       */
@@ -45,19 +45,17 @@ class MyGatekeeperCall : public H323GatekeeperCall                       //
 /*                                                                       */
 /* <clase MyGatekeeperServer>                                            */
 /*                                                                       */
-/* <Descripcion>                                                         */
+/* <Descripción>                                                         */
 /*   Clase derivada de H323GatekeeperServer que describe un servidor     */
 /*  gatekeeper básico.                                                   */
 /*                                                                       */
 /*************************************************************************/
 class MyGatekeeperServer : public H323GatekeeperServer                   //
 {                                                                        //
-    PCLASSINFO(MyGatekeeperServer, H323GatekeeperServer);                //
+  PCLASSINFO(MyGatekeeperServer, H323GatekeeperServer);                  //
   public:                                                                //
     MyGatekeeperServer(H323EndPoint & ep);                               //
                                                                          //
-    /** Sobrecarga de H323GatekeeperServer */                            //
-    //@{                                                                 //
     virtual H323GatekeeperCall * CreateCall(                             //
       const OpalGloballyUniqueID & callIdentifier,                       //
       H323GatekeeperCall::Direction direction                            //
@@ -69,14 +67,12 @@ class MyGatekeeperServer : public H323GatekeeperServer                   //
       PBoolean & isGkRouted,                                             //
       H323GatekeeperCall * call                                          //
     );                                                                   //
-    //@}                                                                 //
                                                                          //
     /** Funciones desarrolladas a partir de OpalServer */                //
     //@{                                                                 //
     bool Configure(PConfig & cfg, PConfigPage * rsrc);                   //
     bool ForceUnregister(const PString id);                              //
     PString OnLoadEndPointStatus(const PString & htmlBlock);             //
-                                                                         //
                                                                          //
   private:                                                               //
     H323EndPoint & endpoint;                                             //
@@ -107,7 +103,7 @@ class MyGatekeeperServer : public H323GatekeeperServer                   //
 /*                                                                       */
 /* <clase MyH323EndPoint>                                                */
 /*                                                                       */
-/* <Descripcion>                                                         */
+/* <Descripción>                                                         */
 /*   Clase derivada de H323ConsoleEndPoint que describe un terminal      */
 /*  H.323.                                                               */
 /*                                                                       */
@@ -135,6 +131,7 @@ class MyH323EndPoint : public H323ConsoleEndPoint                        //
     {                                                                    //
       return m_gkServer;                                                 //
     }                                                                    //
+                                                                         //
     MyGatekeeperServer & GetGatekeeperServer() { return m_gkServer; }    //
                                                                          //
   protected:                                                             //
@@ -143,10 +140,9 @@ class MyH323EndPoint : public H323ConsoleEndPoint                        //
     bool               m_firstConfig;                                    //
     PStringArray       m_configuredAliases;                              //
     PStringArray       m_configuredAliasPatterns;                        //
-    PBoolean           m_verbose;                                        //
+                                                                         //
 };                                                                       //
 /*************************************************************************/
 #endif // OPAL_H323
-
 #endif // _H323_H
 /************************Final del Header*********************************/

@@ -19,7 +19,7 @@ bool MySIPEndPoint::Initialise(PArgList & args, bool verbose, const PString & de
 
   if (verbose)
    cout << "Terminal SIP inicializado" << endl;
-  
+   
   return true;
 }
 

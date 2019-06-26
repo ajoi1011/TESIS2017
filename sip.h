@@ -17,7 +17,7 @@
 /*                                                                       */
 /* <clase MySIPEndPoint>                                                 */
 /*                                                                       */
-/* <Descripcion>                                                         */
+/* <Descripción>                                                         */
 /*   Clase derivada de SIPConsoleEndPoint que describe un terminal SIP.  */
 /*                                                                       */
 /*************************************************************************/
@@ -26,14 +26,12 @@ class MySIPEndPoint : public SIPConsoleEndPoint                          //
   PCLASSINFO(MySIPEndPoint, SIPConsoleEndPoint);                         //
   public:                                                                //
     MySIPEndPoint(MyManager & manager);                                  //
-    /** Sobrecarga de SIPConsoleEndPoint */                              //
-    //@{                                                                 //
+                                                                         //
     virtual bool Initialise(                                             //
       PArgList & args,                                                   //
       bool verbose,                                                      //
       const PString & defaultRoute                                       //
     );                                                                   //
-    //@}                                                                 //
                                                                          //
     /** Funciones desarrolladas a partir de OpalServer */                //
     //@{                                                                 //

@@ -42,7 +42,6 @@ MyH323EndPoint::MyH323EndPoint(MyManager & manager)
   , m_firstConfig(true)
   , m_configuredAliases(GetAliasNames())
   , m_configuredAliasPatterns(GetAliasNamePatterns())
-  , m_verbose(false)
 {
   terminalType = e_MCUWithAVMP;
 }
@@ -50,7 +49,7 @@ MyH323EndPoint::MyH323EndPoint(MyManager & manager)
 bool MyH323EndPoint::Initialise(PArgList & args, bool verbose, const PString & defaultRoute)
 {
   AddRoutesFor(this, defaultRoute);
-  m_verbose = verbose;
+
   if (verbose)
     cout << "Terminal H323 inicializado" << endl;
   
@@ -100,11 +99,9 @@ bool MyH323EndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
   DisableH245inSetup(rsrc->AddBooleanField(DisableH245inSetupKey,  IsH245inSetupDisabled(), "Deshabilita envio inicial H.245 PDU tunelizado en SETUP PDU."));
   ForceSymmetricTCS(rsrc->AddBooleanField(ForceSymmetricTCSKey, IsForcedSymmetricTCS(), "Forza indicación de codecs simétricos en TCS."));
   bool h239Control = rsrc->AddBooleanField(H239ControlKey, false, "Habilita control H.239.");
-  if (h239Control) {
+  if (h239Control)
     SetDefaultH239Control(true); 
-    if (m_verbose)
-      cout << "Control H239 activado" << endl;
-  }
+
   
   SetInitialBandwidth(OpalBandwidth::RxTx, rsrc->AddIntegerField(H323BandwidthKey, 1, OpalBandwidth::Max()/1000,
                                                                  GetInitialBandwidth(OpalBandwidth::RxTx)/1000,

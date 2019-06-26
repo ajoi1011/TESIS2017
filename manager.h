@@ -19,19 +19,19 @@ void ExpandWildcards(
   PStringArray & names, 
   PStringArray & servers
 );
-#endif
+#endif // OPAL_SIP
 
 #if OPAL_SIP && OPAL_H323 && OPAL_HAS_MIXER
 class MyH323EndPoint;
 class MySIPEndPoint;
 class MyMixerEndPoint;
-#endif
+#endif // OPAL_SIP && OPAL_H323 && OPAL_HAS_MIXER
 
 /*************************************************************************/
 /*                                                                       */
 /* <clase MyManager>                                                     */
 /*                                                                       */
-/* <Descripcion>                                                         */
+/* <Descripción>                                                         */
 /*   Clase derivada de OpalManagerConsole que describe un gestor de      */
 /*  terminales H.323, SIP, MCU, PCSS y establece los parámetros para una */
 /*  llamada en el sistema OPAL.                                          */
@@ -42,10 +42,8 @@ class MyManager : public OpalManagerConsole                              //
   PCLASSINFO(MyManager, OpalManagerConsole);                             //
   public:                                                                //
     MyManager();                                                         //
-                                                                         //
     ~MyManager();                                                        //
-    /** Sobrecarga de OpalManagerConsole */                              //
-    //@{                                                                 //
+                                                                         //
     virtual OpalCall * CreateCall(void *);                               //
     void CmdPresentationToken();                                         //
     virtual void EndRun(bool interrupt);                                 //
@@ -69,7 +67,6 @@ class MyManager : public OpalManagerConsole                              //
     );                                                                   //
     virtual bool PreInitialise(PArgList & args, bool verbose = false);   //
     virtual void PrintVersion() const ;                                  //
-    //@}                                                                 //
                                                                          //
     /** Funciones desarrolladas a partir de OpalServer */                //
     //@{                                                                 //
@@ -155,6 +152,5 @@ class MyPCSSEndPoint : public OpalConsolePCSSEndPoint                    //
 };                                                                       //
 /*************************************************************************/
 #endif // _OPAL_HAS_PCSS
-
 #endif // _MANAGER_H
 /************************Final del Header*********************************/

@@ -79,7 +79,6 @@ static PINDEX GetListenerCount(PHTTPRequest & resource, const char * prefix)
   return ep->GetListeners().GetSize() + 1;
 }
 
-
 static PString GetListenerStatus(PHTTPRequest & resource, const PString htmlBlock, const char * prefix)
 {
   PString substitution;
@@ -107,7 +106,6 @@ static PString GetListenerStatus(PHTTPRequest & resource, const PString htmlBloc
   return substitution;
 }
 
-
 static PINDEX GetRegistrationCount(PHTTPRequest & resource, size_t (RegistrationStatusPage::*func)() const)
 {
   RegistrationStatusPage * status = dynamic_cast<RegistrationStatusPage *>(resource.m_resource);
@@ -120,7 +118,6 @@ static PINDEX GetRegistrationCount(PHTTPRequest & resource, size_t (Registration
 
   return count+1;
 }
-
 
 static PString GetRegistrationStatus(PHTTPRequest & resource,
                                      const PString htmlBlock,
@@ -149,25 +146,21 @@ static PString GetRegistrationStatus(PHTTPRequest & resource,
   return substitution;
 }
 
-
 #if OPAL_H323
 PCREATE_SERVICE_MACRO(H323ListenerCount, resource, P_EMPTY)
 {
   return GetListenerCount(resource, OPAL_PREFIX_H323);
 }
 
-
 PCREATE_SERVICE_MACRO_BLOCK(H323ListenerStatus, resource, P_EMPTY, htmlBlock)
 {
   return GetListenerStatus(resource, htmlBlock, OPAL_PREFIX_H323);
 }
 
-
 PCREATE_SERVICE_MACRO(H323RegistrationCount, resource, P_EMPTY)
 {
   return GetRegistrationCount(resource, &RegistrationStatusPage::GetH323Count);
 }
-
 
 PCREATE_SERVICE_MACRO_BLOCK(H323RegistrationStatus, resource, P_EMPTY, htmlBlock)
 {
@@ -181,18 +174,15 @@ PCREATE_SERVICE_MACRO(SIPListenerCount, resource, P_EMPTY)
   return GetListenerCount(resource, OPAL_PREFIX_SIP);
 }
 
-
 PCREATE_SERVICE_MACRO_BLOCK(SIPListenerStatus, resource, P_EMPTY, htmlBlock)
 {
   return GetListenerStatus(resource, htmlBlock, OPAL_PREFIX_SIP);
 }
 
-
 PCREATE_SERVICE_MACRO(SIPRegistrationCount, resource, P_EMPTY)
 {
   return GetRegistrationCount(resource, &RegistrationStatusPage::GetSIPCount);
 }
-
 
 PCREATE_SERVICE_MACRO_BLOCK(SIPRegistrationStatus, resource, P_EMPTY, htmlBlock)
 {
@@ -211,7 +201,6 @@ static bool GetSTUN(PHTTPRequest & resource, PSTUNClient * & stun)
   return stun != NULL;
 }
 
-
 PCREATE_SERVICE_MACRO(STUNServer, resource, P_EMPTY)
 {
   PSTUNClient * stun;
@@ -227,7 +216,6 @@ PCREATE_SERVICE_MACRO(STUNServer, resource, P_EMPTY)
 
   return html;
 }
-
 
 PCREATE_SERVICE_MACRO(STUNStatus, resource, P_EMPTY)
 {
@@ -247,14 +235,11 @@ PCREATE_SERVICE_MACRO(STUNStatus, resource, P_EMPTY)
 }
 #endif // OPAL_PTLIB_NAT
 
-
-
 PCREATE_SERVICE_MACRO(CallCount, resource, P_EMPTY)
 {
   CallStatusPage * status = dynamic_cast<CallStatusPage *>(resource.m_resource);
   return PAssertNULL(status) == NULL ? 0 : status->GetCallCount();
 }
-
 
 static PString BuildPartyStatus(const PString & party, const PString & name)
 {
@@ -263,7 +248,6 @@ static PString BuildPartyStatus(const PString & party, const PString & name)
 
   return PSTRSTRM(name << "<BR>" << party);
 }
-
 
 PCREATE_SERVICE_MACRO_BLOCK(CallStatus,resource,P_EMPTY,htmlBlock)
 {
@@ -345,9 +329,9 @@ PBoolean BaseStatusPage::Post(PHTTPRequest & request,
     msg << "<h2>" << "No calls or endpoints!" << "</h2>";
 
   msg << PHTML::Paragraph()
-      << PHTML::HotLink(request.url.AsString()) << "Reload page" << PHTML::HotLink()
+      << PHTML::HotLink(request.url.AsString()) << "Recargar página" << PHTML::HotLink()
       << PHTML::NonBreakSpace(4)
-      << PHTML::HotLink("/") << "Home page" << PHTML::HotLink();
+      << PHTML::HotLink("/") << "Home" << PHTML::HotLink();
   
   EndPage(msg,MyProcess::Current().GetHtmlCopyright());
 
@@ -395,7 +379,7 @@ void BaseStatusPage::CreateHTML(PHTML & html_page, const PStringToString & query
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 RegistrationStatusPage::RegistrationStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
-  : BaseStatusPage(mgr, auth, "RegistrationStatus")
+  : BaseStatusPage(mgr, auth, "StatusRegistro")
 {
 }
 
@@ -526,7 +510,7 @@ const char * RegistrationStatusPage::GetTitle() const
 
 #if OPAL_H323
 GkStatusPage::GkStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
-  : BaseStatusPage(mgr, auth, "GkStatus")
+  : BaseStatusPage(mgr, auth, "StatusGk")
   , m_gkServer(mgr.FindEndPointAs<MyH323EndPoint>(OPAL_PREFIX_H323)->GetGatekeeperServer())
 {
 }
@@ -588,7 +572,7 @@ PBoolean GkStatusPage::OnPostControl(const PStringToString & data, PHTML & msg)
 
 #if OPAL_SIP
 RegistrarStatusPage::RegistrarStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
-  : BaseStatusPage(mgr, auth, "RegistrarStatus")
+  : BaseStatusPage(mgr, auth, "StatusRegistrar")
   , m_registrar(*mgr.FindEndPointAs<MySIPEndPoint>(OPAL_PREFIX_SIP))
 {
 }
@@ -645,7 +629,7 @@ PBoolean RegistrarStatusPage::OnPostControl(const PStringToString & data, PHTML 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 CallStatusPage::CallStatusPage(MyManager & mgr, const PHTTPAuthority & auth)
-  : BaseStatusPage(mgr, auth, "CallStatus")
+  : BaseStatusPage(mgr, auth, "StatusLlamada")
 {
 }
 
@@ -717,7 +701,7 @@ bool CallStatusPage::OnPostControl(const PStringToString & data, PHTML & msg)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 CDRListPage::CDRListPage(MyManager & mgr, const PHTTPAuthority & auth)
-  : BaseStatusPage(mgr, auth, "CallDetailRecords")
+  : BaseStatusPage(mgr, auth, "CDRLista")
 {
 }
 
@@ -745,7 +729,7 @@ const char * CDRListPage::GetTitle() const
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 CDRPage::CDRPage(MyManager & mgr, const PHTTPAuthority & auth)
-  : BaseStatusPage(mgr, auth, "CallDetailRecord")
+  : BaseStatusPage(mgr, auth, "CDR")
 {
   m_refreshRate = 0;
 }
@@ -767,7 +751,7 @@ const char * CDRPage::GetTitle() const
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 InvitePage::InvitePage(MyProcess & app, PHTTPAuthority & auth)
-  : PServiceHTTPString("Invite", "", "text/html; charset=utf-8", auth)
+  : PServiceHTTPString("Invitar", "", "text/html; charset=utf-8", auth)
   , app(app)
 {
 }
@@ -889,7 +873,7 @@ PBoolean InvitePage::Post(PHTTPRequest & request,
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 SelectRoomPage::SelectRoomPage(MyProcess & app, PHTTPAuthority & auth)
-  : PServiceHTTPString("Select", "", "text/html; charset=utf-8", auth)
+  : PServiceHTTPString("Control", "", "text/html; charset=utf-8", auth)
   , app(app)
 {
 }
@@ -946,7 +930,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
   PStringStream html, meta_page;
   BeginPage(html,meta_page,"Rooms","window.l_rooms","window.l_info_rooms");
 
-  if(data.Contains("action")) html << "<script language='javascript'>location.href='Select';</script>";
+  if(data.Contains("action")) html << "<script language='javascript'>location.href='Control';</script>";
 
   PString nextRoom = "OpalServer";
 
@@ -969,7 +953,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
     for (PSafePtr<OpalMixerNode> node = m_mixer.GetFirstNode(PSafeReadOnly); node != NULL; ++node){
       
       html << "<tr>"
-        << "<td style='text-align:left'><a href='Invite'>"+  node->GetNodeInfo().m_name  +"</a></td>"
+        << "<td style='text-align:left'><a href='Invitar'>"+  node->GetNodeInfo().m_name  +"</a></td>"
         << "<td style='text-align:right'>";
       for (PSafePtr<OpalConnection> connection = node->GetFirstConnection(); connection != NULL; ++connection) {
       html <<  connection->GetCall().GetPartyB() << '\n'; }

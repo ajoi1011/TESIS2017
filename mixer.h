@@ -18,7 +18,7 @@ class MyMixerEndPoint;
 /*                                                                       */
 /* <clase MyMixerConnection>                                             */
 /*                                                                       */
-/* <Descripcion>                                                         */
+/* <Descripción>                                                         */
 /*   Clase derivada de OpalMixerConnection que describe una conexión     */
 /*  creada por una Multipoint Control Unit (MCU) para una conferencia.   */
 /*                                                                       */
@@ -52,7 +52,7 @@ class MyMixerConnection : public OpalMixerConnection                     //
 /*                                                                       */
 /* <clase MyMixerEndPoint>                                               */
 /*                                                                       */
-/* <Descripcion>                                                         */
+/* <Descripción>                                                         */
 /*   Clase derivada de OpalConsoleMixerEndPoint que describe una         */
 /*  Multipoint Control Unit (MCU).                                       */
 /*                                                                       */
@@ -91,7 +91,7 @@ class MyMixerEndPoint : public OpalConsoleMixerEndPoint                  //
 /*                                                                       */
 /* <clase MyMixerMediaStream>                                            */
 /*                                                                       */
-/* <Descripcion>                                                         */
+/* <Descripción>                                                         */
 /*   Clase derivada de OpalMixerMediaStream que describe un media stream */
 /*  enviado/recibido por una Multipoint Control Unit (MCU).              */
 /*                                                                       */
@@ -110,7 +110,6 @@ class MyMixerMediaStream : public OpalMixerMediaStream                   //
       PVideoOutputDevice * outputDevice,                                 //
       bool autoDeleteOutput = true                                       //
     );                                                                   //
-                                                                         //
     ~MyMixerMediaStream();                                               //
                                                                          //
     virtual PVideoOutputDevice * GetVideoOutputDevice() const            //
@@ -142,7 +141,7 @@ class MyMixerMediaStream : public OpalMixerMediaStream                   //
 /*                                                                       */
 /* <clase MyVideoStreamMixer>                                            */
 /*                                                                       */
-/* <Descripcion>                                                         */
+/* <Descripción>                                                         */
 /*   Clase derivada de OpalVideoStreamMixer que describe un frame store  */
 /*  de video multiplexado.                                               */
 /*                                                                       */
@@ -153,6 +152,7 @@ class MyVideoStreamMixer : public OpalVideoStreamMixer                   //
   public:                                                                //
     MyVideoStreamMixer(const OpalMixerNodeInfo & info);                  //
     ~MyVideoStreamMixer();                                               //
+                                                                         //
     virtual bool StartMix(                                               //
       unsigned & x,                                                      //
       unsigned & y,                                                      //
@@ -164,6 +164,5 @@ class MyVideoStreamMixer : public OpalVideoStreamMixer                   //
 };                                                                       //
 /*************************************************************************/
 #endif // OPAL_HAS_MIXER
-
 #endif // _MIXER_H
 /************************Final del Header*********************************/

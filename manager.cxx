@@ -408,37 +408,19 @@ bool MyManager::ConfigureCommon(OpalEndPoint * ep,
                                 PConfigPage * rsrc)
 {
   PString normalPrefix = ep->GetPrefixName();
-  cout << ep->GetDefaultListeners() << endl;
+  
   bool enabled = rsrc->AddBooleanField("Habilitar" & cfgPrefix, true, "Habilita protocolo" & cfgPrefix & ".");
   
-  if (cfgPrefix == "H.323" && enabled) { 
-    PStringArray defaultH323Interfaces = "*:1720";
-    if (!ep->StartListeners(defaultH323Interfaces)) {
-      if (m_verbose)
-        cout << "No se pudo abrir listeners para " << defaultH323Interfaces << endl;
-      return false;
-    }
-    else if (m_verbose)
-      cout  << "Listeners " << cfgPrefix << ':' << ep->GetListeners() << endl;
-  }
-  else if (cfgPrefix == "SIP" && enabled) { 
-    PStringArray defaultSIPInterfaces = "udp$0.0.0.0:5060";
-    defaultSIPInterfaces.push_back("*:5060");
-    if (!ep->StartListeners(defaultSIPInterfaces)) {
-      if (m_verbose)
-        cout << "No se pudo abrir listeners para " << defaultSIPInterfaces << endl;
-        return false;
-    }
-    else if (m_verbose)
-      cout  << "Listeners " << cfgPrefix << ':' << ep->GetListeners() << endl;
-  }
-  else if (!enabled) {
+  PStringArray listeners = rsrc->AddStringArrayField("Interfaces " & cfgPrefix, false, 25, PStringArray(),
+                                                     "Interfaces y  puertos de red local para terminales " & cfgPrefix & ".");
+  if (!enabled) {
     PSYSTEMLOG(Info, "Disabled " << cfgPrefix);
     ep->RemoveListener(NULL);
-    if (m_verbose)
-      cout << "Disable " << cfgPrefix << endl;
   }
-  
+  else if (!ep->StartListeners(listeners)) {
+    PSYSTEMLOG(Error, "Could not open any listeners for " << cfgPrefix);
+  }
+  cout << ep->GetListeners() << endl;
   return true;
 }
 

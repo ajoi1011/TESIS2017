@@ -241,7 +241,7 @@ void MyCallDetailRecord::OutputDetailedHTML(PHTML & html) const
 void MyCallDetailRecord::OutputSummaryHTML(PHTML & html) const
 {
   html << PHTML::TableRow()
-       << PHTML::TableData() << PHTML::HotLink("CallDetailRecord?guid=" + m_GUID.AsString()) << "<span style='color:blue'>" << m_GUID << "</span>" <<PHTML::HotLink()
+       << PHTML::TableData() << PHTML::HotLink("CDR?guid=" + m_GUID.AsString()) << "<span style='color:blue'>" << m_GUID << "</span>" <<PHTML::HotLink()
        << PHTML::TableData() << PHTML::Escape(m_OriginatorURI)
        << PHTML::TableData() << PHTML::Escape(m_DestinationURI)
        << PHTML::TableData() << m_StartTime.AsString(PTime::LoggingFormat)

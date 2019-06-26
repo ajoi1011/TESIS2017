@@ -16,7 +16,7 @@
 /*                                                                       */
 /* <clase MyPConfigPage>                                                 */
 /*                                                                       */
-/* <Descripcion>                                                         */
+/* <Descripción>                                                         */
 /*   Clase derivada de PConfigPage que describe una instancia de         */
 /*  configuración para la aplicación.                                    */
 /*                                                                       */
@@ -51,10 +51,8 @@ class MyProcess : public PHTTPServiceProcess                             //
   PCLASSINFO(MyProcess, PHTTPServiceProcess)                             //
   public:                                                                //
     MyProcess();                                                         //
-                                                                         //
     ~MyProcess();                                                        //
-    /** Sobrecarga de PHTTPServiceProcess */                             //
-    //@{                                                                 //
+                                                                         //
     virtual PBoolean Initialise(const char * initMsg);                   //
     virtual bool InitialiseBase(Params & params);                        //
     virtual void OnConfigChanged();                                      //
@@ -62,7 +60,6 @@ class MyProcess : public PHTTPServiceProcess                             //
     virtual PBoolean OnStart();                                          //
     virtual void OnStop();                                               //
     void Main();                                                         //
-    //@}                                                                 //
                                                                          //
     /** Funciones desarrolladas a partir de OpenMCU-ru */                //
     //@{                                                                 //
@@ -81,7 +78,7 @@ class MyProcess : public PHTTPServiceProcess                             //
                                                                          //
       return html;                                                       //
     }                                                                    //
-   //@}                                                                  //
+    //@}                                                                 //
                                                                          //
     MyManager & GetManager() { return *m_manager; }                      //
                                                                          //
