@@ -101,7 +101,7 @@ static const PConstString GkServerListenersKey("Interfaces Servidor GK");
 static const PConstString AuthenticationCredentialsName("Usuarios Autentificados GK");
 static const PConstString AuthenticationCredentialsKey("Credentials %u\\");
 static const PConstString AliasRouteMapsName("Mapas de Alias");
-static const PConstString AliasRouteMapsKey("Mapa de Rutas Maps\\Mapping %u\\");
+static const PConstString AliasRouteMapsKey("Mapa de Rutas \\Mapping %u\\");
 //MySIPEndPoint
 #define REGISTRATIONS_SECTION "Registro SIP"
 #define REGISTRATIONS_KEY     REGISTRATIONS_SECTION"\\Registro %u\\"
@@ -128,14 +128,15 @@ static const PConstString CDRTextFormatKey("Formato Texto CDR");
 static const PConstString CDRWebPageLimitKey("Limite CDR WebPage");
 
 #if OPAL_HAS_MIXER
-static const PConstString ConfAudioOnlyKey("Conference Audio Only");
-static const PConstString ConfMediaPassThruKey("Conference Media Pass Through");
-static const PConstString ConfVideoResolutionKey("Conference Video Resolution");
+static const PConstString ConfAudioOnlyKey("Solo Audio en Conferencia");
+static const PConstString ConfMediaPassThruKey("Media Pass Through");
+static const PConstString ConfVideoResolutionKey("Resolución de VideoConferencia");
+static const PConstString ConfMixingModeKey("Modo de video");
 
-static const PConstString RecordAllCallsKey("Record All Calls");
+/*static const PConstString RecordAllCallsKey("Record All Calls");
 static const PConstString RecordFileTemplateKey("Record File Template");
 static const PConstString RecordStereoKey("Record Stereo");
-static const PConstString RecordAudioFormatKey("Record Audio Format");
+static const PConstString RecordAudioFormatKey("Record Audio Format");*/
 #endif
 
 #define PATH_SEPARATOR   "/"

@@ -1,4 +1,5 @@
 
+#include "config.h"
 #include "mixer.h"
 
 MyMixerEndPoint::MyMixerEndPoint(MyManager & manager)
@@ -21,17 +22,17 @@ bool MyMixerEndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
   if (GetAdHocNodeInfo() != NULL)
     adHoc = *GetAdHocNodeInfo();
   adHoc.m_name = "OpalServer";
-  adHoc.m_mediaPassThru = rsrc->AddBooleanField("ConfMediaPassThruKey", adHoc.m_mediaPassThru, "Conference media pass though optimisation");
+  adHoc.m_mediaPassThru = rsrc->AddBooleanField(ConfMediaPassThruKey, adHoc.m_mediaPassThru, "Optimiza transferencia de media en conferencia.");
 
 #if OPAL_VIDEO
-  adHoc.m_audioOnly = rsrc->AddBooleanField("ConfAudioOnlyKey", adHoc.m_audioOnly, "Conference is audio only");
+  adHoc.m_audioOnly = rsrc->AddBooleanField(ConfAudioOnlyKey, adHoc.m_audioOnly, "Deshabilita video en conferencia, solo audio.");
 
-  PVideoFrameInfo::ParseSize(rsrc->AddStringField("ConfVideoResolutionKey", 10, PVideoFrameInfo::AsString(adHoc.m_width, adHoc.m_height),
-                                                  "Conference video frame resolution"), adHoc.m_width, adHoc.m_height);
+  PVideoFrameInfo::ParseSize(rsrc->AddStringField(ConfVideoResolutionKey, 10, PVideoFrameInfo::AsString(adHoc.m_width, adHoc.m_height),
+                                                  "Resolución del frame de video en videoconferencia."), adHoc.m_width, adHoc.m_height);
 
-  static const char * const MixingModes[] = { "SideBySideLetterbox", "SideBySideScaled", "StackedPillarbox", "StackedScaled", "Grid" };
-  PString mode = rsrc->AddSelectField("VideoMixingModeKey", PStringArray(PARRAYSIZE(MixingModes), MixingModes),
-    MixingModes[adHoc.m_style], "Video mixing mode.");
+  static const char * const MixingModes[] = { "SideBySideLetterbox", "SideBySideScaled", "StackedPillarbox", "StackedScaled", "Grid", "User" };
+  PString mode = rsrc->AddSelectField(ConfMixingModeKey, PStringArray(PARRAYSIZE(MixingModes), MixingModes),
+    MixingModes[adHoc.m_style], "Modo de video.");
   for (PINDEX i = 0; i < PARRAYSIZE(MixingModes); ++i) {
     if (mode == MixingModes[i]) {
       adHoc.m_style = (OpalVideoMixer::Styles)i;
@@ -88,12 +89,12 @@ OpalMediaStream * MyMixerConnection::CreateMediaStream(const OpalMediaFormat & m
   if (CreateVideoOutputDevice(mediaFormat, false, previewDevice, autoDeletePreview))
     PTRACE(4, "OpalCon\tCreated preview device \"" << previewDevice->GetDeviceName() << '"');
   else
-     previewDevice = NULL;
+    previewDevice = NULL;
   
   MyMixerMediaStream * stream = new MyMixerMediaStream(*this, mediaFormat, sessionID, isSource, m_node, 
                                                        m_listenOnly, previewDevice, autoDeletePreview);
 
-   return stream; 
+  return stream; 
 }
 
 MyMixerMediaStream::MyMixerMediaStream(OpalConnection & conn,
@@ -130,13 +131,11 @@ PBoolean MyMixerMediaStream::Open()
     PTRACE(3, "Cannot open media stream of type " << m_mediaFormat.GetMediaType());
     return false;
   }
-
-  //InternalAdjustDevices();
   
   SetPaused(IsSink() && m_listenOnly);
   
   if (!IsPaused() && !m_node->AttachStream(this))
-    return false; //(4)
+    return false;
 
   return OpalMediaStream::Open();
 }
@@ -153,23 +152,23 @@ PBoolean MyMixerMediaStream::WriteData(const BYTE * data, PINDEX length, PINDEX 
     return false;
   
   if (IsSource()) {
-    cout << "Tried to write to source media stream" << endl;
+    PTRACE(1, "Tried to write to source media stream");
     return false;
   }
 
   PWaitAndSignal mutex(m_devicesMutex);
 
-  // Assume we are writing the exact amount (check?)
   written = length;
-
-  // Check for missing packets, we do nothing at this level, just ignore it
+  
   if (data == NULL)
     return true;
 
   const OpalVideoTranscoder::FrameHeader * frame = (const OpalVideoTranscoder::FrameHeader *)data;
 
-  if (m_outputDevice == NULL) 
+  if (m_outputDevice == NULL) {
+    PTRACE(1, "Output device is null");
     return false;
+  }
 
   if (!m_outputDevice->SetFrameSize(frame->width, frame->height)) {
     PTRACE(1, "Could not resize video display device to " << frame->width << 'x' << frame->height);
@@ -188,22 +187,6 @@ PBoolean MyMixerMediaStream::WriteData(const BYTE * data, PINDEX length, PINDEX 
     return false;
   if (keyFrameNeeded)
     ExecuteCommand(OpalVideoUpdatePicture());
-  
-  return true;
-}
-
-bool MyMixerMediaStream::InternalAdjustDevices()
-{
-  PVideoFrameInfo video(m_mediaFormat.GetOptionInteger(OpalVideoFormat::FrameWidthOption(), PVideoFrameInfo::QCIFWidth),
-                        m_mediaFormat.GetOptionInteger(OpalVideoFormat::FrameHeightOption(), PVideoFrameInfo::QCIFHeight),
-                        m_mediaFormat.GetName(),
-                       (m_mediaFormat.GetClockRate()+m_mediaFormat.GetFrameTime()/2)/m_mediaFormat.GetFrameTime());
-
-  if (m_outputDevice != NULL) {
-    if (!m_outputDevice->SetFrameInfoConverter(video)){
-      return false;
-    }
-  }
   
   return true;
 }

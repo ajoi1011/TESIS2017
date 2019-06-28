@@ -61,7 +61,7 @@ class MyProcess : public PHTTPServiceProcess                             //
     virtual void OnStop();                                               //
     void Main();                                                         //
                                                                          //
-    /** Funciones desarrolladas a partir de OpenMCU-ru */                //
+    /** Funciones implementadas en OpenMCU-ru */                         //
     //@{                                                                 //
     void CreateHTTPResource(const PString & name);                       //
                                                                          //
@@ -78,6 +78,7 @@ class MyProcess : public PHTTPServiceProcess                             //
                                                                          //
       return html;                                                       //
     }                                                                    //
+    PString GetMonitorText() { }                                         //
     //@}                                                                 //
                                                                          //
     MyManager & GetManager() { return *m_manager; }                      //

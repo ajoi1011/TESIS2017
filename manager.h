@@ -68,7 +68,7 @@ class MyManager : public OpalManagerConsole                              //
     virtual bool PreInitialise(PArgList & args, bool verbose = false);   //
     virtual void PrintVersion() const ;                                  //
                                                                          //
-    /** Funciones desarrolladas a partir de OpalServer */                //
+    /** Funciones implementadas en OpalServer */                         //
     //@{                                                                 //
     bool Configure(PConfig & cfg, PConfigPage * rsrc);                   //
     bool ConfigureCDR(PConfig & cfg, PConfigPage * rsrc);                //

@@ -23,7 +23,7 @@ PBoolean MyProcess::Initialise(const char * initMsg)
 {
   PSYSTEMLOG(Warning, "Service " << GetName() << ' ' << initMsg);
 
-  Params params("Parametros");
+  Params params("Parametros", "Parámetros");
   params.m_httpPort = DefaultHTTPPort;
   if (!InitialiseBase(params))
     return false;
@@ -36,17 +36,17 @@ PBoolean MyProcess::Initialise(const char * initMsg)
   m_pageConfigure = (MyPConfigPage*)params.m_configPage;
   m_pageConfigure->BuildHTML(cfgHTML);
   
-  CreateHTTPResource("Invite");
-  CreateHTTPResource("CallStatus");
-  CreateHTTPResource("Select");
-  CreateHTTPResource("HomePage");
-  CreateHTTPResource("CallDetailRecords");
   CreateHTTPResource("CallDetailRecord");
-  CreateHTTPResource("RegistrationStatus");
-  CreateHTTPResource("RegistrarStatus");
+  CreateHTTPResource("CallDetailRecords");
+  CreateHTTPResource("CallStatus");
   CreateHTTPResource("GkStatus");
+  CreateHTTPResource("HomePage");
+  CreateHTTPResource("Invite");
+  CreateHTTPResource("RegistrarStatus");
+  CreateHTTPResource("RegistrationStatus");
+  CreateHTTPResource("Select");
   
-  //Definición tomada de OpenMCU-ru
+  // Definiciónes implementadas en OpenMCU-ru
 #ifdef SYS_RESOURCE_DIR
 #  define WEBSERVER_LINK(r1) m_httpNameSpace.AddResource(new PHTTPFile(r1, PString(SYS_RESOURCE_DIR) + PATH_SEPARATOR + r1), PHTTPSpace::Overwrite)
 #  define WEBSERVER_LINK_MIME(mt1,r1) m_httpNameSpace.AddResource(new PHTTPFile(r1, PString(SYS_RESOURCE_DIR) + PATH_SEPARATOR + r1, mt1), PHTTPSpace::Overwrite)
@@ -130,13 +130,14 @@ bool MyProcess::InitialiseBase(Params & params)
 
     info.m_maxFileAge.SetInterval(0, 0, 0, 0, params.m_configPage->AddIntegerField(RotateAgeKey, 0, 10000,
                                                                                    info.m_maxFileAge.GetDays(), 
-                                                                                   "días", "Número de días para guardar trazos log en el historial, cero indica un número indefinido."));
+                                                                                   "días", "Número de días para guardar trazos log en el historial," 
+                                                                                   " cero indica un número indefinido."));
 
     params.m_httpPort = (WORD)params.m_configPage->AddIntegerField(HTTPPortKey, 1, 65535, params.m_httpPort, "", 
                                                                    "Puerto HTTP para acceder al servidor.");
 
     params.m_httpInterfaces = params.m_configPage->AddStringField(HTTPInterfacesKey, 30, params.m_httpInterfaces, 
-                                                                  "Interfaces HTTP para acceder al servidor.");
+                                                                  "Interfaces HTTP de red local para acceder al servidor.");
   }
   else {
     level = GetLogLevel();
@@ -231,29 +232,29 @@ void MyProcess::CreateHTTPResource(const PString & name)
 {
   PHTTPMultiSimpAuth authConference(GetName());
 
-  if (name == "CallStatus")
-    m_httpNameSpace.AddResource(new CallStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
-  else if (name == "Invite")
-    m_httpNameSpace.AddResource(new InvitePage(*this, authConference), PHTTPSpace::Overwrite);
-  else if (name == "Select")
-    m_httpNameSpace.AddResource(new SelectRoomPage(*this, authConference), PHTTPSpace::Overwrite);
+  if (name == "CallDetailRecord")
+    m_httpNameSpace.AddResource(new CDRPage(GetManager(), authConference), PHTTPSpace::Overwrite);
   else if (name == "CallDetailRecords")
     m_httpNameSpace.AddResource(new CDRListPage(GetManager(), authConference), PHTTPSpace::Overwrite);
-  else if (name == "CallDetailRecord")
-    m_httpNameSpace.AddResource(new CDRPage(GetManager(), authConference), PHTTPSpace::Overwrite);
-  else if (name == "HomePage")
-    m_httpNameSpace.AddResource(new HomePage(*this, authConference), PHTTPSpace::Overwrite);
-  else if (name == "RegistrationStatus")
-    m_httpNameSpace.AddResource(new RegistrationStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
-#if OPAL_SIP
-  else if (name == "RegistrarStatus")
-    m_httpNameSpace.AddResource(new RegistrarStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
-#endif // OPAL_SIP
+  else if (name == "CallStatus")
+    m_httpNameSpace.AddResource(new CallStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
 #if OPAL_H323
   else if (name == "GkStatus")
     m_httpNameSpace.AddResource(new GkStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
 #endif // OPAL_H323
-
+  else if (name == "HomePage")
+    m_httpNameSpace.AddResource(new HomePage(*this, authConference), PHTTPSpace::Overwrite);
+  else if (name == "Invite")
+    m_httpNameSpace.AddResource(new InvitePage(*this, authConference), PHTTPSpace::Overwrite);
+#if OPAL_SIP
+  else if (name == "RegistrarStatus")
+    m_httpNameSpace.AddResource(new RegistrarStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+#endif // OPAL_SIP
+  else if (name == "RegistrationStatus")
+    m_httpNameSpace.AddResource(new RegistrationStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+  else if (name == "Select")
+    m_httpNameSpace.AddResource(new SelectRoomPage(*this, authConference), PHTTPSpace::Overwrite);
+  
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -274,14 +275,14 @@ void MyPConfigPage::BuildHTML(PHTML & html, BuildOptions option)
       if (isDivider)
         html << PHTML::HRule();
       else
-        html <<PHTML::Escaped(field.GetTitle());
+        html << "<b>" << PHTML::Escaped(field.GetTitle()) << "</b>";
       html << PHTML::TableData("align='left' style='background-color:#d9e5e3; padding:5px; border-right:1px solid black;'")
            << "<!--#form html " << field.GetName() << "-->"
            << PHTML::TableData("align='left' style='background-color:#d9e5e3; padding:5px; border-right:1px solid black;'");
       if (isDivider)
         html << PHTML::HRule();
       else
-        html << field.GetHelp();
+        html << "<i>" << field.GetHelp() << "</i>";
       field.SetInHTML();
     }
   }

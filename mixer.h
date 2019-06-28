@@ -129,7 +129,6 @@ class MyMixerMediaStream : public OpalMixerMediaStream                   //
                                                                          //
   protected:                                                             //
     virtual void InternalClose();                                        //
-    bool InternalAdjustDevices();                                        //
     PVideoOutputDevice * m_outputDevice;                                 //
     bool                 m_autoDeleteOutput;                             //
     PDECLARE_MUTEX(m_devicesMutex);                                      //

@@ -19,7 +19,8 @@ struct NATInfo {
     , m_active(method.IsActive())
     , m_server(method.GetServer())
     , m_interface(method.GetInterface())
-  { }
+  { 
+  }
 
   __inline bool operator<(const NATInfo & other) const { return m_method < other.m_method; }
 };
@@ -88,7 +89,7 @@ MyManager::MyManager()
       break;
     }
   }
-#endif
+#endif // OPAL_VIDEO
 
 }
 
@@ -103,7 +104,7 @@ OpalCall * MyManager::CreateCall(void *)
   }
 
   if (m_verbose)
-   cout << "Maximum simultaneous calls (" << m_maxCalls << ") exceeeded." << endl;
+   cout << "Máximo n° de llamadas simultáneas (" << m_maxCalls << ") excedido." << endl;
 
   PTRACE(2, "Maximum simultaneous calls (" << m_maxCalls << ") exceeeded.");
   return NULL;
@@ -167,9 +168,6 @@ bool MyManager::Initialise(PArgList & args, bool verbose, const PString & defaul
         return false;
     }
   }
-  
-  if(verbose)
-    cout << "Rutas predefinidas: " << GetRouteTable() << endl;
   
   return true;
 }
@@ -282,15 +280,15 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
   SetTxMediaTimeout(PTimeInterval(0, rsrc->AddIntegerField(TxMediaTimeoutKey, 1, 365*24*60*60, GetTxMediaTimeout().GetSeconds(),
                                                            "segs", "Terminar llamada cuando no se transmite media al remoto en este tiempo.")));
 
-  /*SetTCPPorts(rsrc->AddIntegerField(TCPPortBaseKey, 0, 65535, GetTCPPortBase(), "", "Rango de puerto base para streams TCP, ej. canal de señalización H.323."),
-              rsrc->AddIntegerField(TCPPortMaxKey, 0, 65535, GetTCPPortMax(), "", "Rango de puerto máx para streams TCP."));
-  SetUDPPorts(rsrc->AddIntegerField(UDPPortBaseKey, 0, 65535, GetUDPPortBase(), "", "Rango de puerto base para streams UDP, ej. canal de señalización SIP."),
-              rsrc->AddIntegerField(UDPPortMaxKey, 0, 65535, GetUDPPortMax(), "", "Rango de puerto máx para streams UDP."));
-  SetRtpIpPorts(rsrc->AddIntegerField(RTPPortBaseKey, 0, 65535, GetRtpIpPortBase(), "", "Rango de puerto base para streams RTP/UDP."),
-                rsrc->AddIntegerField(RTPPortMaxKey, 0, 65535, GetRtpIpPortMax(), "", "Rango de puerto máx para streams RTP/UDP."));
+  SetTCPPorts(rsrc->AddIntegerField(TCPPortBaseKey, 0, 65535, GetTCPPortBase(), "", "Puerto base TCP para rango de puertos TCP."),
+              rsrc->AddIntegerField(TCPPortMaxKey, 0, 65535, GetTCPPortMax(), "", "Puerto max TCP para rango de puertos TCP."));
+  SetUDPPorts(rsrc->AddIntegerField(UDPPortBaseKey, 0, 65535, GetUDPPortBase(), "", "Puerto base UDP para rango de puertos UDP."),
+              rsrc->AddIntegerField(UDPPortMaxKey, 0, 65535, GetUDPPortMax(), "", "Puerto max UDP para rango de puertos UDP."));
+  SetRtpIpPorts(rsrc->AddIntegerField(RTPPortBaseKey, 0, 65535, GetRtpIpPortBase(), "", "Puerto base para rango de puertos RTP/UDP."),
+                rsrc->AddIntegerField(RTPPortMaxKey, 0, 65535, GetRtpIpPortMax(), "", "Puerto max para rango de puertos RTP/UDP."));
 
-  SetMediaTypeOfService(rsrc->AddIntegerField(RTPTOSKey, 0, 255, GetMediaTypeOfService(), "", "Valor para calidad de servicio (QoS)"));
-  */
+  SetMediaTypeOfService(rsrc->AddIntegerField(RTPTOSKey, 0, 255, GetMediaTypeOfService(), "", "Valor para calidad de servicio (QoS)."));
+  
   
 #if OPAL_PTLIB_NAT
   PSYSTEMLOG(Info, "Configuring NAT");
@@ -302,7 +300,7 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
 
     for (std::set<NATInfo>::iterator it = natInfo.begin(); it != natInfo.end(); ++it) {
       PHTTPCompositeField * fields = new PHTTPCompositeField("NAT\\" + it->m_method, it->m_method,
-                   "Habilitar flag y Servidor IP/hostname para NAT traversal usando " + it->m_friendly);
+                                                             "Habilitar flag y Servidor IP/hostname para NAT traversal usando " + it->m_friendly);
       fields->Append(new PHTTPBooleanField(NATActiveKey, it->m_active));
       fields->Append(new PHTTPStringField(NATServerKey, 0, 0, it->m_server, NULL, 1, 15));
       fields->Append(new PHTTPStringField(NATInterfaceKey, 0, 0, it->m_interface, NULL, 1, 15));
@@ -316,18 +314,32 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
 #if OPAL_VIDEO
   {
     unsigned prefWidth = 0, prefHeight = 0;
-    PVideoFrameInfo::ParseSize(rsrc->AddStringField(ConfVideoManagerKey, 30,"CIF",
-                                                    "Resolución de video preferida del manager."), prefWidth, prefHeight); 
+    static const char * const StandardSizes[] = { "SQCIF", "QCIF", "CIF", "CIF4", "CIF16", "HD480", "HD720", "HD1080" };
+    
+    PString prefer = rsrc->AddSelectField(ConfVideoManagerKey, PStringArray(PARRAYSIZE(StandardSizes), StandardSizes),
+    StandardSizes[0], "Resolución de video standar del manager. SQCIF = 128x96, QCIF = 176x144, CIF = 352x288, CIF4"
+                      " = 704x576, CIF16 = 1408x1152, HD480 = 704x480, HD720 = 1280x720, HD1080 = 1920x1080.");
+    for (PINDEX i = 0; i < PARRAYSIZE(StandardSizes); ++i) {
+      if (prefer == StandardSizes[i]) {
+        PVideoFrameInfo::ParseSize(StandardSizes[i], prefWidth, prefHeight);
+      }
+    }
+    
     if (m_verbose)
       cout << "Resolución de video preferida: " << PVideoFrameInfo::AsString(prefWidth, prefHeight) << endl;
 
     unsigned maxWidth = 0, maxHeight = 0;
-    PVideoFrameInfo::ParseSize(rsrc->AddStringField(ConfVideoMaxManagerKey, 30,"HD1080",
-                                                    "Resolución de video máxima del manager"), maxWidth, maxHeight); 
+    PString max = rsrc->AddSelectField(ConfVideoMaxManagerKey, PStringArray(PARRAYSIZE(StandardSizes), StandardSizes),
+    StandardSizes[7], "Resolución de video máxima del manager.");
+    for (PINDEX i = 0; i < PARRAYSIZE(StandardSizes); ++i) {
+      if (max == StandardSizes[i]) {
+        PVideoFrameInfo::ParseSize(StandardSizes[i], maxWidth, maxHeight);
+      }
+    } 
     if (m_verbose)
       cout << "Resolución de video máxima: " << PVideoFrameInfo::AsString(maxWidth, maxHeight) << endl;
 
-    double rate = rsrc->AddIntegerField(FrameRateManagerKey, 1, 60, 15, "", "Video Frame Rate");
+    double rate = rsrc->AddIntegerField(FrameRateManagerKey, 1, 60, 15, "", "Video Frame Rate, valor entre 1 y 60 fps.");
     if (rate < 1 || rate > 60) {
       cout << "Inválido video frame rate." << endl;
     }
@@ -335,11 +347,11 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
       cout << "Video frame rate: " << rate << " fps\n";
 
     unsigned frameTime = (unsigned)(OpalMediaFormat::VideoClockRate/rate);
-    OpalBandwidth bitrate(rsrc->AddStringField(BitRateManagerKey, 30,"1Mbps", "Video Bit Rate"));
-    if (bitrate < 10000) {
+    OpalBandwidth bitrate(rsrc->AddStringField(BitRateManagerKey, 30,"1Mbps", "Video Bit Rate."));
+    if (bitrate < 16000) {
       cout << "Inválido video bit rate." << endl;
     }
-    if (m_verbose)
+    else if (m_verbose)
       cout << "Video target bit rate: " << bitrate << '\n';
 
     OpalMediaFormatList formats = OpalMediaFormat::GetAllRegisteredMediaFormats();
@@ -420,7 +432,7 @@ bool MyManager::ConfigureCommon(OpalEndPoint * ep,
   else if (!ep->StartListeners(listeners)) {
     PSYSTEMLOG(Error, "Could not open any listeners for " << cfgPrefix);
   }
-  cout << ep->GetListeners() << endl;
+  
   return true;
 }
 
