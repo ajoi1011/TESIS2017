@@ -999,18 +999,11 @@ HomePage::HomePage(MyProcess & app, PHTTPAuthority & auth)
   PTime now;
 
   html << "<br><b>Monitor Text (<span style='cursor:pointer;text-decoration:underline' onclick='javascript:{if(document.selection){var range=document.body.createTextRange();range.moveToElementText(document.getElementById(\"monitorTextId\"));range.select();}else if(window.getSelection){var range=document.createRange();range.selectNode(document.getElementById(\"monitorTextId\"));window.getSelection().addRange(range);}}'>select all</span>)</b><div style='padding:5px;border:1pxdotted #595;width:100%;height:auto;max-height:300px;overflow:auto'><pre style='margin:0px;padding:0px' id='monitorTextId'>"
-       << "Programa: "             << MyProcess::Current().GetProductName() << "\n"
-       << "Version: "              << MyProcess::Current().GetVersion(TRUE) << "\n"
-       << "Desarrollador: "        << MyProcess::Current().GetManufacturer() << "\n"
-       << "S.O: "                  << MyProcess::Current().GetOSClass() << " " 
-       << MyProcess::Current().GetOSName() << "\n"
-       << "Version S.O: "          << MyProcess::Current().GetOSVersion() << "\n"
-       << "Hardware: "             << MyProcess::Current().GetOSHardware() << "\n"
        << "Inicio del servidor: "  << MyProcess::Current().GetStartTime().AsString(timeFormat) << "\n"
        << "Host local: "           << PIPSocket::GetHostName() << "\n"
        << "Direccion local: "      << localAddr << "\n"
        << "Puerto local: "         << localPort << "\n"
-     /*<< app.GetEndpoint().GetMonitorText()*/ << "</pre></div>";
+       << app.GetManager().GetMonitorText() << "</pre></div>";
   
   EndPage(html, MyProcess::Current().GetHtmlCopyright());
   m_string = html;

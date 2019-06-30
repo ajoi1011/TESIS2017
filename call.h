@@ -113,15 +113,12 @@ class MyCall : public OpalCall, public MyCallDetailRecord                //
   public:                                                                //
     MyCall(MyManager & manager);                                         //
                                                                          //
-    /** Sobrecarga de OpalCall */                                        //
-    //@{                                                                 //
     virtual PBoolean OnAlerting(OpalConnection & connection);            //
     virtual void OnCleared();                                            //
     virtual PBoolean OnConnected(OpalConnection & connection);           //
     virtual void OnEstablishedCall();                                    //
     virtual void OnProceeding(OpalConnection & connection);              //
     virtual PBoolean OnSetUp(OpalConnection & connection);               //
-    //@}                                                                 //
                                                                          //
     /** Implementadas en clase MyManager */                              //
     //@{                                                                 //

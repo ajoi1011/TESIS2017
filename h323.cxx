@@ -102,7 +102,6 @@ bool MyH323EndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
   if (h239Control)
     SetDefaultH239Control(true); 
 
-  
   SetInitialBandwidth(OpalBandwidth::RxTx, rsrc->AddIntegerField(H323BandwidthKey, 1, OpalBandwidth::Max()/1000,
                                                                  GetInitialBandwidth(OpalBandwidth::RxTx)/1000,
                                                                  "kb/s", "Ancho de banda requerido por el gatekeeper para originar/recibir llamadas.")*1000);
@@ -217,7 +216,7 @@ bool MyGatekeeperServer::Configure(PConfig & cfg, PConfigPage * rsrc)
                                                "Identificador del servidor gatekeeper.", 1, 30));
 
   AddListeners(rsrc->AddStringArrayField(GkServerListenersKey, false, 0, PStringArray(),
-                  "Interfaces de red local para escuchar RAS, en blanco se usan todas.", 1, 25));
+                                         "Interfaces de red local para escuchar RAS, en blanco se usan todas.", 1, 25));
 
   SetAvailableBandwidth(rsrc->AddIntegerField(AvailableBandwidthKey, 1, INT_MAX, GetAvailableBandwidth()/10,
                                               "kb/s", "Ancho de banda total a designar para todas las llamadas a través del servidor gatekeeper.")*10);

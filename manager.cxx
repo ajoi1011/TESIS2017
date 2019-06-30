@@ -100,11 +100,10 @@ MyManager::~MyManager()
 OpalCall * MyManager::CreateCall(void *)
 {
   if (m_activeCalls.GetSize() < m_maxCalls) { 
-   return new MyCall(*this);
+    return new MyCall(*this);
   }
 
-  if (m_verbose)
-   cout << "Máximo n° de llamadas simultáneas (" << m_maxCalls << ") excedido." << endl;
+  cout << "Máximo n° de llamadas simultáneas (" << m_maxCalls << ") excedido." << endl;
 
   PTRACE(2, "Maximum simultaneous calls (" << m_maxCalls << ") exceeeded.");
   return NULL;
@@ -168,6 +167,9 @@ bool MyManager::Initialise(PArgList & args, bool verbose, const PString & defaul
         return false;
     }
   }
+  
+  if (verbose)
+    cout << "Rutas definidas: " << GetRouteTable() << endl;
   
   return true;
 }
@@ -275,6 +277,26 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
   DisableDetectInBandDTMF(rsrc->AddBooleanField(InBandDTMFKey, DetectInBandDTMFDisabled(),
                                                 "Deshabilita filtro digital para detección in-band DTMF (reduce uso CPU)."));
   
+  /*if (args.HasOption("silence-detect")) {
+    OpalSilenceDetector::Params params = GetSilenceDetectParams();
+    PCaselessString arg = args.GetOptionString("silence-detect");
+    if (arg.NumCompare("adaptive") == EqualTo)
+      params.m_mode = OpalSilenceDetector::AdaptiveSilenceDetection;
+    else if (arg.NumCompare("fixed") == EqualTo)
+      params.m_mode = OpalSilenceDetector::FixedSilenceDetection;
+    else
+      params.m_mode = OpalSilenceDetector::NoSilenceDetection;
+    SetSilenceDetectParams(params);
+  }
+   if (args.HasOption("aud-qos"))
+    SetMediaQoS(OpalMediaType::Audio(), args.GetOptionString("aud-qos"));
+
+#if OPAL_VIDEO
+  if (args.HasOption("vid-qos"))
+    SetMediaQoS(OpalMediaType::Video(), args.GetOptionString("vid-qos"));
+#endif
+  */
+  
   SetNoMediaTimeout(PTimeInterval(0, rsrc->AddIntegerField(NoMediaTimeoutKey, 1, 365*24*60*60, GetNoMediaTimeout().GetSeconds(),
                                                            "segs", "Terminar llamada cuando no se recibe media desde remoto en este tiempo.")));
   SetTxMediaTimeout(PTimeInterval(0, rsrc->AddIntegerField(TxMediaTimeoutKey, 1, 365*24*60*60, GetTxMediaTimeout().GetSeconds(),
@@ -314,45 +336,38 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
 #if OPAL_VIDEO
   {
     unsigned prefWidth = 0, prefHeight = 0;
-    static const char * const StandardSizes[] = { "SQCIF", "QCIF", "CIF", "CIF4", "CIF16", "HD480", "HD720", "HD1080" };
+    static const char * const StandardSizes[] = { "SQCIF", "QCIF", "CIF", "CIF4", "HD480" };
     
-    PString prefer = rsrc->AddSelectField(ConfVideoManagerKey, PStringArray(PARRAYSIZE(StandardSizes), StandardSizes),
-    StandardSizes[0], "Resolución de video standar del manager. SQCIF = 128x96, QCIF = 176x144, CIF = 352x288, CIF4"
-                      " = 704x576, CIF16 = 1408x1152, HD480 = 704x480, HD720 = 1280x720, HD1080 = 1920x1080.");
+    m_prefVideo = rsrc->AddSelectField(ConfVideoManagerKey, PStringArray(PARRAYSIZE(StandardSizes), StandardSizes),
+                                       StandardSizes[0], "Resolución de video standar del manager. SQCIF = 128x96, QCIF = 176x144," 
+                                       " CIF = 352x288, CIF4 = 704x576, HD480 = 704x480.");
     for (PINDEX i = 0; i < PARRAYSIZE(StandardSizes); ++i) {
-      if (prefer == StandardSizes[i]) {
+      if (m_prefVideo == StandardSizes[i]) {
         PVideoFrameInfo::ParseSize(StandardSizes[i], prefWidth, prefHeight);
       }
     }
     
-    if (m_verbose)
-      cout << "Resolución de video preferida: " << PVideoFrameInfo::AsString(prefWidth, prefHeight) << endl;
-
     unsigned maxWidth = 0, maxHeight = 0;
-    PString max = rsrc->AddSelectField(ConfVideoMaxManagerKey, PStringArray(PARRAYSIZE(StandardSizes), StandardSizes),
-    StandardSizes[7], "Resolución de video máxima del manager.");
-    for (PINDEX i = 0; i < PARRAYSIZE(StandardSizes); ++i) {
-      if (max == StandardSizes[i]) {
-        PVideoFrameInfo::ParseSize(StandardSizes[i], maxWidth, maxHeight);
+    static const char * const MaxSizes[] = { "CIF16", "HD720", "HD1080" };
+    m_maxVideo = rsrc->AddSelectField(ConfVideoMaxManagerKey, PStringArray(PARRAYSIZE(MaxSizes), MaxSizes),
+                                              MaxSizes[0], "Resolución de video máxima del manager. CIF16 = 1408x1152, HD720 = 1280x720," 
+                                              " HD1080 = 1920x1080.");
+    for (PINDEX i = 0; i < PARRAYSIZE(MaxSizes); ++i) {
+      if (m_maxVideo == MaxSizes[i]) {
+        PVideoFrameInfo::ParseSize(MaxSizes[i], maxWidth, maxHeight);
       }
     } 
-    if (m_verbose)
-      cout << "Resolución de video máxima: " << PVideoFrameInfo::AsString(maxWidth, maxHeight) << endl;
-
-    double rate = rsrc->AddIntegerField(FrameRateManagerKey, 1, 60, 15, "", "Video Frame Rate, valor entre 1 y 60 fps.");
-    if (rate < 1 || rate > 60) {
+    
+    m_rate = rsrc->AddIntegerField(FrameRateManagerKey, 1, 60, 15, "", "Video Frame Rate, valor entre 1 y 60 fps.");
+    if (m_rate < 1 || m_rate > 60) {
       cout << "Inválido video frame rate." << endl;
     }
-    if (m_verbose)
-      cout << "Video frame rate: " << rate << " fps\n";
 
-    unsigned frameTime = (unsigned)(OpalMediaFormat::VideoClockRate/rate);
-    OpalBandwidth bitrate(rsrc->AddStringField(BitRateManagerKey, 30,"1Mbps", "Video Bit Rate."));
-    if (bitrate < 16000) {
+    unsigned frameTime = (unsigned)(OpalMediaFormat::VideoClockRate/m_rate);
+    m_bitrate = rsrc->AddStringField(BitRateManagerKey, 30,"1Mbps", "Video Bit Rate.");
+    if (m_bitrate < 16000) {
       cout << "Inválido video bit rate." << endl;
     }
-    else if (m_verbose)
-      cout << "Video target bit rate: " << bitrate << '\n';
 
     OpalMediaFormatList formats = OpalMediaFormat::GetAllRegisteredMediaFormats();
     for (OpalMediaFormatList::iterator it = formats.begin(); it != formats.end(); ++it) {
@@ -363,7 +378,7 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
         format.SetOptionInteger(OpalVideoFormat::MaxRxFrameWidthOption(), maxWidth);
         format.SetOptionInteger(OpalVideoFormat::MaxRxFrameHeightOption(), maxHeight);
         format.SetOptionInteger(OpalVideoFormat::FrameTimeOption(), frameTime);
-        format.SetOptionInteger(OpalVideoFormat::TargetBitRateOption(), bitrate);
+        format.SetOptionInteger(OpalVideoFormat::TargetBitRateOption(), m_bitrate);
         OpalMediaFormat::SetRegisteredMediaFormat(format);
       }
     }
@@ -419,10 +434,7 @@ bool MyManager::ConfigureCommon(OpalEndPoint * ep,
                                 PConfig & cfg,
                                 PConfigPage * rsrc)
 {
-  PString normalPrefix = ep->GetPrefixName();
-  
   bool enabled = rsrc->AddBooleanField("Habilitar" & cfgPrefix, true, "Habilita protocolo" & cfgPrefix & ".");
-  
   PStringArray listeners = rsrc->AddStringArrayField("Interfaces " & cfgPrefix, false, 25, PStringArray(),
                                                      "Interfaces y  puertos de red local para terminales " & cfgPrefix & ".");
   if (!enabled) {
@@ -463,6 +475,31 @@ bool MyManager::NotEndCDR(const CDRList::const_iterator & it)
 
   m_cdrMutex.Signal();
   return false;
+}
+
+PString MyManager::GetMonitorText()
+{
+  PStringStream output;
+  output << "Usuario: " << GetDefaultDisplayName() << '\n'
+         << "N° llamadas simultáneas: " << m_maxCalls << '\n' 
+         << "Puertos TCP: " << GetTCPPortRange() << '\n'
+         << "Puertos UDP: " << GetUDPPortRange() << '\n'
+         << "Puertos RTP: " << GetRtpIpPortRange() << '\n'
+         << "Rango de audio delay: " << '[' << GetMinAudioJitterDelay() << ',' << GetMaxAudioJitterDelay() << "]\n";
+/*#if OPAL_PTLIB_NAT
+  if (!natMethod.IsEmpty()) {
+    output << '\n' << *GetNatMethods().GetMethodByName(natMethod) << '\n';
+  }
+  else {
+    output << '\n' << natMethod << " unavailable.\n";
+  }
+#endif // OPAL_PTLIB_NAT*/
+  output << "Resolución de video preferida: " << m_prefVideo << '\n'
+         << "Resolución de video maxima: " << m_maxVideo << '\n'
+         << "Video frame rate: " << m_rate << " fps\n"
+         << "Video target bit rate: " << m_bitrate << '\n';
+         
+  return output;
 }
 
 void MyManager::StartRecordingCall(MyCall & call) const

@@ -101,6 +101,7 @@ class MyManager : public OpalManagerConsole                              //
 #endif                                                                   //
     //@}                                                                 //
     PStringArray GetAddressBook() { return m_addressBook; }              //
+    PString GetMonitorText();                                            //
                                                                          //
   protected:                                                             //
     OpalConsoleEndPoint * GetConsoleEndPoint(const PString & prefix);    //
@@ -114,6 +115,10 @@ class MyManager : public OpalManagerConsole                              //
     OpalRecordManager::Options m_recordingOptions;                       //
 #endif                                                                   //
     PStringArray   m_addressBook;                                        //
+    PString        m_prefVideo;                                          //
+    PString        m_maxVideo;                                           //
+    double         m_rate;                                               //
+    OpalBandwidth  m_bitrate;                                            //
     CDRList        m_cdrList;                                            //
     size_t         m_cdrListMax;                                         //
     PTextFile      m_cdrTextFile;                                        //

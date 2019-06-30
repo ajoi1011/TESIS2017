@@ -210,7 +210,7 @@ PBoolean MyProcess::OnStart()
   new MyPCSSEndPoint(*m_manager);
 #endif // OPAL_HAS_PCSS
 
-  m_manager->Initialise(GetArguments(), true, OPAL_PREFIX_MIXER":<du>");
+  m_manager->Initialise(GetArguments(), false, OPAL_PREFIX_MIXER":<du>");
 
   return PHTTPServiceProcess::OnStart();
 }

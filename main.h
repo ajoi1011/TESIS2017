@@ -78,7 +78,6 @@ class MyProcess : public PHTTPServiceProcess                             //
                                                                          //
       return html;                                                       //
     }                                                                    //
-    PString GetMonitorText() { }                                         //
     //@}                                                                 //
                                                                          //
     MyManager & GetManager() { return *m_manager; }                      //
