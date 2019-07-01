@@ -1,3 +1,4 @@
+
 #include "config.h"
 #include "h323.h"
 #include "html.h"
@@ -94,9 +95,9 @@ bool MyH323EndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
     m_configuredAliases = newAliases;
   }
 
-  DisableFastStart(rsrc->AddBooleanField(DisableFastStartKey,  IsFastStartDisabled(), "Deshabilita H.323 Fast Connect."));
-  DisableH245Tunneling(rsrc->AddBooleanField(DisableH245TunnelingKey,  IsH245TunnelingDisabled(), "Deshabilita  tunelizado H.245 en canal de señalización H.225.0."));
-  DisableH245inSetup(rsrc->AddBooleanField(DisableH245inSetupKey,  IsH245inSetupDisabled(), "Deshabilita envio inicial H.245 PDU tunelizado en SETUP PDU."));
+  DisableFastStart(rsrc->AddBooleanField(DisableFastStartKey, IsFastStartDisabled(), "Deshabilita H.323 Fast Connect."));
+  DisableH245Tunneling(rsrc->AddBooleanField(DisableH245TunnelingKey, IsH245TunnelingDisabled(), "Deshabilita  tunelizado H.245 en canal de señalización H.225.0."));
+  DisableH245inSetup(rsrc->AddBooleanField(DisableH245inSetupKey, IsH245inSetupDisabled(), "Deshabilita envio inicial H.245 PDU tunelizado en SETUP PDU."));
   ForceSymmetricTCS(rsrc->AddBooleanField(ForceSymmetricTCSKey, IsForcedSymmetricTCS(), "Forza indicación de codecs simétricos en TCS."));
   bool h239Control = rsrc->AddBooleanField(H239ControlKey, false, "Habilita control H.239.");
   if (h239Control)
@@ -107,7 +108,7 @@ bool MyH323EndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
                                                                  "kb/s", "Ancho de banda requerido por el gatekeeper para originar/recibir llamadas.")*1000);
 
   bool gkEnable = rsrc->AddBooleanField(GatekeeperEnableKey, false, "Habilita registro gatekeeper como cliente.");
-
+  
   PString gkAddress = rsrc->AddStringField(GatekeeperAddressKey, 0, PString::Empty(),
                                            "IP/hostname del gatekeeper para registro, en blanco se usa un broadcast.", 1, 30);
 
@@ -351,9 +352,9 @@ PString MyGatekeeperServer::OnLoadEndPointStatus(const PString & htmlBlock)
 }
 
 MyGatekeeperServer::RouteMap::RouteMap(const PString & theAlias, const PString & theHost)
-  : m_alias(theAlias),
-    m_regex('^' + theAlias + '$'),
-    m_host(theHost)
+  : m_alias(theAlias)
+  , m_regex('^' + theAlias + '$')
+  , m_host(theHost)
 {
 }
 

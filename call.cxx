@@ -477,4 +477,4 @@ void MyCall::OnStopMediaPatch(OpalMediaPatch & patch)
   if (duration > 0)
     m_Bandwidth += stats.m_totalBytes * 8 / duration;
 #endif
-}
+} // Final del Archivo

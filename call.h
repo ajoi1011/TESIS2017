@@ -16,7 +16,7 @@ class MyManager;
 /*                                                                       */
 /* <clase MyCallDetailRecord>                                            */
 /*                                                                       */
-/* <Descripcion>                                                         */
+/* <Descripción>                                                         */
 /*   Clase que describe un registro detallado de los parámetros de las   */
 /*  llamadas entrantes y salientes (CDR).                                */
 /*                                                                       */
@@ -102,7 +102,7 @@ class MyCallDetailRecord                                                 //
 /*                                                                       */
 /* <clase MyCall>                                                        */
 /*                                                                       */
-/* <Descripcion>                                                         */
+/* <Descripción>                                                         */
 /*   Clase derivada de OpalCall y MyCallDetailRecord que describe una    */
 /*  llamada OPAL con registro.                                           */
 /*                                                                       */

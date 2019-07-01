@@ -64,7 +64,7 @@ void ExpandWildcards(const PStringArray & input,
 #endif // OPAL_SIP
 
 MyManager::MyManager()
-  : OpalManagerConsole(OPAL_CONSOLE_PREFIXES OPAL_PREFIX_MIXER)
+  : OpalManagerConsole(OPAL_PREFIX_H323 " " OPAL_PREFIX_SIP " " OPAL_PREFIX_MIXER)
   , m_savedProductInfo(GetProductInfo())
   , m_maxCalls(9999)
   , m_mediaTransferMode(MediaTransferForward)
@@ -102,8 +102,6 @@ OpalCall * MyManager::CreateCall(void *)
   if (m_activeCalls.GetSize() < m_maxCalls) { 
     return new MyCall(*this);
   }
-
-  cout << "Máximo n° de llamadas simultáneas (" << m_maxCalls << ") excedido." << endl;
 
   PTRACE(2, "Maximum simultaneous calls (" << m_maxCalls << ") exceeeded.");
   return NULL;
@@ -276,26 +274,16 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
 
   DisableDetectInBandDTMF(rsrc->AddBooleanField(InBandDTMFKey, DetectInBandDTMFDisabled(),
                                                 "Deshabilita filtro digital para detección in-band DTMF (reduce uso CPU)."));
-  
-  /*if (args.HasOption("silence-detect")) {
-    OpalSilenceDetector::Params params = GetSilenceDetectParams();
-    PCaselessString arg = args.GetOptionString("silence-detect");
-    if (arg.NumCompare("adaptive") == EqualTo)
-      params.m_mode = OpalSilenceDetector::AdaptiveSilenceDetection;
-    else if (arg.NumCompare("fixed") == EqualTo)
-      params.m_mode = OpalSilenceDetector::FixedSilenceDetection;
-    else
-      params.m_mode = OpalSilenceDetector::NoSilenceDetection;
-    SetSilenceDetectParams(params);
-  }
-   if (args.HasOption("aud-qos"))
-    SetMediaQoS(OpalMediaType::Audio(), args.GetOptionString("aud-qos"));
 
-#if OPAL_VIDEO
-  if (args.HasOption("vid-qos"))
-    SetMediaQoS(OpalMediaType::Video(), args.GetOptionString("vid-qos"));
-#endif
-  */
+  OpalSilenceDetector::Params params = GetSilenceDetectParams();
+  PCaselessString vad = rsrc->AddStringField("VAD", 30, "", "VAD Detector de Silencio, ej. adaptativo/fijo/ninguno.");
+  if (vad == "adaptativo")
+    params.m_mode = OpalSilenceDetector::AdaptiveSilenceDetection;
+  else if (vad == "fijo")
+    params.m_mode = OpalSilenceDetector::FixedSilenceDetection;
+  else
+    params.m_mode = OpalSilenceDetector::NoSilenceDetection;
+  SetSilenceDetectParams(params);
   
   SetNoMediaTimeout(PTimeInterval(0, rsrc->AddIntegerField(NoMediaTimeoutKey, 1, 365*24*60*60, GetNoMediaTimeout().GetSeconds(),
                                                            "segs", "Terminar llamada cuando no se recibe media desde remoto en este tiempo.")));
@@ -360,13 +348,13 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
     
     m_rate = rsrc->AddIntegerField(FrameRateManagerKey, 1, 60, 15, "", "Video Frame Rate, valor entre 1 y 60 fps.");
     if (m_rate < 1 || m_rate > 60) {
-      cout << "Inválido video frame rate." << endl;
+      PTRACE(2, "Invalid video frame rate parameter");
     }
 
     unsigned frameTime = (unsigned)(OpalMediaFormat::VideoClockRate/m_rate);
     m_bitrate = rsrc->AddStringField(BitRateManagerKey, 30,"1Mbps", "Video Bit Rate.");
     if (m_bitrate < 16000) {
-      cout << "Inválido video bit rate." << endl;
+      PTRACE(2, "Invalid video bit rate parameter");
     }
 
     OpalMediaFormatList formats = OpalMediaFormat::GetAllRegisteredMediaFormats();
@@ -485,21 +473,32 @@ PString MyManager::GetMonitorText()
          << "Puertos TCP: " << GetTCPPortRange() << '\n'
          << "Puertos UDP: " << GetUDPPortRange() << '\n'
          << "Puertos RTP: " << GetRtpIpPortRange() << '\n'
+         << "[Servidores NAT]" << '\n' << GetNatMethods() << '\n'
          << "Rango de audio delay: " << '[' << GetMinAudioJitterDelay() << ',' << GetMaxAudioJitterDelay() << "]\n";
-/*#if OPAL_PTLIB_NAT
-  if (!natMethod.IsEmpty()) {
-    output << '\n' << *GetNatMethods().GetMethodByName(natMethod) << '\n';
-  }
-  else {
-    output << '\n' << natMethod << " unavailable.\n";
-  }
-#endif // OPAL_PTLIB_NAT*/
-  output << "Resolución de video preferida: " << m_prefVideo << '\n'
+  if (DetectInBandDTMFDisabled())
+    output << "InBandDTMF deshabilitado" << '\n';
+  output << "Silence Detector: " << GetSilenceDetectParams().m_mode << '\n'
+         << "Resolución de video preferida: " << m_prefVideo << '\n'
          << "Resolución de video maxima: " << m_maxVideo << '\n'
          << "Video frame rate: " << m_rate << " fps\n"
-         << "Video target bit rate: " << m_bitrate << '\n';
-         
-  return output;
+         << "Video target bit rate: " << m_bitrate << '\n'
+         << "H323 alias: " << GetH323EndPoint().GetAliasNames() << '\n';
+  if (GetH323EndPoint().IsFastStartDisabled())
+    output << "Fast Connect deshabilitado" << '\n';
+  if (GetH323EndPoint().IsH245TunnelingDisabled())
+    output << "H.245 Tunneling deshabilitado" << '\n';
+  if (GetH323EndPoint().IsH245inSetupDisabled() )
+    output << "H.245 in Setup deshabilitado" << '\n';  
+  if (GetH323EndPoint().IsForcedSymmetricTCS() )
+    output << "Force TCS symmetric deshabilitado" << '\n';
+  if (GetH323EndPoint().GetDefaultH239Control() == false )
+    output << "H.239 Control deshabilitado" << '\n';
+   
+  output << "SIP: " << GetSIPEndPoint().GetDefaultLocalPartyName() << '\n'
+         << "Proxy: " << GetSIPEndPoint().GetProxy() << '\n'
+         << "Registrar Domains: " << GetSIPEndPoint().GetRegistrarDomains() << '\n';
+  
+  return output; 
 }
 
 void MyManager::StartRecordingCall(MyCall & call) const

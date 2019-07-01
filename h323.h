@@ -55,7 +55,7 @@ class MyGatekeeperServer : public H323GatekeeperServer                   //
   PCLASSINFO(MyGatekeeperServer, H323GatekeeperServer);                  //
   public:                                                                //
     MyGatekeeperServer(H323EndPoint & ep);                               //
-                                                                         //
+    //** Funciones implementadas en OpalServer */                        //
     virtual H323GatekeeperCall * CreateCall(                             //
       const OpalGloballyUniqueID & callIdentifier,                       //
       H323GatekeeperCall::Direction direction                            //
@@ -68,8 +68,6 @@ class MyGatekeeperServer : public H323GatekeeperServer                   //
       H323GatekeeperCall * call                                          //
     );                                                                   //
                                                                          //
-    /** Funciones desarrolladas a partir de OpalServer */                //
-    //@{                                                                 //
     bool Configure(PConfig & cfg, PConfigPage * rsrc);                   //
     bool ForceUnregister(const PString id);                              //
     PString OnLoadEndPointStatus(const PString & htmlBlock);             //

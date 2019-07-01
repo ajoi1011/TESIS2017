@@ -33,7 +33,7 @@ bool MySIPEndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
   SIPConnection::PRACKMode prack = cfg.GetEnum(SIPPrackKey, GetDefaultPRACKMode());
   static const char * const prackModes[] = { "Disabled", "Supported", "Required" };
   rsrc->Add(new PHTTPRadioField(SIPPrackKey, PARRAYSIZE(prackModes), prackModes, prack,
-    "Manejo de respuestas SIP provisionales (100rel)."));
+                                "Manejo de respuestas SIP provisionales (100rel)."));
   SetDefaultPRACKMode(prack);
 
   SetProxy(rsrc->AddStringField(SIPProxyKey, 100, GetProxy().AsString(), "SIP outbound proxy IP/hostname.", 1, 30));
