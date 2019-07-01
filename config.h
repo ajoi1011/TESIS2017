@@ -31,6 +31,7 @@ static const PConstString RemovedMediaKey("Codecs Removidos");
 static const PConstString MinJitterKey("Mínimo Jitter");
 static const PConstString MaxJitterKey("Máximo Jitter");
 static const PConstString InBandDTMFKey("Deshabilitar In-DTMF");
+static const PConstString SilenceDetectorKey("Detector de Silencio");
 static const PConstString NoMediaTimeoutKey("Timeout RX Media");
 static const PConstString TxMediaTimeoutKey("Timeout TX Media");
 static const PConstString TCPPortBaseKey("Puerto TCP Base");

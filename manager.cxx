@@ -276,7 +276,7 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
                                                 "Deshabilita filtro digital para detección in-band DTMF (reduce uso CPU)."));
 
   OpalSilenceDetector::Params params = GetSilenceDetectParams();
-  PCaselessString vad = rsrc->AddStringField("VAD", 30, "", "VAD Detector de Silencio, ej. adaptativo/fijo/ninguno.");
+  PCaselessString vad = rsrc->AddStringField(SilenceDetectorKey, 30, "", "Detector de Silencio (VAD), ej. adaptativo/fijo/ninguno.");
   if (vad == "adaptativo")
     params.m_mode = OpalSilenceDetector::AdaptiveSilenceDetection;
   else if (vad == "fijo")
@@ -469,20 +469,27 @@ PString MyManager::GetMonitorText()
 {
   PStringStream output;
   output << "Usuario: " << GetDefaultDisplayName() << '\n'
-         << "N° llamadas simultáneas: " << m_maxCalls << '\n' 
+         << "N° llamadas simultáneas: " << m_maxCalls << '\n'
+         << "\n[ Puertos TCP/UDP/RTP ]" << '\n' 
          << "Puertos TCP: " << GetTCPPortRange() << '\n'
          << "Puertos UDP: " << GetUDPPortRange() << '\n'
          << "Puertos RTP: " << GetRtpIpPortRange() << '\n'
-         << "[Servidores NAT]" << '\n' << GetNatMethods() << '\n'
+         << "\n[ Servidores NAT ]" << '\n' << GetNatMethods() << '\n'
+         << "\n[ Audio ]" << '\n'
          << "Rango de audio delay: " << '[' << GetMinAudioJitterDelay() << ',' << GetMaxAudioJitterDelay() << "]\n";
   if (DetectInBandDTMFDisabled())
     output << "InBandDTMF deshabilitado" << '\n';
-  output << "Silence Detector: " << GetSilenceDetectParams().m_mode << '\n'
-         << "Resolución de video preferida: " << m_prefVideo << '\n'
+  output << "Detector de silencio: " << GetSilenceDetectParams().m_mode << '\n';
+#if OPAL_VIDEO
+  output << "\n[ Video ]" << '\n'
+         << "Resolución de video standard: " << m_prefVideo << '\n'
          << "Resolución de video maxima: " << m_maxVideo << '\n'
          << "Video frame rate: " << m_rate << " fps\n"
-         << "Video target bit rate: " << m_bitrate << '\n'
-         << "H323 alias: " << GetH323EndPoint().GetAliasNames() << '\n';
+         << "Video target bit rate: " << m_bitrate << '\n';
+#endif // OPAL_VIDEO
+#if OPAL_H323
+  output << "\n[ H.323 ]" << '\n'
+         << "Alias H.323: " << GetH323EndPoint().GetAliasNames() << '\n';
   if (GetH323EndPoint().IsFastStartDisabled())
     output << "Fast Connect deshabilitado" << '\n';
   if (GetH323EndPoint().IsH245TunnelingDisabled())
@@ -490,20 +497,21 @@ PString MyManager::GetMonitorText()
   if (GetH323EndPoint().IsH245inSetupDisabled() )
     output << "H.245 in Setup deshabilitado" << '\n';  
   if (GetH323EndPoint().IsForcedSymmetricTCS() )
-    output << "Force TCS symmetric deshabilitado" << '\n';
+    output << "Force symmetric TCS deshabilitado" << '\n';
   if (GetH323EndPoint().GetDefaultH239Control() == false )
     output << "H.239 Control deshabilitado" << '\n';
-   
-  output << "SIP: " << GetSIPEndPoint().GetDefaultLocalPartyName() << '\n'
-         << "Proxy: " << GetSIPEndPoint().GetProxy() << '\n'
-         << "Registrar Domains: " << GetSIPEndPoint().GetRegistrarDomains() << '\n';
-  
+#endif // OPAL_H323
+#if OPAL_SIP
+  output << "\n[ SIP ]" << '\n'
+         << "Usuario SIP: " << GetSIPEndPoint().GetDefaultLocalPartyName() << '\n'
+         << "Servidor Proxy: " << GetSIPEndPoint().GetProxy() << '\n'
+         << "Dominios Servidor Registrar: " << GetSIPEndPoint().GetRegistrarDomains() << '\n';
+#endif // OPAL_SIP
   return output; 
 }
 
 void MyManager::StartRecordingCall(MyCall & call) const
 {
-  // A Implementar
 }
 
 void MyManager::OnChangedRegistrarAoR(const PURL & aor, bool registering)
