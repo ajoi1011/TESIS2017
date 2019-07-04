@@ -16,10 +16,6 @@ MySIPEndPoint::MySIPEndPoint(MyManager & manager)
 bool MySIPEndPoint::Initialise(PArgList & args, bool verbose, const PString & defaultRoute)
 {
   AddRoutesFor(this, defaultRoute);
-
-  if (verbose)
-   cout << "Terminal SIP inicializado" << endl;
-   
   return true;
 }
 

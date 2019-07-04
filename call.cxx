@@ -67,7 +67,7 @@ bool MyManager::ConfigureCDR(PConfig & cfg, PConfigPage * rsrc)
 
   m_cdrTextFile.Close();
 
-  PString filename = rsrc->AddStringField(CDRTextFileKey, 0, m_cdrTextFile.GetFilePath(), "Nombre archivo de texto del CDR.", 1, 30);
+  PString filename = rsrc->AddStringField(CDRTextFileKey, 0, m_cdrTextFile.GetFilePath(), "Nombre del archivo de texto CDR.", 1, 30);
   PString cdrHeadings = rsrc->AddStringField(CDRTextHeadingsKey, 0, GetDefaultTextHeadings(), "Headers del CDR en el texto de salida.", 1, 30);
   m_cdrFormat = rsrc->AddStringField(CDRTextFormatKey, 0, GetDefaultTextFormats(), "Formato de salida de texto CDR.", 1, 30);
 

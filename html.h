@@ -65,7 +65,7 @@ class BaseStatusPage : public PServiceHTTPString                         //
       const PStringToString & query                                      //
     );                                                                   //
     virtual const char * GetTitle() const = 0;                           //
-    virtual bool OnPostControl(const PStringToString & /*data*/,         // 
+    virtual bool OnPostControl(const PStringToString & /*data*/,         //
                                PHTML & /*msg*/)                          //
     {                                                                    //
       return false;                                                      //
@@ -129,7 +129,7 @@ class RegistrationStatusPage : public BaseStatusPage                     //
 /*                                                                       */
 /* <Descripción>                                                         */
 /*   Clase derivada de BaseStatusPage que describe un post HTTP con info */
-/*  del servidor gatekeeper H.323.                                       */
+/*  del cliente/servidor gatekeeper H.323.                               */
 /*                                                                       */
 /*************************************************************************/
 class GkStatusPage : public BaseStatusPage                               //

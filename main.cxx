@@ -23,7 +23,7 @@ PBoolean MyProcess::Initialise(const char * initMsg)
 {
   PSYSTEMLOG(Warning, "Service " << GetName() << ' ' << initMsg);
 
-  Params params("Parametros", "Parámetros");
+  Params params("Parametros", "Parametros");
   params.m_httpPort = DefaultHTTPPort;
   if (!InitialiseBase(params))
     return false;
@@ -46,7 +46,7 @@ PBoolean MyProcess::Initialise(const char * initMsg)
   CreateHTTPResource("RegistrationStatus");
   CreateHTTPResource("Select");
   
-  // Definiciónes implementadas en OpenMCU-ru
+  // Definiciones implementadas en OpenMCU-ru
 #ifdef SYS_RESOURCE_DIR
 #  define WEBSERVER_LINK(r1) m_httpNameSpace.AddResource(new PHTTPFile(r1, PString(SYS_RESOURCE_DIR) + PATH_SEPARATOR + r1), PHTTPSpace::Overwrite)
 #  define WEBSERVER_LINK_MIME(mt1,r1) m_httpNameSpace.AddResource(new PHTTPFile(r1, PString(SYS_RESOURCE_DIR) + PATH_SEPARATOR + r1, mt1), PHTTPSpace::Overwrite)
@@ -59,7 +59,7 @@ PBoolean MyProcess::Initialise(const char * initMsg)
   WEBSERVER_LINK_MIME("text/javascript", "locale_en.js");
   WEBSERVER_LINK_MIME("text/css",  "main.css");
   WEBSERVER_LINK_MIME("text/css",  "bootstrap.css");
-  WEBSERVER_LINK_MIME("image/png", "openmcu.ru_logo_text.png");
+  WEBSERVER_LINK_MIME("image/png", "mylogo_text.png");
   
   if (ListenForHTTP(params.m_httpPort))
     PSYSTEMLOG(Info, "Opened master socket for HTTP: " << m_httpListeningSockets.front().GetPort());
@@ -114,7 +114,7 @@ bool MyProcess::InitialiseBase(Params & params)
                                                   "Archivo de salida para trazo log.", 1, 30);
 
     info.m_directory = params.m_configPage->AddStringField(RotateDirKey, 0, info.m_directory, 
-                                                          "Ruta del directorio para archivo de trazo log.", 1, 30);
+                                                           "Ruta del directorio para archivo de trazo log.", 1, 30);
 
     info.m_prefix = params.m_configPage->AddStringField(RotatePrefixKey, 0, info.m_prefix, 
                                                         "Prefijo para archivo de trazo log.", 1, 30);
@@ -171,12 +171,12 @@ bool MyProcess::InitialiseBase(Params & params)
     if (params.m_fullLogPageName != NULL) {
       params.m_fullLogPage = new PHTTPFile(params.m_fullLogPageName, logFile->GetFilePath(), PMIMEInfo::TextPlain(), 
                                            params.m_authority);
-      
+
       m_httpNameSpace.AddResource(params.m_fullLogPage, PHTTPSpace::Overwrite);
     }
 
     if (params.m_clearLogPageName != NULL) {
-      params.m_clearLogPage = new ClearLogPage(*this, params.m_clearLogPageName, params.m_authority);
+      params.m_clearLogPage = new MyClearLogPage(*this, params.m_clearLogPageName, params.m_authority);
       m_httpNameSpace.AddResource(params.m_clearLogPage, PHTTPSpace::Overwrite);
     }
 
@@ -187,7 +187,7 @@ bool MyProcess::InitialiseBase(Params & params)
       m_httpNameSpace.AddResource(params.m_tailLogPage, PHTTPSpace::Overwrite);
     }
   }
-  
+
   return true;
 }
 
@@ -254,7 +254,7 @@ void MyProcess::CreateHTTPResource(const PString & name)
     m_httpNameSpace.AddResource(new RegistrationStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
   else if (name == "Select")
     m_httpNameSpace.AddResource(new SelectRoomPage(*this, authConference), PHTTPSpace::Overwrite);
-  
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -262,7 +262,7 @@ void MyProcess::CreateHTTPResource(const PString & name)
 void MyPConfigPage::BuildHTML(PHTML & html, BuildOptions option)
 {
   PStringStream html_begin, html_end, html_page, meta;
-  
+
   html.Set(PHTML::InBody);
   html << PHTML::Form("POST")
        << PHTML::TableStart("style='border:1px solid black;'");
@@ -300,4 +300,67 @@ void MyPConfigPage::BuildHTML(PHTML & html, BuildOptions option)
     m_string = html_page;
   }
 
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+MyClearLogPage::MyClearLogPage(PHTTPServiceProcess & process, const PURL & url, const PHTTPAuthority & auth)
+  : ClearLogPage(process, url, auth)
+{
+}
+
+PString MyClearLogPage::LoadText(PHTTPRequest & request)
+{
+  PStringStream html_begin, html_end, html_page, meta;
+  PHTML html;
+  html.Set(PHTML::InBody);
+  html << PHTML::Paragraph() << "<center>"
+       << PHTML::Form("POST")
+       << PHTML::Paragraph() << "<center>" << PHTML::SubmitButton(ClearLogFileStr);
+
+  PSystemLogToFile * logFile = dynamic_cast<PSystemLogToFile *>(&PSystemLog::GetTarget());
+  if (logFile != NULL && logFile->GetRotateInfo().CanRotate())
+    html << PHTML::Paragraph() << "<center>" << PHTML::SubmitButton(RotateLogFilesStr);
+
+  html << PHTML::Form();
+
+  BeginPage(html_begin, meta, "Clear Log Page", "window.l_param_general","window.l_info_param_general");
+  EndPage(html_end, MyProcess::Current().GetHtmlCopyright());
+  html_page << html_begin << html << html_end;
+  m_string = html_page;
+
+  return PServiceHTTPString::LoadText(request);
+}
+
+PBoolean MyClearLogPage::Post(PHTTPRequest & request, const PStringToString & data, PHTML & msg)
+{
+  msg << PHTML::Title() << "Cleared Log File" << PHTML::Body()
+      << PHTML::Heading(1) << "Cleared Log File" << PHTML::Heading(1);
+
+  PSystemLogToFile * logFile = dynamic_cast<PSystemLogToFile *>(&PSystemLog::GetTarget());
+  if (logFile == NULL)
+    msg << "Not logging to a file";
+  else {
+    if (data("submit") == ClearLogFileStr) {
+      if (logFile->Clear())
+        msg << "Cleared ";
+      else
+        msg << "Could not clear ";
+      msg << " log file " << logFile->GetFilePath();
+    }
+    else if (data("submit") == RotateLogFilesStr) {
+      if (logFile->Rotate(true))
+        msg << "Rotated";
+      else
+        msg << "Could not rotate";
+      msg << " log file " << logFile->GetFilePath() << " to " << logFile->GetRotateInfo().m_directory;
+    }
+  }
+
+  msg << PHTML::Paragraph()
+      << PHTML::HotLink("/") << "Home page" << PHTML::HotLink();
+
+  PServiceHTML::ProcessMacros(request, msg, "html/status.html",
+                              PServiceHTML::LoadFromFile | PServiceHTML::NoSignatureForFile);
+  return true;
 } // Final del Archivo

@@ -13,5 +13,5 @@
 #include <opal/patch.h>
 #include <h323/gkclient.h>
 #include <h323/gkserver.h>
-
+typedef PHTTPServiceProcess::ClearLogPage ClearLogPage;
 // End of File ///////////////////////////////////////////////////////////////

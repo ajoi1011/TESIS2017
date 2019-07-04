@@ -1,7 +1,24 @@
+/*************************************************************************/
+/*************************************************************************/
+/*                                                                       */
+/*                       C O N F I G  H E A D E R                        */
+/*                                                                       */
+/*************************************************************************/
+/*                                                                       */
+/* <Descripción>                                                         */
+/*   Clase derivada de PConfigPage que describe una instancia de         */
+/*  configuración para la aplicación.                                    */
+/*                                                                       */
+/*************************************************************************/
+
 #ifndef _CONFIG_H
 #define _CONFIG_H
 
 #include "precompile.h"
+
+//MyClearLogPage
+static const PConstString ClearLogFileStr("Clear Log File");
+static const PConstString RotateLogFilesStr("Rotate Log Files");
 
 //MyProcess
 const  WORD  DefaultHTTPPort = 1719;
@@ -17,6 +34,7 @@ static const PConstString RotateCountKey("Conteo Trazo Log");
 static const PConstString RotateAgeKey("Historial Trazo Log");
 static const PConstString HTTPPortKey("Puerto HTTP");
 static const PConstString HTTPInterfacesKey("Interfaces HTTP");
+
 //MyManager
 static const PConstString DisplayNameKey("Display");
 static const PConstString OverrideProductInfoKey("Anular Info");
@@ -52,10 +70,12 @@ static const PConstString ConfVideoMaxManagerKey("Resolución max de Video");
 static const PConstString FrameRateManagerKey("Video Frame Rate");
 static const PConstString BitRateManagerKey("Video Bit Rate");
 #endif
+
 //MyH323EndPoint
-#define H323RegistrationSection "H.323 Registration\\"
-#define H323RegistrationNewSection H323RegistrationSection "New"
-#define H323RegistrationEncryptedSection H323RegistrationSection"Encrypted"
+#if OPAL_H323
+#define H323RegistrationSection "Registro H.323\\"
+#define H323RegistrationNewSection H323RegistrationSection "Nuevo"
+#define H323RegistrationEncryptedSection H323RegistrationSection"Encriptado"
 static const PINDEX H323GatekeeperPasswordSize = 30;
 static const PConstString H323AliasesKey("Alias H.323");
 static const PConstString DisableFastStartKey("Deshabilitar Fast Start");
@@ -103,10 +123,12 @@ static const PConstString AuthenticationCredentialsName("Usuarios Autentificados
 static const PConstString AuthenticationCredentialsKey("Credentials %u\\");
 static const PConstString AliasRouteMapsName("Mapas de Alias");
 static const PConstString AliasRouteMapsKey("Mapa de Rutas \\Mapping %u\\");
+#endif // OPAL_H323
+
 //MySIPEndPoint
+#if OPAL_SIP
 #define REGISTRATIONS_SECTION "Registro SIP"
 #define REGISTRATIONS_KEY     REGISTRATIONS_SECTION"\\Registro %u\\"
-
 static const PConstString SIPUsernameKey("Usuario SIP");
 static const PConstString SIPPrackKey("Respuestas SIP Provisionales");
 static const PConstString SIPProxyKey("Proxy URL SIP");
@@ -116,12 +138,12 @@ static const PConstString SIPCiscoDevicePatternKey("Patrón Dispositivo SIP Cisc
 #if OPAL_H323
 static const PConstString SIPAutoRegisterH323Key("Auto-Registro H.323");
 #endif
-
 static const PConstString SIPAddressofRecordKey("Dirección");
 static const PConstString SIPAuthIDKey("ID");
 static const PConstString SIPPasswordKey("Contraseña");
 static const PConstString SIPRegTTLKey("TTL");
 static const PConstString SIPCompatibilityKey("Compatibilidad");
+#endif // OPAL_SIP
 
 static const PConstString CDRTextFileKey("Archivo de Texto CDR");
 static const PConstString CDRTextHeadingsKey("Headings CDR");
@@ -133,12 +155,7 @@ static const PConstString ConfAudioOnlyKey("Solo Audio en Conferencia");
 static const PConstString ConfMediaPassThruKey("Media Pass Through");
 static const PConstString ConfVideoResolutionKey("Resolución de VideoConferencia");
 static const PConstString ConfMixingModeKey("Modo de video");
-
-/*static const PConstString RecordAllCallsKey("Record All Calls");
-static const PConstString RecordFileTemplateKey("Record File Template");
-static const PConstString RecordStereoKey("Record Stereo");
-static const PConstString RecordAudioFormatKey("Record Audio Format");*/
-#endif
+#endif // OPAL_HAS_MIXER
 
 #define PATH_SEPARATOR   "/"
 // specify the path executable files
@@ -149,6 +166,5 @@ static const PConstString RecordAudioFormatKey("Record Audio Format");*/
 //#define SYS_RESOURCE_DIR "/usr/local/share/opalserver/resource"
 #define SYS_RESOURCE_DIR "/home/ajoi1011/proyecto/project/resource"
 
-
 #endif // CONFIG_H
-
+/************************Final del Header*********************************/

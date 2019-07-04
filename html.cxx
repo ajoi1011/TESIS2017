@@ -17,7 +17,7 @@ void BeginPage(PStringStream & html,
                const char * quotekey)  
 { 
   PWaitAndSignal m(html_mutex);
-  
+
   if (html_template_size <= 0) { 
     FILE * fs = fopen("/home/ajoi1011/proyecto/project/resource/template.html", "r");
     if (fs) { 
@@ -33,14 +33,13 @@ void BeginPage(PStringStream & html,
     }
     else html_template_size = -1; // read error indicator
   }
- 
+
   if (html_template_size <= 0) { 
-    cout << "No se pudo cargar la plantilla html!\n"; 
     PTRACE(1,"WebCtrl\tCan't read HTML template from file"); 
     return; 
   }
 
-  PString lang = "en";//MCUConfig("Parameters").GetString("Language").ToLower();
+  PString lang = "en";
   
   PString html0(html_template_buffer); 
   html0 = html0.Left(html0.Find("$BODY$"));
@@ -49,7 +48,6 @@ void BeginPage(PStringStream & html,
   html0.Replace("$PTITLE$",   ptitle,   TRUE, 0);
   html0.Replace("$TITLE$",    title,    TRUE, 0);
   html0.Replace("$QUOTE$",    quotekey, TRUE, 0);
-  //html0.Replace("$INIT$",     jsInit,   TRUE, 0);
   html << html0;
 }
 
@@ -59,7 +57,7 @@ void EndPage(PStringStream & html, PString copyr)
   
   if (html_template_size <= 0) 
     return;
-    
+
   PString html0(html_template_buffer); 
   html0 = html0.Mid(html0.Find("$BODY$")+6,P_MAX_INDEX);
   html0.Replace("$COPYRIGHT$", copyr,   TRUE, 0);
@@ -319,7 +317,7 @@ PBoolean BaseStatusPage::Post(PHTTPRequest & request,
     PServiceHTML::ProcessMacros(request, msg, "", PServiceHTML::LoadFromFile);
     return true;
   }
-  
+
   PStringStream meta_page;
   BeginPage(msg, meta_page, GetTitle(), "window.l_param_general","window.l_info_param_general");
   msg.Set(PHTML::InBody);
@@ -332,7 +330,7 @@ PBoolean BaseStatusPage::Post(PHTTPRequest & request,
       << PHTML::HotLink(request.url.AsString()) << "Recargar página" << PHTML::HotLink()
       << PHTML::NonBreakSpace(4)
       << PHTML::HotLink("/") << "Home" << PHTML::HotLink();
-  
+
   EndPage(msg,MyProcess::Current().GetHtmlCopyright());
 
   PServiceHTML::ProcessMacros(request, msg, "html/status.html",
@@ -344,7 +342,7 @@ void BaseStatusPage::CreateHTML(PHTML & html_page, const PStringToString & query
 {
   PStringStream html_begin, html_end, meta_page;
   PHTML html(PHTML::InBody);
-  
+
   if (m_refreshRate > 0) {
     meta_page << "<meta http-equiv=\"Refresh\" content=\"" << m_refreshRate << "\" />";
     BeginPage(html_begin, meta_page, GetTitle(), "window.l_param_general","window.l_info_param_general");
@@ -352,7 +350,7 @@ void BaseStatusPage::CreateHTML(PHTML & html_page, const PStringToString & query
   else {
     BeginPage(html_begin, meta_page, GetTitle(), "window.l_param_general","window.l_info_param_general");
   }
-  
+
   html << PHTML::Form("POST");
 
   CreateContent(html, query);
@@ -371,7 +369,7 @@ void BaseStatusPage::CreateHTML(PHTML & html_page, const PStringToString & query
   html << PHTML::Form()
        << PHTML::HRule()
        << "<p>Last update: <!--#macro LongDateTime--></p>";
-  
+
   EndPage(html_end,MyProcess::Current().GetHtmlCopyright());
   html_page << html_begin << html << html_end;
 }
@@ -761,11 +759,11 @@ void InvitePage::CreateHTML(PHTML & html)
   PStringStream meta_page;
   PStringArray myAddressBook = MyProcess::Current().GetManager().GetAddressBook();
   MyMixerEndPoint & mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
-  
+
   PHTML html_page;
   BeginPage(html_page,meta_page,"Invite","window.l_invite","window.l_info_invite");
   html_page.Set(PHTML::InBody);
-  
+
   html_page << PHTML::Paragraph() << "<center>"
        
        << PHTML::Form("POST") 
@@ -790,7 +788,7 @@ void InvitePage::CreateHTML(PHTML & html)
        << PHTML::SubmitButton("Invite") 
        << PHTML::Form() 
        << PHTML::HRule();
-  
+
   EndPage(html_page,MyProcess::Current().GetHtmlCopyright());
   html = html_page;
 }
@@ -810,11 +808,11 @@ PBoolean InvitePage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo & co
   PHTML html;
   CreateHTML(html);
        
-  
+
   { PStringStream message; PTime now; message
       << "HTTP/1.1 200 OK\r\n"
       << "Date: " << now.AsString(PTime::RFC1123, PTime::GMT) << "\r\n"
-      << "Server: OpalServer\r\n"
+      << "Server: OpalMCU-EIE\r\n"
       << "MIME-Version: 1.0\r\n"
       << "Cache-Control: no-cache, must-revalidate\r\n"
       << "Expires: Sat, 26 Jul 1997 05:00:00 GMT\r\n"
@@ -854,19 +852,19 @@ PBoolean InvitePage::Post(PHTTPRequest & request,
   else {
    MyProcess::Current().GetManager().GetAddressBook().push_back(address);
   }
-  
+
   PSafePtr<OpalMixerNode> node = m_mixer.FindNode(room);
   if (node == NULL) {
     cout << "Conference \"" << room << "\" does not exist" << endl;
   }
-  
+
   if (MyProcess::Current().GetManager().SetUpCall("mcu:"+node->GetGUID().AsString(), address, token))
     cout << "Adding new member \"" << address << "\" to conference " << *node << endl;
   else
     cout << "Could not add new member \"" << address << "\" to conference " << *node << endl;
-  
+
   CreateHTML(msg);
-    
+
   return true;
 }
 
@@ -892,7 +890,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
 
   MyMixerEndPoint & m_mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
   MyManager & manager = MyProcess::Current().GetManager();
- 
+
   PWaitAndSignal m(html_mutex);
   if(data.Contains("action") && !data("room").IsEmpty())
   {
@@ -926,7 +924,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
       }
     }
   }
-  
+
   PStringStream html, meta_page;
   BeginPage(html,meta_page,"Rooms","window.l_rooms","window.l_info_rooms");
 
@@ -968,7 +966,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
   { PStringStream message; PTime now; message
       << "HTTP/1.1 200 OK\r\n"
       << "Date: " << now.AsString(PTime::RFC1123, PTime::GMT) << "\r\n"
-      << "Server: OpalMCU-ru\r\n"
+      << "Server: OpalMCU-EIE\r\n"
       << "MIME-Version: 1.0\r\n"
       << "Cache-Control: no-cache, must-revalidate\r\n"
       << "Expires: Sat, 26 Jul 1997 05:00:00 GMT\r\n"
@@ -980,7 +978,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
   }
   server.Write((const char*)html,html.GetLength());
   server.flush();
-  return TRUE;
+  return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -992,19 +990,19 @@ HomePage::HomePage(MyProcess & app, PHTTPAuthority & auth)
   PString peerAddr  = "N/A",
           localAddr = "127.0.0.1";
   WORD    localPort = 80;
-  
-  PStringStream html, meta_page;
-  BeginPage(html, meta_page, "OpalMCU-ru","window.l_welcome","window.l_info_welcome");
+
+  PStringStream html, meta;
+  BeginPage(html, meta, "OpalMCU-EIE","window.l_welcome","window.l_info_welcome");
   PString timeFormat = "dd/MM/yyyy hh:mm:ss";
   PTime now;
 
-  html << "<br><b>Monitor Text (<span style='cursor:pointer;text-decoration:underline' onclick='javascript:{if(document.selection){var range=document.body.createTextRange();range.moveToElementText(document.getElementById(\"monitorTextId\"));range.select();}else if(window.getSelection){var range=document.createRange();range.selectNode(document.getElementById(\"monitorTextId\"));window.getSelection().addRange(range);}}'>select all</span>)</b><div style='padding:5px;border:1pxdotted #595;width:100%;height:auto;max-height:300px;overflow:auto'><pre style='margin:0px;padding:0px' id='monitorTextId'>"
+  html << "<br><b>Info del servidor (<span style='cursor:pointer;text-decoration:underline' onclick='javascript:{if(document.selection){var range=document.body.createTextRange();range.moveToElementText(document.getElementById(\"monitorTextId\"));range.select();}else if(window.getSelection){var range=document.createRange();range.selectNode(document.getElementById(\"monitorTextId\"));window.getSelection().addRange(range);}}'>seleccionar todo</span>)</b><div style='padding:5px;border:1pxdotted #595;width:100%;height:auto;max-height:300px;overflow:auto'><pre style='margin:0px;padding:0px' id='monitorTextId'>"
        << "Inicio del servidor: "  << MyProcess::Current().GetStartTime().AsString(timeFormat) << "\n"
        << "Host local: "           << PIPSocket::GetHostName() << "\n"
        << "Direccion local: "      << localAddr << "\n"
        << "Puerto local: "         << localPort << "\n"
        << app.GetManager().GetMonitorText() << "</pre></div>";
-  
+
   EndPage(html, MyProcess::Current().GetHtmlCopyright());
   m_string = html;
 }

@@ -25,7 +25,7 @@ class MyPConfigPage : public PConfigPage                                 //
 {                                                                        //
   public:                                                                //
     MyPConfigPage(PHTTPServiceProcess & app,                             //
-                  const PString & title,                                 // 
+                  const PString & title,                                 //
                   const PString & section,                               //
                   const PHTTPAuthority & auth)                           //
     : PConfigPage(app,title,section,auth)                                //
@@ -36,7 +36,7 @@ class MyPConfigPage : public PConfigPage                                 //
                                                                          //
 };                                                                       //
 /*************************************************************************/
-                                                                         
+
 /*************************************************************************/
 /*                                                                       */
 /* <clase MyProcess>                                                     */
@@ -73,7 +73,7 @@ class MyProcess : public PHTTPServiceProcess                             //
     PString GetHtmlCopyright()                                           //
     {                                                                    //
       PHTML html(PHTML::InBody);                                         //
-      html << "MCU &copy;" << m_compilationDate.AsString("yyyy")         //
+      html << "OpalMCU-EIE &copy;" << m_compilationDate.AsString("yyyy") //
            << " por " << m_copyrightHolder;                              //
                                                                          //
       return html;                                                       //
@@ -85,6 +85,37 @@ class MyProcess : public PHTTPServiceProcess                             //
   protected:                                                             //
     MyManager        * m_manager;                                        //
     MyPConfigPage    * m_pageConfigure;                                  //
+                                                                         //
+};                                                                       //
+/*************************************************************************/
+
+/*************************************************************************/
+/*                                                                       */
+/* <clase MyClearLogPage>                                                */
+/*                                                                       */
+/* <Descripción>                                                         */
+/*   Clase derivada de ClearLogPage que describe una instancia que borra */
+/*  trazo log generado por la aplicación.                                */
+/*                                                                       */
+/*************************************************************************/
+class MyClearLogPage : public ClearLogPage                               //
+{                                                                        //
+  PCLASSINFO(MyClearLogPage, ClearLogPage);                              //
+  public:                                                                //
+    MyClearLogPage(                                                      //
+      PHTTPServiceProcess & process,                                     //
+      const PURL & url,                                                  //
+      const PHTTPAuthority & auth                                        //
+    );                                                                   //
+                                                                         //
+    virtual PString LoadText(                                            //
+      PHTTPRequest & request                                             //
+    );                                                                   //
+    virtual PBoolean Post(                                               //
+      PHTTPRequest & request,                                            //
+      const PStringToString &,                                           //
+      PHTML & msg                                                        //
+    );                                                                   //
                                                                          //
 };                                                                       //
 /*************************************************************************/

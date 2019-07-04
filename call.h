@@ -21,7 +21,7 @@ class MyManager;
 /*  llamadas entrantes y salientes (CDR).                                */
 /*                                                                       */
 /*************************************************************************/
-class MyCallDetailRecord                                                 // 
+class MyCallDetailRecord                                                 //
 {                                                                        //
   public:                                                                //
     MyCallDetailRecord();                                                //
@@ -123,7 +123,7 @@ class MyCall : public OpalCall, public MyCallDetailRecord                //
     /** Implementadas en clase MyManager */                              //
     //@{                                                                 //
     void OnStartMediaPatch(                                              //
-      OpalConnection & connection,                                       // 
+      OpalConnection & connection,                                       //
       OpalMediaPatch & patch                                             //
     );                                                                   //
     void OnStopMediaPatch(OpalMediaPatch & patch);                       //

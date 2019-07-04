@@ -9,9 +9,6 @@ MyMixerEndPoint::MyMixerEndPoint(MyManager & manager)
 
 bool MyMixerEndPoint::Initialise(PArgList & args, bool verbose, const PString &)
 {
-  if (verbose)
-    cout << "Terminal MCU inicializado" << endl;
-  
   SetDeferredAnswer(false);
   return true;
 }

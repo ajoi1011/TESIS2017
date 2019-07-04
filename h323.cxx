@@ -50,10 +50,6 @@ MyH323EndPoint::MyH323EndPoint(MyManager & manager)
 bool MyH323EndPoint::Initialise(PArgList & args, bool verbose, const PString & defaultRoute)
 {
   AddRoutesFor(this, defaultRoute);
-
-  if (verbose)
-    cout << "Terminal H323 inicializado" << endl;
-  
   return true;
 }
 

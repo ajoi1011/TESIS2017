@@ -155,9 +155,6 @@ bool MyManager::Initialise(PArgList & args, bool verbose, const PString & defaul
   if (!PreInitialise(args, verbose))
     return false;
 
-  if (verbose)
-    cout << "Manager creado." << endl;
-  
   for (PINDEX i = 0; i < m_endpointPrefixes.GetSize(); ++i) {
     OpalConsoleEndPoint * ep = GetConsoleEndPoint(m_endpointPrefixes[i]);
     if (ep != NULL) {
@@ -165,10 +162,7 @@ bool MyManager::Initialise(PArgList & args, bool verbose, const PString & defaul
         return false;
     }
   }
-  
-  if (verbose)
-    cout << "Rutas definidas: " << GetRouteTable() << endl;
-  
+
   return true;
 }
 
@@ -292,10 +286,8 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
 
   SetTCPPorts(rsrc->AddIntegerField(TCPPortBaseKey, 0, 65535, GetTCPPortBase(), "", "Puerto base TCP para rango de puertos TCP."),
               rsrc->AddIntegerField(TCPPortMaxKey, 0, 65535, GetTCPPortMax(), "", "Puerto max TCP para rango de puertos TCP."));
-  SetUDPPorts(rsrc->AddIntegerField(UDPPortBaseKey, 0, 65535, GetUDPPortBase(), "", "Puerto base UDP para rango de puertos UDP."),
-              rsrc->AddIntegerField(UDPPortMaxKey, 0, 65535, GetUDPPortMax(), "", "Puerto max UDP para rango de puertos UDP."));
-  SetRtpIpPorts(rsrc->AddIntegerField(RTPPortBaseKey, 0, 65535, GetRtpIpPortBase(), "", "Puerto base para rango de puertos RTP/UDP."),
-                rsrc->AddIntegerField(RTPPortMaxKey, 0, 65535, GetRtpIpPortMax(), "", "Puerto max para rango de puertos RTP/UDP."));
+  SetRtpIpPorts(rsrc->AddIntegerField(RTPPortBaseKey, 0, 65535, GetRtpIpPortBase(), "", "Puerto base para rango de puertos RTP."),
+                rsrc->AddIntegerField(RTPPortMaxKey, 0, 65535, GetRtpIpPortMax(), "", "Puerto max para rango de puertos RTP."));
 
   SetMediaTypeOfService(rsrc->AddIntegerField(RTPTOSKey, 0, 255, GetMediaTypeOfService(), "", "Valor para calidad de servicio (QoS)."));
   
@@ -472,7 +464,6 @@ PString MyManager::GetMonitorText()
          << "N° llamadas simultáneas: " << m_maxCalls << '\n'
          << "\n[ Puertos TCP/UDP/RTP ]" << '\n' 
          << "Puertos TCP: " << GetTCPPortRange() << '\n'
-         << "Puertos UDP: " << GetUDPPortRange() << '\n'
          << "Puertos RTP: " << GetRtpIpPortRange() << '\n'
          << "\n[ Servidores NAT ]" << '\n' << GetNatMethods() << '\n'
          << "\n[ Audio ]" << '\n'
