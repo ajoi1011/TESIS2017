@@ -1,8 +1,8 @@
 
+#include "h323.h"
 #include "html.h"
 #include "manager.h"
 #include "mixer.h"
-#include "h323.h"
 #include "sip.h"
 
 static unsigned long html_template_size;
@@ -40,7 +40,7 @@ void BeginPage(PStringStream & html,
   }
 
   PString lang = "en";
-  
+
   PString html0(html_template_buffer); 
   html0 = html0.Left(html0.Find("$BODY$"));
   html0.Replace("$LANG$",     lang,     TRUE, 0);
@@ -318,8 +318,8 @@ PBoolean BaseStatusPage::Post(PHTTPRequest & request,
     return true;
   }
 
-  PStringStream meta_page;
-  BeginPage(msg, meta_page, GetTitle(), "window.l_param_general","window.l_info_param_general");
+  PStringStream meta;
+  BeginPage(msg, meta, GetTitle(), "window.l_param_general","window.l_info_param_general");
   msg.Set(PHTML::InBody);
   msg << "<h2>" << "Accepted Control Command" << "</h2>";
 
@@ -327,9 +327,9 @@ PBoolean BaseStatusPage::Post(PHTTPRequest & request,
     msg << "<h2>" << "No calls or endpoints!" << "</h2>";
 
   msg << PHTML::Paragraph()
-      << PHTML::HotLink(request.url.AsString()) << "Recargar página" << PHTML::HotLink()
+      << PHTML::HotLink(request.url.AsString()) << "Reload Page" << PHTML::HotLink()
       << PHTML::NonBreakSpace(4)
-      << PHTML::HotLink("/") << "Home" << PHTML::HotLink();
+      << PHTML::HotLink("/") << "Home Page" << PHTML::HotLink();
 
   EndPage(msg,MyProcess::Current().GetHtmlCopyright());
 
@@ -340,15 +340,15 @@ PBoolean BaseStatusPage::Post(PHTTPRequest & request,
 
 void BaseStatusPage::CreateHTML(PHTML & html_page, const PStringToString & query)
 {
-  PStringStream html_begin, html_end, meta_page;
+  PStringStream html_begin, html_end, meta;
   PHTML html(PHTML::InBody);
 
   if (m_refreshRate > 0) {
-    meta_page << "<meta http-equiv=\"Refresh\" content=\"" << m_refreshRate << "\" />";
-    BeginPage(html_begin, meta_page, GetTitle(), "window.l_param_general","window.l_info_param_general");
+    meta << "<meta http-equiv=\"Refresh\" content=\"" << m_refreshRate << "\" />";
+    BeginPage(html_begin, meta, GetTitle(), "window.l_param_general","window.l_info_param_general");
   }
   else {
-    BeginPage(html_begin, meta_page, GetTitle(), "window.l_param_general","window.l_info_param_general");
+    BeginPage(html_begin, meta, GetTitle(), "window.l_param_general","window.l_info_param_general");
   }
 
   html << PHTML::Form("POST");
@@ -756,16 +756,16 @@ InvitePage::InvitePage(MyProcess & app, PHTTPAuthority & auth)
 
 void InvitePage::CreateHTML(PHTML & html)
 {
-  PStringStream meta_page;
+  PStringStream meta;
   PStringArray myAddressBook = MyProcess::Current().GetManager().GetAddressBook();
   MyMixerEndPoint & mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
 
   PHTML html_page;
-  BeginPage(html_page,meta_page,"Invite","window.l_invite","window.l_info_invite");
+  BeginPage(html_page, meta, "Invite", "window.l_invite", "window.l_info_invite");
   html_page.Set(PHTML::InBody);
 
   html_page << PHTML::Paragraph() << "<center>"
-       
+
        << PHTML::Form("POST") 
        << "<b>Room Name</b>" << PHTML::Select("room");
  for (PSafePtr<OpalMixerNode> node = mixer.GetFirstNode(PSafeReadOnly); node != NULL; ++node)
@@ -795,19 +795,24 @@ void InvitePage::CreateHTML(PHTML & html)
 
 PBoolean InvitePage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo & connectInfo)
 {
-  { PHTTPRequest * req = CreateRequest(server, connectInfo); // check authorization
-    if(!CheckAuthority(server, *req, connectInfo)) {delete req; return FALSE;}
+  { PHTTPRequest * req = CreateRequest(server, connectInfo);
+    if(!CheckAuthority(server, *req, connectInfo)) {
+      delete req; return FALSE;
+    }
     delete req;
   }
 
   PStringToString data;
-  { PString request=connectInfo.GetURL().AsString(); PINDEX q;
-    if((q=request.Find("?"))!=P_MAX_INDEX) { request=request.Mid(q+1,P_MAX_INDEX); PURL::SplitQueryVars(request,data); }
+  { PString request=connectInfo.GetURL().AsString(); 
+    PINDEX q;
+    if((q=request.Find("?"))!=P_MAX_INDEX) { 
+      request=request.Mid(q+1,P_MAX_INDEX); 
+      PURL::SplitQueryVars(request,data); 
+    }
   }
 
   PHTML html;
   CreateHTML(html);
-       
 
   { PStringStream message; PTime now; message
       << "HTTP/1.1 200 OK\r\n"
@@ -831,29 +836,29 @@ PBoolean InvitePage::Post(PHTTPRequest & request,
                           const PStringToString & data,
                           PHTML & msg)
 {
-  PStringStream meta_page;
+  PStringStream meta;
   PString room    = data("room");
   PString address = data("address");
   PString book    = data("book");
-
-  MyMixerEndPoint & m_mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
-  PStringArray addressBook = MyProcess::Current().GetManager().GetAddressBook();
   PString token;
 
-  if(address.IsEmpty() || room.IsEmpty()){
-    BeginPage(msg,meta_page,"Invite","window.l_invite","window.l_info_invite");
+  MyMixerEndPoint & mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
+  PStringArray addressBook = MyProcess::Current().GetManager().GetAddressBook();
+
+  if(address.IsEmpty() || room.IsEmpty()) {
+    BeginPage(msg, meta, "Invite", "window.l_invite", "window.l_info_invite");
     msg.Set(PHTML::InBody);
     msg << "<b>Invitacion fallida, no existe sala de conferencia o direccion de remoto</b>"
         << PHTML::Paragraph()
         << PHTML::HotLink(request.url.AsString()) << "Reload page" << PHTML::HotLink();
-    EndPage(msg,MyProcess::Current().GetHtmlCopyright());
+    EndPage(msg, MyProcess::Current().GetHtmlCopyright());
     return true;
   }
   else {
    MyProcess::Current().GetManager().GetAddressBook().push_back(address);
   }
 
-  PSafePtr<OpalMixerNode> node = m_mixer.FindNode(room);
+  PSafePtr<OpalMixerNode> node = mixer.FindNode(room);
   if (node == NULL) {
     cout << "Conference \"" << room << "\" does not exist" << endl;
   }
@@ -878,55 +883,58 @@ SelectRoomPage::SelectRoomPage(MyProcess & app, PHTTPAuthority & auth)
 
 PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo & connectInfo)
 {
-  { PHTTPRequest * req = CreateRequest(server, connectInfo); // check authorization
-    if(!CheckAuthority(server, *req, connectInfo)) {delete req; return FALSE;}
+  { PHTTPRequest * req = CreateRequest(server, connectInfo);
+    if(!CheckAuthority(server, *req, connectInfo)) {
+      delete req; return FALSE;
+    }
     delete req;
   }
 
   PStringToString data;
   { PString request=connectInfo.GetURL().AsString(); PINDEX q;
-    if((q=request.Find("?"))!=P_MAX_INDEX) { request=request.Mid(q+1,P_MAX_INDEX); PURL::SplitQueryVars(request,data); }
+    if((q=request.Find("?"))!=P_MAX_INDEX) { 
+      request=request.Mid(q+1,P_MAX_INDEX); 
+      PURL::SplitQueryVars(request,data); 
+    }
   }
 
-  MyMixerEndPoint & m_mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
-  MyManager & manager = MyProcess::Current().GetManager();
+  MyMixerEndPoint & mixer = MyProcess::Current().GetManager().GetMixerEndPoint();
 
   PWaitAndSignal m(html_mutex);
-  if(data.Contains("action") && !data("room").IsEmpty())
-  {
-    
+  if(data.Contains("action") && !data("room").IsEmpty()) {
+
     PString action = data("action");
     PString room = data("room");
     if(action == "create")
     {
-      
-      if (m_mixer.FindNode(room) != NULL) {
+
+      if (mixer.FindNode(room) != NULL) {
        cout << "Conference name \"" << room << "\" already exists." << endl;
       }
       else {
        OpalMixerNodeInfo * info = new OpalMixerNodeInfo();
        info->m_name = room;
-       PSafePtr<OpalMixerNode> node = m_mixer.AddNode(info);
+       PSafePtr<OpalMixerNode> node = mixer.AddNode(info);
        cout << "Added conference " << *node << endl; 
       }
-    
+
     }
     else if(action == "delete")
     {
-      PSafePtr<OpalMixerNode> node = m_mixer.FindNode(room);
+      PSafePtr<OpalMixerNode> node = mixer.FindNode(room);
       if (node == NULL) {
       cout << "Conference \"" << room << "\" does not exist" << endl;
       
       }
       else {
-      m_mixer.RemoveNode(*node);
+      mixer.RemoveNode(*node);
       cout << "Removed conference \"" << room << "\" " << *node << endl;
       }
     }
   }
 
-  PStringStream html, meta_page;
-  BeginPage(html,meta_page,"Rooms","window.l_rooms","window.l_info_rooms");
+  PStringStream html, meta;
+  BeginPage(html, meta, "Rooms", "window.l_rooms", "window.l_info_rooms");
 
   if(data.Contains("action")) html << "<script language='javascript'>location.href='Control';</script>";
 
@@ -947,8 +955,8 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
     << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_delete);</script><br></th>"
     << "</tr>"
   ;
-    
-    for (PSafePtr<OpalMixerNode> node = m_mixer.GetFirstNode(PSafeReadOnly); node != NULL; ++node){
+
+    for (PSafePtr<OpalMixerNode> node = mixer.GetFirstNode(PSafeReadOnly); node != NULL; ++node){
       
       html << "<tr>"
         << "<td style='text-align:left'><a href='Invitar'>"+  node->GetNodeInfo().m_name  +"</a></td>"
@@ -961,7 +969,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
         << "</tr>";
     }
   html << "</table></form>";
-       
+
   EndPage(html,MyProcess::Current().GetHtmlCopyright());
   { PStringStream message; PTime now; message
       << "HTTP/1.1 200 OK\r\n"
@@ -992,7 +1000,7 @@ HomePage::HomePage(MyProcess & app, PHTTPAuthority & auth)
   WORD    localPort = 80;
 
   PStringStream html, meta;
-  BeginPage(html, meta, "OpalMCU-EIE","window.l_welcome","window.l_info_welcome");
+  BeginPage(html, meta, "OpalMCU-EIE", "window.l_welcome", "window.l_info_welcome");
   PString timeFormat = "dd/MM/yyyy hh:mm:ss";
   PTime now;
 
@@ -1005,5 +1013,4 @@ HomePage::HomePage(MyProcess & app, PHTTPAuthority & auth)
 
   EndPage(html, MyProcess::Current().GetHtmlCopyright());
   m_string = html;
-}
-// Final del Archivo
+} // Final del Archivo

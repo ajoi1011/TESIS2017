@@ -33,7 +33,7 @@ class MySIPEndPoint : public SIPConsoleEndPoint                          //
       const PString & defaultRoute                                       //
     );                                                                   //
                                                                          //
-    /** Funciones desarrolladas a partir de OpalServer */                //
+    /** Funciones implementadas en OpalServer */                         //
     //@{                                                                 //
     void AutoRegisterCisco(                                              //
       const PString & server,                                            //

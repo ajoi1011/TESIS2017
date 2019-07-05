@@ -35,7 +35,7 @@ bool MySIPEndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
   SetProxy(rsrc->AddStringField(SIPProxyKey, 100, GetProxy().AsString(), "SIP outbound proxy IP/hostname.", 1, 30));
   
   PHTTPCompositeField * registrationsFields = new PHTTPCompositeField(REGISTRATIONS_KEY, REGISTRATIONS_SECTION,
-                                                  "Registro de usuarios SIP en el dominio/hostname/dirección IP.");
+                                                                      "Registro de usuarios SIP en el dominio/hostname/dirección IP.");
   registrationsFields->Append(new PHTTPStringField(SIPAddressofRecordKey, 0, NULL, NULL, 1, 5));
   registrationsFields->Append(new PHTTPStringField(SIPAuthIDKey, 0, NULL, NULL, 1, 5));
   registrationsFields->Append(new PHTTPIntegerField(SIPRegTTLKey, 1, 86400, 300));
@@ -61,7 +61,6 @@ bool MySIPEndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
   m_autoRegisterH323 = rsrc->AddBooleanField(SIPAutoRegisterH323Key, m_autoRegisterH323,
                                              "Auto-registra alias H.323 del mismo nombre como registro SIP.");
 #endif
-
 
   if (!registrationsArray->LoadFromConfig(cfg)) {
     for (PINDEX i = 0; i < registrationsArray->GetSize(); ++i) {
@@ -161,5 +160,4 @@ void MySIPEndPoint::AutoRegisterCisco(const PString & server, const PString & wi
     }
   }
 }
-#endif // OPAL_H323
-// Final del Archivo
+#endif // OPAL_H323 Final del Archivo
