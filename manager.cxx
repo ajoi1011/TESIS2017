@@ -77,7 +77,7 @@ MyManager::MyManager()
 #if OPAL_VIDEO
   for (OpalVideoFormat::ContentRole role = OpalVideoFormat::BeginContentRole; role < OpalVideoFormat::EndContentRole; ++role)
     m_videoInputDevice[role].deviceName = m_videoPreviewDevice[role].deviceName = m_videoOutputDevice[role].deviceName = P_NULL_VIDEO_DEVICE;
-  
+
   PStringArray devices = PVideoOutputDevice::GetDriversDeviceNames("*");
   PINDEX i;
   for (i = 0; i < devices.GetSize(); ++i) {
@@ -237,34 +237,34 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
   m_savedProductInfo.version = rsrc->AddStringField(ProductVersionKey, 30, m_savedProductInfo.version);
   if (overrideProductInfo) 
     SetProductInfo(m_savedProductInfo);
-  
+
   m_maxCalls = rsrc->AddIntegerField(MaxSimultaneousCallsKey, 1, 9999, m_maxCalls, "", "N° max de llamadas simultáneas.");
-  
+
   m_mediaTransferMode = cfg.GetEnum(MediaTransferModeKey, m_mediaTransferMode);
   static const char * const MediaTransferModeValues[] = { "0", "1", "2" };
   static const char * const MediaTransferModeTitles[] = { "Bypass", "Forward", "Transcode" };
   rsrc->Add(new PHTTPRadioField(MediaTransferModeKey,
-    PARRAYSIZE(MediaTransferModeValues), MediaTransferModeValues, MediaTransferModeTitles,
-    m_mediaTransferMode, "Modo de transferencia entre los terminales."));
+                                PARRAYSIZE(MediaTransferModeValues), MediaTransferModeValues, MediaTransferModeTitles,
+                                m_mediaTransferMode, "Transferencia de media entre los terminales."));
 
   {
     OpalMediaTypeList mediaTypes = OpalMediaType::GetList();
     for (OpalMediaTypeList::iterator it = mediaTypes.begin(); it != mediaTypes.end(); ++it) {
       PString key = AutoStartKeyPrefix;
       key &= it->c_str();
-      
+
       if (key == "Auto Start audio" || key == "Auto Start video" || key == "Auto Start presentation") {
       (*it)->SetAutoStart(cfg.GetEnum<OpalMediaType::AutoStartMode::Enumeration>(key, (*it)->GetAutoStart()));
       static const char * const AutoStartValues[] = { "Inactive", "Receive only", "Send only", "Send & Receive", "Don't offer" };
-      rsrc->Add(new PHTTPEnumField<OpalMediaType::AutoStartMode::Enumeration>(key,
-                        PARRAYSIZE(AutoStartValues), AutoStartValues, (*it)->GetAutoStart(),
-                        "Inicio automático para tipos de media."));
+      rsrc->Add(new PHTTPEnumField<OpalMediaType::AutoStartMode::Enumeration>(key, PARRAYSIZE(AutoStartValues), AutoStartValues, 
+                                                                              (*it)->GetAutoStart(),
+                                                                              "Inicio automático para tipos de media."));
      }
     }
   }
 
-  SetAudioJitterDelay(rsrc->AddIntegerField(MinJitterKey, 20, 2000, GetMinAudioJitterDelay(), "ms", "Tamaño min buffer jitter."),
-                      rsrc->AddIntegerField(MaxJitterKey, 20, 2000, GetMaxAudioJitterDelay(), "ms", "Tamaño max buffer jitter."));
+  SetAudioJitterDelay(rsrc->AddIntegerField(MinJitterKey, 20, 2000, GetMinAudioJitterDelay(), "ms", "Tamaño min de buffer jitter."),
+                      rsrc->AddIntegerField(MaxJitterKey, 20, 2000, GetMaxAudioJitterDelay(), "ms", "Tamaño max de buffer jitter."));
 
   DisableDetectInBandDTMF(rsrc->AddBooleanField(InBandDTMFKey, DetectInBandDTMFDisabled(),
                                                 "Deshabilita filtro digital para detección in-band DTMF (reduce uso CPU)."));
@@ -278,11 +278,11 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
   else
     params.m_mode = OpalSilenceDetector::NoSilenceDetection;
   SetSilenceDetectParams(params);
-  
+
   SetNoMediaTimeout(PTimeInterval(0, rsrc->AddIntegerField(NoMediaTimeoutKey, 1, 365*24*60*60, GetNoMediaTimeout().GetSeconds(),
-                                                           "segs", "Terminar llamada cuando no se recibe media desde remoto en este tiempo.")));
+                                                           "segs", "Termina llamada cuando no se recibe media desde remoto en este tiempo.")));
   SetTxMediaTimeout(PTimeInterval(0, rsrc->AddIntegerField(TxMediaTimeoutKey, 1, 365*24*60*60, GetTxMediaTimeout().GetSeconds(),
-                                                           "segs", "Terminar llamada cuando no se transmite media al remoto en este tiempo.")));
+                                                           "segs", "Termina llamada cuando no se transmite media al remoto en este tiempo.")));
 
   SetTCPPorts(rsrc->AddIntegerField(TCPPortBaseKey, 0, 65535, GetTCPPortBase(), "", "Puerto base TCP para rango de puertos TCP."),
               rsrc->AddIntegerField(TCPPortMaxKey, 0, 65535, GetTCPPortMax(), "", "Puerto max TCP para rango de puertos TCP."));
@@ -290,8 +290,7 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
                 rsrc->AddIntegerField(RTPPortMaxKey, 0, 65535, GetRtpIpPortMax(), "", "Puerto max para rango de puertos RTP."));
 
   SetMediaTypeOfService(rsrc->AddIntegerField(RTPTOSKey, 0, 255, GetMediaTypeOfService(), "", "Valor para calidad de servicio (QoS)."));
-  
-  
+
 #if OPAL_PTLIB_NAT
   PSYSTEMLOG(Info, "Configuring NAT");
 
@@ -302,7 +301,7 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
 
     for (std::set<NATInfo>::iterator it = natInfo.begin(); it != natInfo.end(); ++it) {
       PHTTPCompositeField * fields = new PHTTPCompositeField("NAT\\" + it->m_method, it->m_method,
-                                                             "Habilitar flag y Servidor IP/hostname para NAT traversal usando " + it->m_friendly);
+                                                             "Habilita flag y Servidor IP/hostname para NAT traversal usando " + it->m_friendly);
       fields->Append(new PHTTPBooleanField(NATActiveKey, it->m_active));
       fields->Append(new PHTTPStringField(NATServerKey, 0, 0, it->m_server, NULL, 1, 15));
       fields->Append(new PHTTPStringField(NATInterfaceKey, 0, 0, it->m_interface, NULL, 1, 15));
@@ -317,16 +316,16 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
   {
     unsigned prefWidth = 0, prefHeight = 0;
     static const char * const StandardSizes[] = { "SQCIF", "QCIF", "CIF", "CIF4", "HD480" };
-    
+
     m_prefVideo = rsrc->AddSelectField(ConfVideoManagerKey, PStringArray(PARRAYSIZE(StandardSizes), StandardSizes),
-                                       StandardSizes[0], "Resolución de video standar del manager. SQCIF = 128x96, QCIF = 176x144," 
+                                       StandardSizes[0], "Resolución de video estándar del manager. SQCIF = 128x96, QCIF = 176x144," 
                                        " CIF = 352x288, CIF4 = 704x576, HD480 = 704x480.");
     for (PINDEX i = 0; i < PARRAYSIZE(StandardSizes); ++i) {
       if (m_prefVideo == StandardSizes[i]) {
         PVideoFrameInfo::ParseSize(StandardSizes[i], prefWidth, prefHeight);
       }
     }
-    
+
     unsigned maxWidth = 0, maxHeight = 0;
     static const char * const MaxSizes[] = { "CIF16", "HD720", "HD1080" };
     m_maxVideo = rsrc->AddSelectField(ConfVideoMaxManagerKey, PStringArray(PARRAYSIZE(MaxSizes), MaxSizes),
@@ -337,14 +336,14 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
         PVideoFrameInfo::ParseSize(MaxSizes[i], maxWidth, maxHeight);
       }
     } 
-    
+
     m_rate = rsrc->AddIntegerField(FrameRateManagerKey, 1, 60, 15, "", "Video Frame Rate, valor entre 1 y 60 fps.");
     if (m_rate < 1 || m_rate > 60) {
       PTRACE(2, "Invalid video frame rate parameter");
     }
 
     unsigned frameTime = (unsigned)(OpalMediaFormat::VideoClockRate/m_rate);
-    m_bitrate = rsrc->AddStringField(BitRateManagerKey, 30,"1Mbps", "Video Bit Rate.");
+    m_bitrate = rsrc->AddStringField(BitRateManagerKey, 30,"1Mbps", "Video Bit Rate, valor min 16kbps.");
     if (m_bitrate < 16000) {
       PTRACE(2, "Invalid video bit rate parameter");
     }
@@ -405,7 +404,7 @@ PBoolean MyManager::Configure(PConfig & cfg, PConfigPage * rsrc)
   if (!GetMixerEndPoint().Configure(cfg, rsrc))
     return false;
 #endif // OPAL_HAS_MIXER
-  
+
   return ConfigureCDR(cfg, rsrc);
 }
 
@@ -416,7 +415,7 @@ bool MyManager::ConfigureCommon(OpalEndPoint * ep,
 {
   bool enabled = rsrc->AddBooleanField("Habilitar" & cfgPrefix, true, "Habilita protocolo" & cfgPrefix & ".");
   PStringArray listeners = rsrc->AddStringArrayField("Interfaces " & cfgPrefix, false, 25, PStringArray(),
-                                                     "Interfaces y  puertos de red local para terminales " & cfgPrefix & ".");
+                                                     "Interfaces y puertos de red local para terminales " & cfgPrefix & ".");
   if (!enabled) {
     PSYSTEMLOG(Info, "Disabled " << cfgPrefix);
     ep->RemoveListener(NULL);
@@ -424,7 +423,7 @@ bool MyManager::ConfigureCommon(OpalEndPoint * ep,
   else if (!ep->StartListeners(listeners)) {
     PSYSTEMLOG(Error, "Could not open any listeners for " << cfgPrefix);
   }
-  
+
   return true;
 }
 
@@ -462,7 +461,7 @@ PString MyManager::GetMonitorText()
   PStringStream output;
   output << "Usuario: " << GetDefaultDisplayName() << '\n'
          << "N° llamadas simultáneas: " << m_maxCalls << '\n'
-         << "\n[ Puertos TCP/UDP/RTP ]" << '\n' 
+         << "\n[ Puertos TCP/RTP ]" << '\n' 
          << "Puertos TCP: " << GetTCPPortRange() << '\n'
          << "Puertos RTP: " << GetRtpIpPortRange() << '\n'
          << "\n[ Servidores NAT ]" << '\n' << GetNatMethods() << '\n'
@@ -473,7 +472,7 @@ PString MyManager::GetMonitorText()
   output << "Detector de silencio: " << GetSilenceDetectParams().m_mode << '\n';
 #if OPAL_VIDEO
   output << "\n[ Video ]" << '\n'
-         << "Resolución de video standard: " << m_prefVideo << '\n'
+         << "Resolución de video estándar: " << m_prefVideo << '\n'
          << "Resolución de video maxima: " << m_maxVideo << '\n'
          << "Video frame rate: " << m_rate << " fps\n"
          << "Video target bit rate: " << m_bitrate << '\n';
@@ -485,9 +484,9 @@ PString MyManager::GetMonitorText()
     output << "Fast Connect deshabilitado" << '\n';
   if (GetH323EndPoint().IsH245TunnelingDisabled())
     output << "H.245 Tunneling deshabilitado" << '\n';
-  if (GetH323EndPoint().IsH245inSetupDisabled() )
+  if (GetH323EndPoint().IsH245inSetupDisabled())
     output << "H.245 in Setup deshabilitado" << '\n';  
-  if (GetH323EndPoint().IsForcedSymmetricTCS() )
+  if (GetH323EndPoint().IsForcedSymmetricTCS())
     output << "Force symmetric TCS deshabilitado" << '\n';
   if (GetH323EndPoint().GetDefaultH239Control() == false )
     output << "H.239 Control deshabilitado" << '\n';

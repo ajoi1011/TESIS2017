@@ -36,7 +36,7 @@ class MyMixerEndPoint;
 /*  terminales H.323, SIP, MCU, PCSS y establece los parámetros para una */
 /*  llamada en el sistema OPAL.                                          */
 /*                                                                       */
-/*************************************************************************/ 
+/*************************************************************************/
 class MyManager : public OpalManagerConsole                              //
 {                                                                        //
   PCLASSINFO(MyManager, OpalManagerConsole);                             //
@@ -68,8 +68,6 @@ class MyManager : public OpalManagerConsole                              //
     virtual bool PreInitialise(PArgList & args, bool verbose = false);   //
     virtual void PrintVersion() const ;                                  //
                                                                          //
-    /** Funciones implementadas en OpalServer */                         //
-    //@{                                                                 //
     bool Configure(PConfig & cfg, PConfigPage * rsrc);                   //
     bool ConfigureCDR(PConfig & cfg, PConfigPage * rsrc);                //
     typedef std::list<MyCallDetailRecord> CDRList;                       //
@@ -99,7 +97,6 @@ class MyManager : public OpalManagerConsole                              //
     virtual OpalConsoleMixerEndPoint * CreateMixerEndPoint();            //
     MyMixerEndPoint & GetMixerEndPoint() const ;                         //
 #endif                                                                   //
-    //@}                                                                 //
     PStringArray GetAddressBook() { return m_addressBook; }              //
     PString GetMonitorText();                                            //
                                                                          //
@@ -126,7 +123,6 @@ class MyManager : public OpalManagerConsole                              //
     PString        m_cdrTable;                                           //
     PString        m_cdrFieldNames[MyCall::NumFieldCodes];               //
     PDECLARE_MUTEX(m_cdrMutex);                                          //
-                                                                         //
 };                                                                       //
 /*************************************************************************/
 

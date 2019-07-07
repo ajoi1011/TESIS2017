@@ -32,8 +32,8 @@ bool MySIPEndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
                                 "Manejo de respuestas SIP provisionales (100rel)."));
   SetDefaultPRACKMode(prack);
 
-  SetProxy(rsrc->AddStringField(SIPProxyKey, 100, GetProxy().AsString(), "SIP outbound proxy IP/hostname.", 1, 30));
-  
+  SetProxy(rsrc->AddStringField(SIPProxyKey, 100, GetProxy().AsString(), "Proxy SIP outbound IP/hostname.", 1, 30));
+
   PHTTPCompositeField * registrationsFields = new PHTTPCompositeField(REGISTRATIONS_KEY, REGISTRATIONS_SECTION,
                                                                       "Registro de usuarios SIP en el dominio/hostname/dirección IP.");
   registrationsFields->Append(new PHTTPStringField(SIPAddressofRecordKey, 0, NULL, NULL, 1, 5));
@@ -44,7 +44,7 @@ bool MySIPEndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
       "Compliant", "Single Contact", "No Private", "ALGw", "RFC 5626", "Cisco"
   };
   registrationsFields->Append(new PHTTPEnumField<SIPRegister::CompatibilityModes>(SIPCompatibilityKey,
-                                                   PARRAYSIZE(compatibilityModes), compatibilityModes));
+                                                                                  PARRAYSIZE(compatibilityModes), compatibilityModes));
   PHTTPFieldArray * registrationsArray = new PHTTPFieldArray(registrationsFields, false);
   rsrc->Add(registrationsArray);
 
@@ -83,7 +83,7 @@ bool MySIPEndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
       }
     }
   }
- 
+
   return true;
 }
 
@@ -92,7 +92,6 @@ PString MySIPEndPoint::OnLoadEndPointStatus(const PString & htmlBlock)
   PString substitution;
 
   for (PSafePtr<RegistrarAoR> ua(m_registeredUAs); ua != NULL; ++ua) {
-    // make a copy of the repeating html chunk
     PString insert = htmlBlock;
 
     PServiceHTML::SpliceMacro(insert, "status EndPointIdentifier", ua->GetAoR());
@@ -113,7 +112,6 @@ PString MySIPEndPoint::OnLoadEndPointStatus(const PString & htmlBlock)
 
     PServiceHTML::SpliceMacro(insert, "status ActiveCalls", "N/A");
 
-    // Then put it into the page, moving insertion point along after it.
     substitution += insert;
   }
 

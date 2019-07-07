@@ -1,4 +1,5 @@
 
+#include "config.h"
 #include "h323.h"
 #include "html.h"
 #include "manager.h"
@@ -15,11 +16,11 @@ void BeginPage(PStringStream & html,
                const char * ptitle, 
                const char * title, 
                const char * quotekey)  
-{ 
+{
   PWaitAndSignal m(html_mutex);
 
   if (html_template_size <= 0) { 
-    FILE * fs = fopen("/home/ajoi1011/proyecto/project/resource/template.html", "r");
+    FILE * fs = fopen(PString(SYS_RESOURCE_DIR) + PATH_SEPARATOR + "template.html", "r");
     if (fs) { 
       fseek(fs, 0L, SEEK_END); 
       html_template_size = ftell(fs); 
@@ -31,7 +32,7 @@ void BeginPage(PStringStream & html,
         html_template_buffer[html_template_size] = 0;
       fclose(fs);
     }
-    else html_template_size = -1; // read error indicator
+    else html_template_size = -1;
   }
 
   if (html_template_size <= 0) { 
@@ -54,7 +55,7 @@ void BeginPage(PStringStream & html,
 void EndPage(PStringStream & html, PString copyr) 
 {
   PWaitAndSignal m(html_mutex);
-  
+
   if (html_template_size <= 0) 
     return;
 
@@ -262,7 +263,6 @@ PCREATE_SERVICE_MACRO_BLOCK(CallStatus,resource,P_EMPTY,htmlBlock)
     if (call == NULL)
       continue;
 
-    // make a copy of the repeating html chunk
     PString insert = htmlBlock;
 
     PServiceHTML::SpliceMacro(insert, "status Token",    call->GetToken());
@@ -278,7 +278,6 @@ PCREATE_SERVICE_MACRO_BLOCK(CallStatus,resource,P_EMPTY,htmlBlock)
       duration << '(' << call->GetStartTime().GetElapsed() << ')';
     PServiceHTML::SpliceMacro(insert, "status Duration", duration);
 
-    // Then put it into the page, moving insertion point along after it.
     substitution += insert;
   }
 
@@ -814,20 +813,22 @@ PBoolean InvitePage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo & co
   PHTML html;
   CreateHTML(html);
 
-  { PStringStream message; PTime now; message
-      << "HTTP/1.1 200 OK\r\n"
-      << "Date: " << now.AsString(PTime::RFC1123, PTime::GMT) << "\r\n"
-      << "Server: OpalMCU-EIE\r\n"
-      << "MIME-Version: 1.0\r\n"
-      << "Cache-Control: no-cache, must-revalidate\r\n"
-      << "Expires: Sat, 26 Jul 1997 05:00:00 GMT\r\n"
-      << "Content-Type: text/html;charset=utf-8\r\n"
-      << "Content-Length: " << html.GetLength() << "\r\n"
-      << "Connection: Close\r\n"
-      << "\r\n";  //that's the last time we need to type \r\n instead of just \n
-    server.Write((const char*)message,message.GetLength());
+  { PStringStream message; 
+    PTime now; 
+    message << "HTTP/1.1 200 OK\r\n"
+            << "Date: " << now.AsString(PTime::RFC1123, PTime::GMT) << "\r\n"
+            << "Server: OpalMCU-EIE\r\n"
+            << "MIME-Version: 1.0\r\n"
+            << "Cache-Control: no-cache, must-revalidate\r\n"
+            << "Expires: Sat, 26 Jul 1997 05:00:00 GMT\r\n"
+            << "Content-Type: text/html;charset=utf-8\r\n"
+            << "Content-Length: " << html.GetLength() << "\r\n"
+            << "Connection: Close\r\n"
+            << "\r\n";  //that's the last time we need to type \r\n instead of just \n
+    server.Write((const char*)message, message.GetLength());
   }
-  server.Write((const char*)html,html.GetLength());
+
+  server.Write((const char*)html, html.GetLength());
   server.flush();
   return true;
 }
@@ -875,13 +876,13 @@ PBoolean InvitePage::Post(PHTTPRequest & request,
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-SelectRoomPage::SelectRoomPage(MyProcess & app, PHTTPAuthority & auth)
+ControlRoomPage::ControlRoomPage(MyProcess & app, PHTTPAuthority & auth)
   : PServiceHTTPString("Control", "", "text/html; charset=utf-8", auth)
   , app(app)
 {
 }
 
-PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo & connectInfo)
+PBoolean ControlRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo & connectInfo)
 {
   { PHTTPRequest * req = CreateRequest(server, connectInfo);
     if(!CheckAuthority(server, *req, connectInfo)) {
@@ -924,7 +925,7 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
       PSafePtr<OpalMixerNode> node = mixer.FindNode(room);
       if (node == NULL) {
       cout << "Conference \"" << room << "\" does not exist" << endl;
-      
+
       }
       else {
       mixer.RemoveNode(*node);
@@ -945,7 +946,8 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
     << "<table id=\"Table\" class=\"table table-striped table-bordered table-condensed\">"
 
     << "<tr>"
-    << "<td colspan='7'><input type='text' class='input-small' name='newroom' id='newroom' value='" << nextRoom << "' /><input type='button' class='btn btn-large btn-info' value='Crear Sala de Conferencia' onclick=\"location.href='?action=create&room='+encodeURIComponent(document.getElementById('newroom').value);\"></td>"
+    << "<td colspan='7'><input type='text' class='input-small' name='newroom' id='newroom' value='" << nextRoom 
+    << "' /><input type='button' class='btn btn-large btn-info' value='Crear Sala de Conferencia' onclick=\"location.href='?action=create&room='+encodeURIComponent(document.getElementById('newroom').value);\"></td>"
     << "</tr>"
 
     << "<tr>"
@@ -953,11 +955,10 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
     << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_visible);</script><br></th>"
     //<< "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_record);</script><br></th>"
     << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_delete);</script><br></th>"
-    << "</tr>"
-  ;
+    << "</tr>";
 
     for (PSafePtr<OpalMixerNode> node = mixer.GetFirstNode(PSafeReadOnly); node != NULL; ++node){
-      
+
       html << "<tr>"
         << "<td style='text-align:left'><a href='Invitar'>"+  node->GetNodeInfo().m_name  +"</a></td>"
         << "<td style='text-align:right'>";
@@ -970,21 +971,24 @@ PBoolean SelectRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo 
     }
   html << "</table></form>";
 
-  EndPage(html,MyProcess::Current().GetHtmlCopyright());
-  { PStringStream message; PTime now; message
-      << "HTTP/1.1 200 OK\r\n"
-      << "Date: " << now.AsString(PTime::RFC1123, PTime::GMT) << "\r\n"
-      << "Server: OpalMCU-EIE\r\n"
-      << "MIME-Version: 1.0\r\n"
-      << "Cache-Control: no-cache, must-revalidate\r\n"
-      << "Expires: Sat, 26 Jul 1997 05:00:00 GMT\r\n"
-      << "Content-Type: text/html;charset=utf-8\r\n"
-      << "Content-Length: " << html.GetLength() << "\r\n"
-      << "Connection: Close\r\n"
-      << "\r\n";  //that's the last time we need to type \r\n instead of just \n
-    server.Write((const char*)message,message.GetLength());
+  EndPage(html, MyProcess::Current().GetHtmlCopyright());
+  
+  { PStringStream message; 
+    PTime now; 
+    message << "HTTP/1.1 200 OK\r\n"
+            << "Date: " << now.AsString(PTime::RFC1123, PTime::GMT) << "\r\n"
+            << "Server: OpalMCU-EIE\r\n"
+            << "MIME-Version: 1.0\r\n"
+            << "Cache-Control: no-cache, must-revalidate\r\n"
+            << "Expires: Sat, 26 Jul 1997 05:00:00 GMT\r\n"
+            << "Content-Type: text/html;charset=utf-8\r\n"
+            << "Content-Length: " << html.GetLength() << "\r\n"
+            << "Connection: Close\r\n"
+            << "\r\n";  //that's the last time we need to type \r\n instead of just \n
+    server.Write((const char*)message, message.GetLength());
   }
-  server.Write((const char*)html,html.GetLength());
+
+  server.Write((const char*)html, html.GetLength());
   server.flush();
   return true;
 }

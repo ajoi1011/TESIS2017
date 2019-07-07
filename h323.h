@@ -24,9 +24,9 @@ class MyGatekeeperServer;
 /*                                                                       */
 /*************************************************************************/
 class MyGatekeeperCall : public H323GatekeeperCall                       //
-{									                                                       //
+{                                                                        //
   PCLASSINFO(MyGatekeeperCall, H323GatekeeperCall);                      //
-  public:								                                                 //
+  public:                                                                //
     MyGatekeeperCall(                                                    //
       MyGatekeeperServer & server,                                       //
       const OpalGloballyUniqueID & callIdentifier,                       //
@@ -55,7 +55,7 @@ class MyGatekeeperServer : public H323GatekeeperServer                   //
   PCLASSINFO(MyGatekeeperServer, H323GatekeeperServer);                  //
   public:                                                                //
     MyGatekeeperServer(H323EndPoint & ep);                               //
-    //** Funciones implementadas en OpalServer */                        //
+                                                                         //
     virtual H323GatekeeperCall * CreateCall(                             //
       const OpalGloballyUniqueID & callIdentifier,                       //
       H323GatekeeperCall::Direction direction                            //
@@ -67,7 +67,6 @@ class MyGatekeeperServer : public H323GatekeeperServer                   //
       PBoolean & isGkRouted,                                             //
       H323GatekeeperCall * call                                          //
     );                                                                   //
-                                                                         //
     bool Configure(PConfig & cfg, PConfigPage * rsrc);                   //
     bool ForceUnregister(const PString id);                              //
     PString OnLoadEndPointStatus(const PString & htmlBlock);             //
@@ -91,9 +90,7 @@ class MyGatekeeperServer : public H323GatekeeperServer                   //
         H323TransportAddress m_host;                                     //
     };                                                                   //
     PList<RouteMap> routes;                                              //
-                                                                         //
     PDECLARE_MUTEX(reconfigurationMutex);                                //
-    //@}                                                                 //
 };                                                                       //
 /*************************************************************************/
 
@@ -117,15 +114,13 @@ class MyH323EndPoint : public H323ConsoleEndPoint                        //
       bool verbose,                                                      //
       const PString & defaultRoute                                       //
     );                                                                   //
-                                                                         //
     void AutoRegister(                                                   //
       const PString & alias,                                             //
       const PString & gk,                                                //
       bool registering                                                   //
     );                                                                   //
     bool Configure(PConfig & cfg, PConfigPage * rsrc);                   //
-                                                                         //
-    const MyGatekeeperServer & GetGatekeeperServer() const               // 
+    const MyGatekeeperServer & GetGatekeeperServer() const               //
     {                                                                    //
       return m_gkServer;                                                 //
     }                                                                    //
@@ -138,7 +133,6 @@ class MyH323EndPoint : public H323ConsoleEndPoint                        //
     bool               m_firstConfig;                                    //
     PStringArray       m_configuredAliases;                              //
     PStringArray       m_configuredAliasPatterns;                        //
-                                                                         //
 };                                                                       //
 /*************************************************************************/
 #endif // OPAL_H323

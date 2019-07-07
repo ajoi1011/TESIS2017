@@ -6,8 +6,8 @@
 /*************************************************************************/
 /*                                                                       */
 /* <Descripción>                                                         */
-/*   Clase derivada de PConfigPage que describe una instancia de         */
-/*  configuración para la aplicación.                                    */
+/*   Header que contiene los "keys" para la plantilla de configuración   */
+/*  de la aplicación y otras definiciones.                               */
 /*                                                                       */
 /*************************************************************************/
 
@@ -54,8 +54,6 @@ static const PConstString NoMediaTimeoutKey("Timeout RX Media");
 static const PConstString TxMediaTimeoutKey("Timeout TX Media");
 static const PConstString TCPPortBaseKey("Puerto TCP Base");
 static const PConstString TCPPortMaxKey("Puerto TCP Max");
-static const PConstString UDPPortBaseKey("Puerto UDP Base");
-static const PConstString UDPPortMaxKey("Puerto UDP Max");
 static const PConstString RTPPortBaseKey("Puerto RTP Base");
 static const PConstString RTPPortMaxKey("Puerto RTP Max");
 static const PConstString RTPTOSKey("Tipo de Servicio RTP");
@@ -65,7 +63,7 @@ static const PConstString NATServerKey("Servidor");
 static const PConstString NATInterfaceKey("Interfaz");
 #endif
 #if OPAL_VIDEO
-static const PConstString ConfVideoManagerKey("Resolución de Video");
+static const PConstString ConfVideoManagerKey("Resolución Estándar de Video");
 static const PConstString ConfVideoMaxManagerKey("Resolución max de Video");
 static const PConstString FrameRateManagerKey("Video Frame Rate");
 static const PConstString BitRateManagerKey("Video Bit Rate");
@@ -80,7 +78,7 @@ static const PINDEX H323GatekeeperPasswordSize = 30;
 static const PConstString H323AliasesKey("Alias H.323");
 static const PConstString DisableFastStartKey("Deshabilitar Fast Start");
 static const PConstString DisableH245TunnelingKey("Deshabilitar H.245 Tunneling");
-static const PConstString DisableH245inSetupKey("Deshabilitar H.245 en Setup");
+static const PConstString DisableH245inSetupKey("Deshabilitar H.245 in Setup");
 static const PConstString ForceSymmetricTCSKey("Forzar TCS Simétrico");
 static const PConstString H239ControlKey("Habilitar Control H.239");
 static const PConstString H323BandwidthKey("Ancho de Banda H.323");
@@ -102,7 +100,7 @@ static const PConstString DefaultBandwidthKey("Designar Ancho de Banda Por Defec
 static const PConstString MaximumBandwidthKey("Designar Ancho de Banda Máximo");
 static const PConstString DefaultTimeToLiveKey("Tiempo GK Por Defecto");
 static const PConstString CallHeartbeatTimeKey("Tiempo de validación llamada GK");
-static const PConstString DisengageOnHearbeatFailKey("Disengage On Hearbeat Fail");
+static const PConstString DisengageOnHearbeatFailKey("Colgar Si Falla Tiempo de Validación");
 static const PConstString OverwriteOnSameSignalAddressKey("Sobreescritura de registro GK");
 static const PConstString CanHaveDuplicateAliasKey("Duplicar Alias GK");
 static const PConstString CanOnlyCallRegisteredEPKey("Solo LLamada de Terminales Registrados");
@@ -110,7 +108,7 @@ static const PConstString CanOnlyAnswerRegisteredEPKey("Solo Respuesta de Termin
 static const PConstString AnswerCallPreGrantedARQKey("Responder Pregarantizando ARQ");
 static const PConstString MakeCallPreGrantedARQKey("Llamar Pregarantizando ARQ");
 static const PConstString IsGatekeeperRoutedKey("GK Enrutado");
-static const PConstString AliasCanBeHostNameKey("Alias H.323 como Host Name");
+static const PConstString AliasCanBeHostNameKey("Alias H.323 como Hostname");
 static const PConstString MinAliasToAllocateKey("Alias Mínimos a Designar");
 static const PConstString MaxAliasToAllocateKey("Alias Máximos a Designar");
 static const PConstString RequireH235Key("GK Requiere Autentificación H.235");
@@ -120,7 +118,7 @@ static const PConstString RouteAliasKey("Alias");
 static const PConstString RouteHostKey("Host");
 static const PConstString GkServerListenersKey("Interfaces Servidor GK");
 static const PConstString AuthenticationCredentialsName("Usuarios Autentificados GK");
-static const PConstString AuthenticationCredentialsKey("Credentials %u\\");
+static const PConstString AuthenticationCredentialsKey("Credenciales %u\\");
 static const PConstString AliasRouteMapsName("Mapas de Alias");
 static const PConstString AliasRouteMapsKey("Mapa de Rutas \\Mapping %u\\");
 #endif // OPAL_H323
@@ -158,12 +156,6 @@ static const PConstString ConfMixingModeKey("Modo de video");
 #endif // OPAL_HAS_MIXER
 
 #define PATH_SEPARATOR   "/"
-// specify the path executable files
-#define SYS_BIN_DIR "/usr/local/bin"
-// specify the path for .conf files
-#define SYS_CONFIG_DIR "/usr/local/share/opalserver/config"
-// specify the path for built-in web server resources
-//#define SYS_RESOURCE_DIR "/usr/local/share/opalserver/resource"
 #define SYS_RESOURCE_DIR "/home/ajoi1011/proyecto/project/resource"
 
 #endif // CONFIG_H

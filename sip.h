@@ -32,9 +32,6 @@ class MySIPEndPoint : public SIPConsoleEndPoint                          //
       bool verbose,                                                      //
       const PString & defaultRoute                                       //
     );                                                                   //
-                                                                         //
-    /** Funciones implementadas en OpalServer */                         //
-    //@{                                                                 //
     void AutoRegisterCisco(                                              //
       const PString & server,                                            //
       const PString & wildcard,                                          //
@@ -47,9 +44,7 @@ class MySIPEndPoint : public SIPConsoleEndPoint                          //
 #if OPAL_H323                                                            //
     virtual void OnChangedRegistrarAoR(RegistrarAoR & ua);               //
 #endif                                                                   //
-                                                                         //
     bool GetAutoRegisterH323() { return m_autoRegisterH323; }            //
-    //@}                                                                 //
                                                                          //
   protected:                                                             //
     MyManager & m_manager;                                               //

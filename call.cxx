@@ -426,7 +426,7 @@ PBoolean MyCall::OnSetUp(OpalConnection & connection)
 {
   if (!OpalCall::OnSetUp(connection))
     return false;
-  
+
   PSafePtr<OpalConnection> a = GetConnection(0);
   if (a != NULL) {
     m_OriginatorID = a->GetIdentifier();

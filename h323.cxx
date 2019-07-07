@@ -92,8 +92,8 @@ bool MyH323EndPoint::Configure(PConfig & cfg, PConfigPage * rsrc)
   }
 
   DisableFastStart(rsrc->AddBooleanField(DisableFastStartKey, IsFastStartDisabled(), "Deshabilita H.323 Fast Connect."));
-  DisableH245Tunneling(rsrc->AddBooleanField(DisableH245TunnelingKey, IsH245TunnelingDisabled(), "Deshabilita  tunelizado H.245 en canal de señalización H.225.0."));
-  DisableH245inSetup(rsrc->AddBooleanField(DisableH245inSetupKey, IsH245inSetupDisabled(), "Deshabilita envio inicial H.245 PDU tunelizado en SETUP PDU."));
+  DisableH245Tunneling(rsrc->AddBooleanField(DisableH245TunnelingKey, IsH245TunnelingDisabled(), "Deshabilita  H.245 Tunneling en canal de señalización H.225.0."));
+  DisableH245inSetup(rsrc->AddBooleanField(DisableH245inSetupKey, IsH245inSetupDisabled(), "Deshabilita H.245 in SETUP PDU."));
   ForceSymmetricTCS(rsrc->AddBooleanField(ForceSymmetricTCSKey, IsForcedSymmetricTCS(), "Forza indicación de codecs simétricos en TCS."));
   bool h239Control = rsrc->AddBooleanField(H239ControlKey, false, "Habilita control H.239.");
   if (h239Control)
@@ -175,7 +175,6 @@ PBoolean MyGatekeeperServer::TranslateAliasAddress(const H225_AliasAddress & ali
                                                    PBoolean & isGkRouted,
                                                    H323GatekeeperCall * call)
 {
-
   if (H323GatekeeperServer::TranslateAliasAddress(alias, aliases, address, isGkRouted, call))
     return true;
 
@@ -230,7 +229,7 @@ bool MyGatekeeperServer::Configure(PConfig & cfg, PConfigPage * rsrc)
   SetInfoResponseRate(rsrc->AddIntegerField(CallHeartbeatTimeKey, 0, 86400, GetInfoResponseRate(),
                                             "segundos", "Tiempo de validación de peticiones en llamada controlada por el servidor gatekeeper."));
 
-  SetDisengageOnHearbeatFail(rsrc->AddBooleanField(DisengageOnHearbeatFailKey, GetDisengageOnHearbeatFail(), "Colgar llamada si tiempo de validación (IRR) falla."));
+  SetDisengageOnHearbeatFail(rsrc->AddBooleanField(DisengageOnHearbeatFailKey, GetDisengageOnHearbeatFail(), "Termina llamada si tiempo de validación (IRR) falla."));
 
   SetOverwriteOnSameSignalAddress(rsrc->AddBooleanField(OverwriteOnSameSignalAddressKey, GetOverwriteOnSameSignalAddress(),
                                                         "Sobreescribe en una dirección de señal específica para anular previo registro."));
@@ -239,10 +238,10 @@ bool MyGatekeeperServer::Configure(PConfig & cfg, PConfigPage * rsrc)
                                                  "Diferentes terminales pueden registrarse en el gatekeeper con el mismo alias de otro terminal."));
 
   SetCanOnlyCallRegisteredEP(rsrc->AddBooleanField(CanOnlyCallRegisteredEPKey, GetCanOnlyCallRegisteredEP(),
-                                                   "Gatekeeper permitirá a un terminal llamar a otro registrado localmente."));
+                                                   "Gatekeeper permite a un terminal llamar a otro registrado localmente."));
 
   SetCanOnlyAnswerRegisteredEP(rsrc->AddBooleanField(CanOnlyAnswerRegisteredEPKey, GetCanOnlyAnswerRegisteredEP(),
-                                                     "Gatekeeper permitirá a un terminal responder a otro registrado localmente."));
+                                                     "Gatekeeper permite a un terminal responder a otro registrado localmente."));
 
   SetAnswerCallPreGrantedARQ(rsrc->AddBooleanField(AnswerCallPreGrantedARQKey, GetAnswerCallPreGrantedARQ(),
                                                    "Gatekeeper garantiza todas las llamadas entrantes al terminal."));
@@ -254,10 +253,10 @@ bool MyGatekeeperServer::Configure(PConfig & cfg, PConfigPage * rsrc)
                                               "Gatekeeper permite registrar simplemente su hostname/dirección IP."));
 
   SetMinAliasToAllocate(rsrc->AddIntegerField(MinAliasToAllocateKey, 0, INT_MAX, GetMinAliasToAllocate(), "",
-                                              "Mínimo valor para alias que gatekeeper podrá designar cuando el terminal no provea ninguna, 0 deshabilitadas."));
+                                              "Mínimo valor para alias que gatekeeper designa cuando el terminal no provee ninguna, 0 deshabilitadas."));
 
   SetMaxAliasToAllocate(rsrc->AddIntegerField(MaxAliasToAllocateKey, 0, INT_MAX, GetMaxAliasToAllocate(), "",
-                                              "Máximo valor para alias que gatekeeper podrá designar cuando el terminal no provea ninguna, 0 deshabilitadas."));
+                                              "Máximo valor para alias que gatekeeper designa cuando el terminal no provee ninguna, 0 deshabilitadas."));
 
   SetGatekeeperRouted(rsrc->AddBooleanField(IsGatekeeperRoutedKey, IsGatekeeperRouted(),
                                             "Habilita a todos los terminales a enrutar la señalización para todas las llamadas a través del gatekeeper."));
@@ -312,7 +311,6 @@ PString MyGatekeeperServer::OnLoadEndPointStatus(const PString & htmlBlock)
   PString substitution;
 
   for (PSafePtr<H323RegisteredEndPoint> ep = GetFirstEndPoint(PSafeReadOnly); ep != NULL; ep++) {
-    // make a copy of the repeating html chunk
     PString insert = htmlBlock;
 
     PServiceHTML::SpliceMacro(insert, "status EndPointIdentifier", ep->GetIdentifier());
@@ -340,7 +338,6 @@ PString MyGatekeeperServer::OnLoadEndPointStatus(const PString & htmlBlock)
 
     PServiceHTML::SpliceMacro(insert, "status ActiveCalls", ep->GetCallCount());
 
-    // Then put it into the page, moving insertion point along after it.
     substitution += insert;
   }
 
@@ -377,7 +374,6 @@ MyGatekeeperCall::MyGatekeeperCall(MyGatekeeperServer & gk,
                                    Direction dir)
   : H323GatekeeperCall(gk, id, dir)
 {
-
 }
 
 MyGatekeeperCall::~MyGatekeeperCall()
@@ -396,4 +392,4 @@ H323GatekeeperRequest::Response MyGatekeeperCall::OnAdmission(H323GatekeeperARQ 
 #endif
 
   return H323GatekeeperCall::OnAdmission(info);
-}
+} // Final del Archivo

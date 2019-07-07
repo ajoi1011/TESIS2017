@@ -85,7 +85,6 @@ class MyProcess : public PHTTPServiceProcess                             //
   protected:                                                             //
     MyManager        * m_manager;                                        //
     MyPConfigPage    * m_pageConfigure;                                  //
-                                                                         //
 };                                                                       //
 /*************************************************************************/
 

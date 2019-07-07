@@ -18,9 +18,9 @@
 void BeginPage(
   PStringStream & html, 
   PStringStream & pmeta, 
-  const char        * ptitle, 
-  const char        * title, 
-  const char  * quotekey
+  const char    * ptitle, 
+  const char    * title, 
+  const char    * quotekey
 );
   
 void EndPage (PStringStream & html, PString copyr);
@@ -47,7 +47,7 @@ class BaseStatusPage : public PServiceHTTPString                         //
                                                                          //
     virtual PString LoadText(                                            //
       PHTTPRequest & request                                             //
-      );                                                                 //
+    );                                                                   //
     virtual PBoolean Post(                                               //
       PHTTPRequest & request,                                            //
       const PStringToString &,                                           //
@@ -301,21 +301,22 @@ class InvitePage : public PServiceHTTPString                             //
 
 /*************************************************************************/
 /*                                                                       */
-/* <clase SelectRoomPage>                                                */
+/* <clase <ControlRoomPage>                                              */
 /*                                                                       */
 /* <Descripción>                                                         */
 /*   Clase derivada de PServiceHTTPString que describe un post HTTP para */
 /*  crear salas de conferencias en la Multipoint Control Unit (MCU).     */
 /*                                                                       */
 /*************************************************************************/
-class SelectRoomPage : public PServiceHTTPString                         //
+class ControlRoomPage : public PServiceHTTPString                        //
 {                                                                        //
   public:                                                                //
+    ControlRoomPage(MyProcess & app, PHTTPAuthority & auth);             //
+                                                                         //
     PBoolean OnGET (                                                     //
       PHTTPServer & server,                                              //
       const PHTTPConnectionInfo & connectInfo                            //
     );                                                                   //
-    SelectRoomPage(MyProcess & app, PHTTPAuthority & auth);              //
                                                                          //
   protected:                                                             //
     MyProcess & app;                                                     //

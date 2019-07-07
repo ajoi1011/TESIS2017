@@ -44,7 +44,6 @@ class MyMixerConnection : public OpalMixerConnection                     //
                                                                          //
   protected:                                                             //
     MyMixerEndPoint & m_endpoint;                                        //
-                                                                         //
 };                                                                       //
 /*************************************************************************/
 
@@ -68,7 +67,6 @@ class MyMixerEndPoint : public OpalConsoleMixerEndPoint                  //
       bool verbose,                                                      //
       const PString &                                                    //
     );                                                                   //
-                                                                         //
     virtual OpalMixerConnection * CreateConnection(                      //
       PSafePtr<OpalMixerNode> node,                                      //
       OpalCall & call,                                                   //
@@ -76,14 +74,13 @@ class MyMixerEndPoint : public OpalConsoleMixerEndPoint                  //
       unsigned options,                                                  //
       OpalConnection::StringOptions * stringOptions                      //
     );                                                                   //
-    virtual OpalMixerNode * CreateNode(OpalMixerNodeInfo * info);        //  
+    virtual OpalMixerNode * CreateNode(OpalMixerNodeInfo * info);        //
     virtual OpalVideoStreamMixer * CreateVideoMixer(                     //
       const OpalMixerNodeInfo & info                                     //
     );                                                                   //
     bool Configure(PConfig & cfg, PConfigPage * rsrc);                   //
                                                                          //
   protected:                                                             //
-                                                                         //
 };                                                                       //
 /*************************************************************************/
 
@@ -132,7 +129,6 @@ class MyMixerMediaStream : public OpalMixerMediaStream                   //
     PVideoOutputDevice * m_outputDevice;                                 //
     bool                 m_autoDeleteOutput;                             //
     PDECLARE_MUTEX(m_devicesMutex);                                      //
-                                                                         //
 };                                                                       //
 /*************************************************************************/
 

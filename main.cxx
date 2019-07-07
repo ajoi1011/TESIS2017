@@ -23,7 +23,7 @@ PBoolean MyProcess::Initialise(const char * initMsg)
 {
   PSYSTEMLOG(Warning, "Service " << GetName() << ' ' << initMsg);
 
-  Params params("Parametros", "Parametros");
+  Params params("Parametros");
   params.m_httpPort = DefaultHTTPPort;
   if (!InitialiseBase(params))
     return false;
@@ -35,17 +35,17 @@ PBoolean MyProcess::Initialise(const char * initMsg)
   PHTML cfgHTML;
   m_pageConfigure = (MyPConfigPage*)params.m_configPage;
   m_pageConfigure->BuildHTML(cfgHTML);
-  
+
   CreateHTTPResource("CallDetailRecord");
   CreateHTTPResource("CallDetailRecords");
+  CreateHTTPResource("Control");
   CreateHTTPResource("CallStatus");
   CreateHTTPResource("GkStatus");
   CreateHTTPResource("HomePage");
   CreateHTTPResource("Invite");
   CreateHTTPResource("RegistrarStatus");
   CreateHTTPResource("RegistrationStatus");
-  CreateHTTPResource("Select");
-  
+
   // Definiciones implementadas en OpenMCU-ru
 #ifdef SYS_RESOURCE_DIR
 #  define WEBSERVER_LINK(r1) m_httpNameSpace.AddResource(new PHTTPFile(r1, PString(SYS_RESOURCE_DIR) + PATH_SEPARATOR + r1), PHTTPSpace::Overwrite)
@@ -60,7 +60,7 @@ PBoolean MyProcess::Initialise(const char * initMsg)
   WEBSERVER_LINK_MIME("text/css",  "main.css");
   WEBSERVER_LINK_MIME("text/css",  "bootstrap.css");
   WEBSERVER_LINK_MIME("image/png", "mylogo_text.png");
-  
+
   if (ListenForHTTP(params.m_httpPort))
     PSYSTEMLOG(Info, "Opened master socket for HTTP: " << m_httpListeningSockets.front().GetPort());
   else {
@@ -110,11 +110,11 @@ bool MyProcess::InitialiseBase(Params & params)
                                                                           "", "0=Fatal, 1=Errores, 2=Alertas, 3=Info, 4=Debug, 5=Detallado."));
 
     fileName = params.m_configPage->AddStringField(FileKey, 0, 
-                                                  logFile != NULL ? logFile->GetFilePath() : PString::Empty(), 
-                                                  "Archivo de salida para trazo log.", 1, 30);
+                                                   logFile != NULL ? logFile->GetFilePath() : PString::Empty(), 
+                                                   "Nombre del archivo para trazo log.", 1, 30);
 
     info.m_directory = params.m_configPage->AddStringField(RotateDirKey, 0, info.m_directory, 
-                                                           "Ruta del directorio para archivo de trazo log.", 1, 30);
+                                                           "Ruta del directorio en donde se guarda archivo de trazo log.", 1, 30);
 
     info.m_prefix = params.m_configPage->AddStringField(RotatePrefixKey, 0, info.m_prefix, 
                                                         "Prefijo para archivo de trazo log.", 1, 30);
@@ -171,7 +171,6 @@ bool MyProcess::InitialiseBase(Params & params)
     if (params.m_fullLogPageName != NULL) {
       params.m_fullLogPage = new PHTTPFile(params.m_fullLogPageName, logFile->GetFilePath(), PMIMEInfo::TextPlain(), 
                                            params.m_authority);
-
       m_httpNameSpace.AddResource(params.m_fullLogPage, PHTTPSpace::Overwrite);
     }
 
@@ -183,7 +182,6 @@ bool MyProcess::InitialiseBase(Params & params)
     if (params.m_tailLogPageName != NULL) {
       params.m_tailLogPage = new PHTTPTailFile(params.m_tailLogPageName, logFile->GetFilePath(), PMIMEInfo::TextPlain(), 
                                                params.m_authority);
-                                               
       m_httpNameSpace.AddResource(params.m_tailLogPage, PHTTPSpace::Overwrite);
     }
   }
@@ -210,7 +208,11 @@ PBoolean MyProcess::OnStart()
   new MyPCSSEndPoint(*m_manager);
 #endif // OPAL_HAS_PCSS
 
+#if OPAL_HAS_MIXER
   m_manager->Initialise(GetArguments(), false, OPAL_PREFIX_MIXER":<du>");
+#else
+  m_manager->Initialise(GetArguments(), false);
+#endif // OPAL_HAS_MIXER
 
   return PHTTPServiceProcess::OnStart();
 }
@@ -238,6 +240,8 @@ void MyProcess::CreateHTTPResource(const PString & name)
     m_httpNameSpace.AddResource(new CDRListPage(GetManager(), authConference), PHTTPSpace::Overwrite);
   else if (name == "CallStatus")
     m_httpNameSpace.AddResource(new CallStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+  else if (name == "Control")
+    m_httpNameSpace.AddResource(new ControlRoomPage(*this, authConference), PHTTPSpace::Overwrite);
 #if OPAL_H323
   else if (name == "GkStatus")
     m_httpNameSpace.AddResource(new GkStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
@@ -252,9 +256,6 @@ void MyProcess::CreateHTTPResource(const PString & name)
 #endif // OPAL_SIP
   else if (name == "RegistrationStatus")
     m_httpNameSpace.AddResource(new RegistrationStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
-  else if (name == "Select")
-    m_httpNameSpace.AddResource(new SelectRoomPage(*this, authConference), PHTTPSpace::Overwrite);
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -299,7 +300,6 @@ void MyPConfigPage::BuildHTML(PHTML & html, BuildOptions option)
     html_page << html_begin << html << html_end;
     m_string = html_page;
   }
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
