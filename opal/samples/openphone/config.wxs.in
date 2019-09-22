@@ -1,0 +1,43 @@
+<Include>
+    <?include version.wxs ?>
+
+    <?define ProductName = "OpenPhone" ?>
+    <?define ProductDescription = "VoIP client for OPAL" ?>
+    <?define ProductBaseFilename = "OpenPhone" ?>
+    <?define ProductVersion = "$(var.OPAL_VERSION)" ?>
+    <?define ProductManufacturer = "Vox Lucida Pty. Ltd." ?>
+    <?define ProductGUID = "56E04FF6-6AEB-4917-B8FC-6C0C1F5831F1" ?>
+
+    <?if $(var.Architecture) = "x86" ?>
+        <?define SSLDir = "$(env.ProgramW6432)\OpenSSL-Win32\bin" ?>
+        <?define LuaDir = "..\..\..\external\Lua-win32" ?>
+        <?define V8Dir = "..\..\..\external\v8\v8\out.gn\ia32.release" ?>
+        <?define JPEGDir = "C:\Tools\bin" ?>
+        <?define SaslDir = "C:\Tools\bin" ?>
+        <?define LDAPDir = "C:\Tools\bin" ?>
+        <?define FFMPEGDir = "..\..\..\external\ffmpeg-win32-dev\bin" ?>
+        <?define OpenH264Dir = "$(env.ProgramFiles)\PTLib Plug Ins" ?>
+        <?define SpanDspDir = "..\..\..\external\spandsp-0.0.6\src\Release" ?>
+    <?else?>
+        <?define SSLDir = "$(env.ProgramW6432)\OpenSSL-Win64\bin" ?>
+        <?define LuaDir = "..\..\..\external\Lua-win64" ?>
+        <?define V8Dir = "..\..\..\external\v8\v8\out.gn\x64.release" ?>
+        <?define FFMPEGDir = "..\..\..\external\ffmpeg-win64-dev\bin" ?>
+        <?define OpenH264Dir = "$(env.ProgramW6432)\PTLib Plug Ins" ?>
+        <?define SpanDspDir = "..\..\..\external\spandsp-0.0.6\src\x64\Release" ?>
+    <?endif?>
+
+    <?define AVFORMATVer = "57" ?>
+    <?define AVCODECVer = "57" ?>
+    <?define AVUTILVer = "55" ?>
+    <?define SWRESAMPLEVer = "2" ?>
+    <?define SWSCALEVer = "4" ?>
+
+    <?define WxDir = "$(env.WXDIR)" ?>
+    <?define WxVer = "$(env.WXVER)1" ?>
+    <?define WxCustom = "yes" ?>
+
+    <?define PTLibDir = "..\..\..\ptlib" ?>
+    <?define OPALDir = "..\.." ?>
+
+</Include>
