@@ -1,4 +1,6 @@
---disable-h460 --disable-h460nat --disable-h450 --disable-h501 --disable-lid --disable-skinny --disable-iax2 --enable-openssl
+#Configure OPAL
+./configure --disable-h460 --disable-h460nat --disable-h450 --disable-h501 --disable-lid --disable-skinny --disable-iax2 --enable-openssl
+#Mods 
 ptlib sdl.cxx
 void PVideoOutputDevice_SDL::PostEvent(unsigned code, bool wait)
 {
@@ -14,7 +16,7 @@ void PVideoOutputDevice_SDL::PostEvent(unsigned code, bool wait)
 
   PTRACE(5, "Posted user event " << (unsigned)sdlEvent.user.code);
   if (wait)
-    PAssert(m_operationComplete.Wait(100000),
+    PAssert(m_operationComplete.Wait(100000), /*Original 10000*/
             PSTRSTRM("Couldn't process user event " << (unsigned)sdlEvent.user.code));
 }
 
@@ -47,7 +49,7 @@ opalvoip MediaFormat void OpalMediaFormatInternal::DeconflictPayloadTypes(OpalMe
     // A conflict is when we are after an explicit payload type, we have found one already using it
     if (rtpPayloadType > RTP_DataFrame::DynamicBase && rtpPayloadType == format->GetPayloadType()) {
       // If it is a shared payload types, which happens when encoding name is the same, then allow it
-      if (!m_allowMultiple && rtpEncodingName == format->GetEncodingName())
+      if (!m_allowMultiple && rtpEncodingName == format->GetEncodingName()) //Add ! to m_allowMutiple
         return;
 
       // Have a conflicting media format, move it later when we know where to
