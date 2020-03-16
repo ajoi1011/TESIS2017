@@ -1,0 +1,86 @@
+--disable-h460 --disable-h460nat --disable-h450 --disable-h501 --disable-lid --disable-skinny --disable-iax2 --enable-openssl
+ptlib sdl.cxx
+void PVideoOutputDevice_SDL::PostEvent(unsigned code, bool wait)
+{
+  SDL_Event sdlEvent;
+  sdlEvent.type = SDL_USEREVENT;
+  sdlEvent.user.code = code;
+  sdlEvent.user.data1 = this;
+  sdlEvent.user.data2 = NULL;
+  if (::SDL_PushEvent(&sdlEvent) < 0) {
+    PTRACE(1, "Couldn't post user event " << (unsigned)sdlEvent.user.code << ": " << ::SDL_GetError());
+    return;
+  }
+
+  PTRACE(5, "Posted user event " << (unsigned)sdlEvent.user.code);
+  if (wait)
+    PAssert(m_operationComplete.Wait(100000),
+            PSTRSTRM("Couldn't process user event " << (unsigned)sdlEvent.user.code));
+}
+
+ptlib Assert Videoio.cxx 
+PBoolean PVideoFrameInfo::SetFrameSize(unsigned width, unsigned height)
+{
+  /*if (!PAssert(width >= 1 && height >= 1 && width < 65536 && height < 65536, PInvalidParameter))
+    return false;*/
+
+  m_frameWidth = width;
+  m_frameHeight = height;
+  return true;
+}
+opalvoip MediaFormat void OpalMediaFormatInternal::DeconflictPayloadTypes(OpalMediaFormatList & formats)
+{
+  OpalMediaFormat * conflictingFormat = NULL;
+
+  // Build a table of all the unused payload types
+  bool inUse[RTP_DataFrame::IllegalPayloadType+1];
+  memset(inUse, 0, sizeof(inUse));
+
+  // Do not use the "forbidden zone"
+  for (int i = RTP_DataFrame::StartConflictRTCP; i <= RTP_DataFrame::EndConflictRTCP; ++i)
+    inUse[i] = true;
+
+  // Search for conflicting RTP Payload Type, collecting in use payload types along the way
+  for (OpalMediaFormatList::iterator format = formats.begin(); format != formats.end(); ++format) {
+    inUse[format->GetPayloadType()] = true;
+
+    // A conflict is when we are after an explicit payload type, we have found one already using it
+    if (rtpPayloadType > RTP_DataFrame::DynamicBase && rtpPayloadType == format->GetPayloadType()) {
+      // If it is a shared payload types, which happens when encoding name is the same, then allow it
+      if (!m_allowMultiple && rtpEncodingName == format->GetEncodingName())
+        return;
+
+      // Have a conflicting media format, move it later when we know where to
+      conflictingFormat = &*format;
+    }
+  }
+
+  if (!inUse[rtpPayloadType]) {
+    PTRACE(5, "Using provided payload type " << rtpPayloadType << " for " << formatName);
+    return;
+  }
+
+  // Determine next unused payload type, if all the dynamic ones are allocated then
+  // we start downward toward the well known values.
+  int nextUnused = RTP_DataFrame::DynamicBase;
+  while (inUse[nextUnused]) {
+    if (nextUnused < RTP_DataFrame::DynamicBase)
+      --nextUnused;
+    else if (++nextUnused >= RTP_DataFrame::MaxPayloadType)
+      nextUnused = RTP_DataFrame::DynamicBase-1;
+  }
+
+  // If we had a conflict we change the older one, as it is assumed that the
+  // application really wanted that value and internal OPAL ones can move
+  if (conflictingFormat == NULL || m_allowMultiple) {
+    RTP_DataFrame::PayloadTypes newPT = (RTP_DataFrame::PayloadTypes)nextUnused;
+    PTRACE(4, "Replacing payload type " << rtpPayloadType << " with " << newPT << " for " << formatName);
+    rtpPayloadType = newPT;
+  }
+  else {
+    PTRACE(3, "Conflicting payload type: "
+           << *conflictingFormat << " moved to " << nextUnused
+           << " as " << formatName << " requires " << rtpPayloadType);
+    conflictingFormat->SetPayloadType((RTP_DataFrame::PayloadTypes)nextUnused);
+  }
+}
