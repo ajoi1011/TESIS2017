@@ -44,11 +44,11 @@ void BeginPage(PStringStream & html,
 
   PString html0(html_template_buffer); 
   html0 = html0.Left(html0.Find("$BODY$"));
-  html0.Replace("$LANG$",     lang,     TRUE, 0);
-  html0.Replace("$PMETA$",    pmeta,    TRUE, 0);
-  html0.Replace("$PTITLE$",   ptitle,   TRUE, 0);
-  html0.Replace("$TITLE$",    title,    TRUE, 0);
-  html0.Replace("$QUOTE$",    quotekey, TRUE, 0);
+  html0.Replace("$LANG$",     lang,     true, 0);
+  html0.Replace("$PMETA$",    pmeta,    true, 0);
+  html0.Replace("$PTITLE$",   ptitle,   true, 0);
+  html0.Replace("$TITLE$",    title,    true, 0);
+  html0.Replace("$QUOTE$",    quotekey, true, 0);
   html << html0;
 }
 
