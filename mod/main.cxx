@@ -1,586 +1,309 @@
+
+
+
+#include "main.h"
+#include "custom.h"
 #include "html.h"
-#include "config.h"
-#include <jpeglib.h>
 
-static unsigned long html_template_size;
-char * html_template_buffer;
-char * html_quote_buffer;
-PMutex html_mutex;
+int MyProcess::defaultRoomCount = 5;
 
-void BeginPage(PStringStream & html, 
-               PStringStream & pmeta, 
-               const char * ptitle, 
-               const char * title, 
-               const char * quotekey)  
+VideoMixConfigurator MyProcess::vmcfg;
+PCREATE_PROCESS(MyProcess);
+
+MyProcess::MyProcess()
+ : PHTTPServiceProcess (ProductInfo)
+ , m_manager(NULL)
 {
-  PWaitAndSignal m(html_mutex);
-
-  if (html_template_size <= 0) { 
-    FILE * fs = fopen(PString(SYS_RESOURCE_DIR) + PATH_SEPARATOR + "template.html", "r");
-    if (fs) { 
-      fseek(fs, 0L, SEEK_END); 
-      html_template_size = ftell(fs); 
-      rewind(fs);
-      html_template_buffer = new char[html_template_size + 1];
-      if (html_template_size != fread(html_template_buffer, 1, html_template_size, fs)) 
-        html_template_size = -1;
-      else 
-        html_template_buffer[html_template_size] = 0;
-      fclose(fs);
-    }
-    else html_template_size = -1;
-  }
-
-  if (html_template_size <= 0) { 
-    PTRACE(1,"WebCtrl\tCan't read HTML template from file"); 
-    return; 
-  }
-
-  PString lang = "en";
-
-  PString html0(html_template_buffer); 
-  html0 = html0.Left(html0.Find("$BODY$"));
-  html0.Replace("$LANG$",     lang,     TRUE, 0);
-  html0.Replace("$PMETA$",    pmeta,    TRUE, 0);
-  html0.Replace("$PTITLE$",   ptitle,   TRUE, 0);
-  html0.Replace("$TITLE$",    title,    TRUE, 0);
-  html0.Replace("$QUOTE$",    quotekey, TRUE, 0);
-  html << html0;
-}
-
-void EndPage(PStringStream & html, PString copyr) 
-{
-  PWaitAndSignal m(html_mutex);
-
-  if (html_template_size <= 0) 
-    return;
-
-  PString html0(html_template_buffer); 
-  html0 = html0.Mid(html0.Find("$BODY$")+6,P_MAX_INDEX);
-  html0.Replace("$COPYRIGHT$", copyr,   TRUE, 0);
-  html << html0;
-}
-
-HomePage::HomePage(MyProcess & app, PHTTPAuthority & auth)
-  : PServiceHTTPString("welcome.html", "", "text/html; charset=utf-8", auth)
-  , app(app)
-{
-  PString peerAddr  = "N/A",
-          localAddr = "127.0.0.1";
-  WORD    localPort = 80;
-
-  PStringStream html, meta;
-  BeginPage(html, meta, "OpalMCU-EIE", "window.l_welcome", "window.l_info_welcome");
-  PString timeFormat = "dd/MM/yyyy hh:mm:ss";
-  PTime now;
-
-  html << "<script src=\"control.js\"></script>"
+  m_manager = new OpalManager();
+  manager = new ConferenceManager(*m_manager);
   
-       << "<br><b>Info del servidor (<span style='cursor:pointer;text-decoration:underline' onclick='javascript:{if(document.selection){var range=document.body.createTextRange();range.moveToElementText(document.getElementById(\"monitorTextId\"));range.select();}else if(window.getSelection){var range=document.createRange();range.selectNode(document.getElementById(\"monitorTextId\"));window.getSelection().addRange(range);}}'>seleccionar todo</span>)</b><div style='padding:5px;border:1pxdotted #595;width:100%;height:auto;max-height:300px;overflow:auto'><pre style='margin:0px;padding:0px' id='monitorTextId'>"
-       << "Inicio del servidor: "  << MyProcess::Current().GetStartTime().AsString(timeFormat) << "\n"
-       << "Host local: "           << PIPSocket::GetHostName() << "\n"
-       << "Direccion local: "      << localAddr << "\n"
-       << "Puerto local: "         << localPort << "\n"
-       /*<< app.GetManager().GetMonitorText()*/ << "</pre></div>";
+}
 
-  EndPage(html, MyProcess::Current().GetHtmlCopyright());
-  m_string = html;
-} 
-
-ControlRoomPage::ControlRoomPage(MyProcess & app, PHTTPAuthority & auth)
-  : PServiceHTTPString("Select", "", "text/html; charset=utf-8", auth)
-  , app(app)
+MyProcess::~MyProcess()
 {
 }
 
-PBoolean ControlRoomPage::OnGET (PHTTPServer & server, const PHTTPConnectionInfo & connectInfo)
+PBoolean MyProcess::Initialise(const char * initMsg)
 {
-  { PHTTPRequest * req = CreateRequest(server, connectInfo);
-    if(!CheckAuthority(server, *req, connectInfo)) {
-      delete req; 
-      return false;
-    }
-    delete req;
-  }
+  PSYSTEMLOG(Warning, "Service " << GetName() << ' ' << initMsg);
 
-  PStringToString data;
-  { PString request = connectInfo.GetURL().AsString(); 
-	PINDEX q;
-    if((q = request.Find("?")) != P_MAX_INDEX) { 
-      request = request.Mid(q+1, P_MAX_INDEX); 
-      PURL::SplitQueryVars(request, data); 
-    }
-  }
-
-  if(data.Contains("action"))
-  {
-    PString action = data("action");
-    PString room = data("room");
-    if(action == "create" && (!room.IsEmpty()))
-    { ConferenceManager & cm = MyProcess::Current().GetConferenceManager();
-      cm.MakeAndLockConference(room);
-      cm.UnlockConference();
-    }
-    else if(action == "delete" && (!room.IsEmpty()))
-    { ConferenceManager & cm = MyProcess::Current().GetConferenceManager();
-      if(cm.HasConference(room))
-      { Conference * conference = cm.FindConferenceWithLock(room); // find & get locked
-        if(conference != NULL)
-        { cm.RemoveConference(conference->GetID());
-          cm.UnlockConference();
-        }
-      }
-    }
-    else if(action == "startRecorder" && (!room.IsEmpty()))
-    { ConferenceManager & cm = MyProcess::Current().GetConferenceManager();
-      if(cm.HasConference(room))
-      { Conference * conference = cm.FindConferenceWithLock(room); // find & get locked
-        if(conference != NULL)
-        {
-          conference->StartRecorder();
-          cm.UnlockConference();
-        }
-      }
-    }
-    else if(action == "stopRecorder" && (!room.IsEmpty()))
-    { ConferenceManager & cm = MyProcess::Current().GetConferenceManager();
-      if(cm.HasConference(room))
-      { Conference * conference = cm.FindConferenceWithLock(room); // find & get locked
-        if(conference != NULL)
-        {
-          conference->StopRecorder();
-          cm.UnlockConference();
-        }
-      }
-    }
-  }
-
-  //MyH323EndPoint & ep=MyProcess::Current().GetEndpoint();
-
-  PStringStream html, meta;
-  BeginPage(html,meta,"Rooms","window.l_rooms","window.l_info_rooms");
-
-  if(data.Contains("action")) html << "<script language='javascript'>location.href='Select';</script>";
-
-  PString nextRoom;
-  { ConferenceManager & cm = MyProcess::Current().GetConferenceManager();
-    ConferenceListType::const_iterator r;
-    PWaitAndSignal m(cm.GetConferenceListMutex());
-    for(r = cm.GetConferenceList().begin(); r != cm.GetConferenceList().end(); ++r)
-    { PString room0 = r->second->GetNumber().Trim(); PINDEX lastCharPos=room0.GetLength()-1;
-      if(room0.IsEmpty()) continue;
-#     if ENABLE_ECHO_MIXER
-        if(room0.Left(4) *= "echo") continue;
-#     endif
-#     if ENABLE_TEST_ROOMS
-        if(room0.Left(8) == "testroom") continue;
-#     endif
-      PINDEX i, d1=-1, d2=-1;
-      for (i=lastCharPos; i>=0; i--)
-      { char c=room0[i];
-        BOOL isDigit = (c>='0' && c<='9');
-        if (isDigit) { if (d2==-1) d2=i; }
-        else { if (d2!=-1) { if (d1==-1) { d1 = i+1; break; } } }
-      }
-      if(d1==-1 || d2==-1) continue;
-      if(d2-d1>6)d1=d2-6;
-      PINDEX roomStart=room0.Mid(d1,d2).AsInteger(); PString roomText=room0.Left(d1);
-      PString roomText2; if(d2<lastCharPos) roomText2=room0.Mid(d2+1,lastCharPos);
-      while(1)
-      { roomStart++;
-        PString testName = roomText + PString(roomStart) + roomText2;
-        for (r = cm.GetConferenceList().begin(); r != cm.GetConferenceList().end(); ++r) if(r->second->GetNumber()==testName) break;
-        if(r == cm.GetConferenceList().end()) { nextRoom = testName; break; }
-      }
-      break;
-    }
-    if(nextRoom.IsEmpty()) nextRoom = MyProcess::Current().GetDefaultRoomName();
-  }
-
-  html
-    << "<form method=\"post\" onsubmit=\"javascript:{if(document.getElementById('newroom').value!='')location.href='?action=create&room='+encodeURIComponent(document.getElementById('newroom').value);return false;}\"><input name='room' id='room' type=hidden>"
-    << "<table class=\"table table-striped table-bordered table-condensed\">"
-
-    << "<tr>"
-    << "<td colspan='7'><input type='text' class='input-small' name='newroom' id='newroom' value='" << nextRoom << "' /><input type='button' class='btn btn-large btn-info' id='l_select_create' onclick=\"location.href='?action=create&room='+encodeURIComponent(document.getElementById('newroom').value);\"></td>"
-    << "</tr>"
-
-    << "<tr>"
-    << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_enter);</script><br></th>"
-    << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_record);</script><br></th>"
-    << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_moderated);</script><br></th>"
-    << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_visible);</script><br></th>"
-    << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_unvisible);</script><br></th>"
-    << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_duration);</script><br></th>"
-    << "<th style='text-align:center'><script type=\"text/javascript\">document.write(window.l_select_delete);</script><br></th>"
-    << "</tr>"
-  ;
+  Params params("Parameters");
+  params.m_httpPort = DefaultHTTPPort;
+  if (!InitialiseBase(params))
+    return false;
   
-  { PWaitAndSignal m(MyProcess::Current().GetConferenceManager().GetConferenceListMutex());
-    ConferenceListType & conferenceList = MyProcess::Current().GetConferenceManager().GetConferenceList();
-
-    ConferenceListType::iterator r;
-    for (r = conferenceList.begin(); r != conferenceList.end(); ++r)
-    {
-      BOOL controlled = TRUE;
-      Conference & conference = *(r->second);
-      PString roomNumber = conference.GetNumber();
-#if ENABLE_TEST_ROOMS
-      controlled &= (!((roomNumber.Left(8)=="testroom") && (roomNumber.GetLength()>8))) ;
+  vmcfg.go(vmcfg.bfw,vmcfg.bfh);
+  CreateHTTPResource("HomePage");
+  CreateHTTPResource("Control");
+  CreateHTTPResource("Comm");
+  CreateHTTPResource("Jpeg");
+  
+  httpBuffer=100;
+  httpBufferedEvents.SetSize(httpBuffer);
+  httpBufferIndex=0; httpBufferComplete=0;
+  
+  // Definiciones implementadas en MyProcess-ru
+#ifdef SYS_RESOURCE_DIR
+#  define WEBSERVER_LINK(r1) m_httpNameSpace.AddResource(new PHTTPFile(r1, PString(SYS_RESOURCE_DIR) + PATH_SEPARATOR + r1), PHTTPSpace::Overwrite)
+#  define WEBSERVER_LINK_MIME(mt1,r1) m_httpNameSpace.AddResource(new PHTTPFile(r1, PString(SYS_RESOURCE_DIR) + PATH_SEPARATOR + r1, mt1), PHTTPSpace::Overwrite)
+#  define WEBSERVER_LINK_MIME_CFG(mt1,r1) m_httpNameSpace.AddResource(new PHTTPFile(r1, PString(SYS_CONFIG_DIR) + PATH_SEPARATOR + r1, mt1), PHTTPSpace::Overwrite)
+#else
+#  define WEBSERVER_LINK(r1) m_httpNameSpace.AddResource(new PHTTPFile(r1), PHTTPSpace::Overwrite)
+#  define WEBSERVER_LINK_MIME(mt1,r1) m_httpNameSpace.AddResource(new PHTTPFile(r1, r1, mt1), PHTTPSpace::Overwrite)
+#  define WEBSERVER_LINK_MIME_CFG(mt1,r1) m_httpNameSpace.AddResource(new PHTTPFile(r1, r1, mt1), PHTTPSpace::Overwrite)
 #endif
-#if ENABLE_ECHO_MIXER
-      controlled &= (!(roomNumber.Left(4)*="echo"));
-#endif
-      BOOL moderated=FALSE; PString charModerated = "-";
-      if(controlled) { charModerated = conference.IsModerated(); moderated=(charModerated=="+"); }
-      if(charModerated=="-") charModerated = "<script type=\"text/javascript\">document.write(window.l_select_moderated_no);</script>";
-      else charModerated = "<script type=\"text/javascript\">document.write(window.l_select_moderated_yes);</script>";
-      PINDEX   visibleMemberCount = conference.GetVisibleMemberCount();
-      PINDEX unvisibleMemberCount = conference.GetMemberCount() - visibleMemberCount;
-
-      PString roomButton = "<span class=\"btn btn-large btn-";
-      if(moderated) roomButton+="success";
-      else if(controlled) roomButton+="primary";
-      else roomButton+="inverse";
-      roomButton += "\"";
-      if(controlled) roomButton+=" onclick='document.getElementById(\"room\").value=\""
-        + roomNumber + "\";document.forms[0].submit();'";
-      roomButton += ">" + roomNumber + "</span>";
-
-      PStringStream recordButton; if(controlled)
-      { BOOL recState = conference.externalRecorder!=NULL; recordButton
-        << "<input type='button' class='btn btn-large "
-        << (recState ? "btn-inverse" : "btn-danger")
-        << "' style='width:36px;height:36px;"
-        << (recState ? "border-radius:0px" : "border-radius:18px")
-        << "' value=' ' title='"
-        << (recState ? "Stop recording" : "Start recording")
-        << "' onclick=\"location.href='?action="
-        << (recState ? "stop" : "start")
-        << "Recorder&room="
-        << PURL::TranslateString(roomNumber,PURL::QueryTranslation)
-        << "'\">";
-      }
-
-      html << "<tr>"
-        << "<td style='text-align:left'>"   << roomButton                            << "</td>"
-        << "<td style='text-align:center'>" << recordButton                          << "</td>"
-        << "<td style='text-align:center'>" << charModerated                         << "</td>"
-        << "<td style='text-align:right'>"  << visibleMemberCount                    << "</td>"
-        << "<td style='text-align:right'>"  << unvisibleMemberCount                  << "</td>"
-        << "<td style='text-align:right'>"  << (PTime() - conference.GetStartTime()).AsString(0, PTimeInterval::IncludeDays, 10) << "</td>"
-        << "<td style='text-align:center'><span class=\"btn btn-large btn-danger\" onclick=\"if(confirm('Вы уверены? Are you sure?')){location.href='?action=delete&room=" << PURL::TranslateString(roomNumber,PURL::QueryTranslation) << "';}\">X</span></td>"
-        << "</tr>";
-    }
-  }
-
-  html << "</table></form>";
-
-  EndPage(html, MyProcess::Current().GetHtmlCopyright());
+  WEBSERVER_LINK_MIME("text/javascript", "control.js");
+  WEBSERVER_LINK_MIME("text/javascript", "locale_en.js");
+  WEBSERVER_LINK_MIME("text/css",  "main.css");
+  WEBSERVER_LINK_MIME("text/css",  "bootstrap.css");
+  WEBSERVER_LINK_MIME("image/png", "mylogo_text.png");
+  WEBSERVER_LINK_MIME("image/png"                , "s15_ch.png");
+  WEBSERVER_LINK_MIME("image/gif"                , "i15_getNoVideo.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "openmcu.ru_vad_vad.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "openmcu.ru_vad_disable.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "openmcu.ru_vad_chosenvan.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "i15_inv.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "openmcu.ru_launched_Ypf.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "i20_close.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "i20_vad.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "i20_vad2.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "i20_static.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "i20_plus.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "i24_shuff.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "i24_left.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "i24_right.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "i24_mix.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "i24_clr.gif");
+  WEBSERVER_LINK_MIME("image/gif"                , "i24_revert.gif");
+  WEBSERVER_LINK_MIME("image/vnd.microsoft.icon" , "openmcu.ico");
+  WEBSERVER_LINK_MIME("image/png"                , "openmcu.ru_logo_text.png");
+  WEBSERVER_LINK_MIME("image/png"                , "menu_left.png");
+  WEBSERVER_LINK_MIME("image/png"                , "i16_close_gray.png");
+  WEBSERVER_LINK_MIME("image/png"                , "i16_close_red.png");
+  WEBSERVER_LINK_MIME("image/png"                , "i32_lock.png");
+  WEBSERVER_LINK_MIME("image/png"                , "i32_lockopen.png");
   
-  { PStringStream message; 
-    PTime now; 
-    message << "HTTP/1.1 200 OK\r\n"
-            << "Date: " << now.AsString(PTime::RFC1123, PTime::GMT) << "\r\n"
-            << "Server: OpalMCU-EIE\r\n"
-            << "MIME-Version: 1.0\r\n"
-            << "Cache-Control: no-cache, must-revalidate\r\n"
-            << "Expires: Sat, 26 Jul 1997 05:00:00 GMT\r\n"
-            << "Content-Type: text/html;charset=utf-8\r\n"
-            << "Content-Length: " << html.GetLength() << "\r\n"
-            << "Connection: Close\r\n"
-            << "\r\n";  //that's the last time we need to type \r\n instead of just \n
-    server.Write((const char*)message, message.GetLength());
+ 
+  if (ListenForHTTP(params.m_httpPort))
+    PSYSTEMLOG(Info, "Opened master socket for HTTP: " << m_httpListeningSockets.front().GetPort());
+  else {
+    PSYSTEMLOG(Fatal, "Cannot run without HTTP port.");
+    return false;
   }
 
-  server.Write((const char*)html, html.GetLength());
-  server.flush();
+  PSYSTEMLOG(Info, "Completed configuring service " << GetName() << " (" << initMsg << ')');
+
   return true;
 }
 
-PBoolean ControlRoomPage::Post(PHTTPRequest & request,
-                          const PStringToString & data,
-                          PHTML & msg)
-{
-  /*if(!MyProcess::Current().GetForceScreenSplit())
-  {
-    msg << "Locked Room Control feature is locked To unlock the page: click &laquo;<a href='/Parameters'>Parameters</a>&raquo;, check &laquo;Force split screen video and enable Room Control feature&raquo; and accept.<br/><br/>";
-    return TRUE;
-  }
-
-# if ENABLE_TEST_ROOMS||ENABLE_ECHO_MIXER
-    if(data.Contains("room"))
-    {
-      const PString room=data("room");
-#     if ENABLE_TEST_ROOMS
-        if((room.Left(8) == "testroom") && (room.GetLength() > 8))
-        {
-          //msg << ErrorPage(request.localAddr.AsString(),request.localPort,423,"Locked","Room Control feature is locked","The room you've tried to control is for test purposes only, control features not implemented yet. Please use &laquo;testroom&raquo; (without a number) if you want to test several video layouts.<br/><br/>");
-          return TRUE;
-        }
-#     endif
-#     if ENABLE_ECHO_MIXER
-        if(room.Left(4)*="echo")
-        {
-          //msg << ErrorPage(request.localAddr.AsString(),request.localPort,423,"Locked","Room Control feature is locked","This is the personal echo room, it does not supply control functions.<br/><br/>");
-          return TRUE;
-        }
-#     endif
-    }
-# endif*/
-
-  msg << MyProcess::Current().GetConferenceManager().SetRoomParams(data);
-  return TRUE;
-}
-
-InteractiveHTTP::InteractiveHTTP(MyProcess & app, PHTTPAuthority & auth)
-  : PServiceHTTPString("Comm", "", "text/html; charset=utf-8", auth)
-  , app(app)
+void MyProcess::OnConfigChanged()
 {
 }
 
-PBoolean InteractiveHTTP::OnGET (PHTTPServer & server, const PHTTPConnectionInfo & connectInfo)
+void MyProcess::OnControl()
 {
-  { PHTTPRequest * req = CreateRequest(server, connectInfo);
-    if(!CheckAuthority(server, *req, connectInfo)) {
-      delete req; 
-      return false;
-    }
-    delete req;
-  }
+}
 
-  PStringToString data;
-  { PString request = connectInfo.GetURL().AsString(); 
-	PINDEX q;
-    if((q = request.Find("?")) != P_MAX_INDEX) { 
-      request = request.Mid(q+1, P_MAX_INDEX); 
-      PURL::SplitQueryVars(request, data); 
-    }
-  }
+PBoolean MyProcess::OnStart()
+{
+  Params params(NULL);
+  params.m_forceRotate = true;
+  InitialiseBase(params);  
 
-  
-  PString room=data("room");
+  return PHTTPServiceProcess::OnStart();
+}
 
-  PStringStream message;
+void MyProcess::OnStop()
+{
+  PHTTPServiceProcess::OnStop();
+}
+
+void MyProcess::Main()
+{
+  Suspend();
+}
+
+void MyProcess::CreateHTTPResource(const PString & name)
+{
+  PHTTPMultiSimpAuth authConference(GetName());
+
+  /*if (name == "CallDetailRecord")
+    m_httpNameSpace.AddResource(new CDRPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+  else if (name == "CallDetailRecords")
+    m_httpNameSpace.AddResource(new CDRListPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+  else if (name == "CallStatus")
+    m_httpNameSpace.AddResource(new CallStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+  else*/ if (name == "Control")
+    m_httpNameSpace.AddResource(new ControlRoomPage(*this, authConference), PHTTPSpace::Overwrite);
+  else if (name == "Comm")
+    m_httpNameSpace.AddResource(new InteractiveHTTP(*this, authConference), PHTTPSpace::Overwrite);
+  else if (name == "Jpeg")
+    m_httpNameSpace.AddResource(new JpegFrameHTTP(*this, authConference), PHTTPSpace::Overwrite);
+/*#if OPAL_H323
+  else if (name == "GkStatus")
+    m_httpNameSpace.AddResource(new GkStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+#endif // OPAL_H323
+  else */if (name == "HomePage")
+    m_httpNameSpace.AddResource(new HomePage(*this, authConference), PHTTPSpace::Overwrite);
+  /*else if (name == "Invite")
+    m_httpNameSpace.AddResource(new InvitePage(*this, authConference), PHTTPSpace::Overwrite);
+#if OPAL_SIP
+  else if (name == "RegistrarStatus")
+    m_httpNameSpace.AddResource(new RegistrarStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);
+#endif // OPAL_SIP
+  else if (name == "RegistrationStatus")
+    m_httpNameSpace.AddResource(new RegistrationStatusPage(GetManager(), authConference), PHTTPSpace::Overwrite);*/
+}
+
+void MyProcess::LogMessage(const PString & str)
+{
+  static PMutex logMutex;
+  static PTextFile logFile;
+
   PTime now;
-  int idx;
+  PString msg = now.AsString("dd/MM/yyyy") & str;
+  logMutex.Wait();
 
-  message << "HTTP/1.1 200 OK\r\n"
-          << "Date: " << now.AsString(PTime::RFC1123, PTime::GMT) << "\r\n"
-          << "Server: MyProcess-ru\r\n"
-          << "MIME-Version: 1.0\r\n"
-          << "Cache-Control: no-cache, must-revalidate\r\n"
-          << "Expires: Sat, 26 Jul 1997 05:00:00 GMT\r\n"
-          << "Content-Type: text/html;charset=utf-8\r\n"
-          << "Connection: Close\r\n"
-          << "\r\n";  //that's the last time we need to type \r\n instead of just \n
-  server.Write((const char*)message,message.GetLength());
-  server.flush();
-
-  message="<html><body style='font-size:9px;font-family:Verdana,Arial;padding:0px;margin:1px;color:#000'><script>p=parent</script>\n";
-  message << MyProcess::Current().HttpStartEventReading(idx,room);
-
-//PTRACE(1,"!!!!!\tsha1('123')=" << PMessageDigestSHA1::Encode("123")); // sha1 works!! I'll try with websocket in future
-
-  if(room!="")
-  {
-    MyProcess::Current().GetConferenceManager().GetConferenceListMutex().Wait();
-    ConferenceListType & conferenceList = MyProcess::Current().GetConferenceManager().GetConferenceList();
-    ConferenceListType::iterator r;
-    for (r = conferenceList.begin(); r != conferenceList.end(); ++r) if(r->second->GetNumber() == room) break;
-    if(r != conferenceList.end() )
+  if (!logFile.IsOpen()) {
+    if(!logFile.Open(logFilename, PFile::ReadWrite))
     {
-      Conference & conference = *(r->second);
-      message << "<script>p.splitdata=Array(";
-      for (unsigned i=0;i<MyProcess::vmcfg.vmconfs;i++)
-      {
-        PString split=MyProcess::vmcfg.vmconf[i].splitcfg.Id;
-        split.Replace("\"","\\x22",TRUE,0);
-        if(i!=0) message << ",";
-        message << "\"" << split << "\"";
-      }
-      message << ");\np.splitdata2={";
-      for (unsigned i=0;i<MyProcess::vmcfg.vmconfs;i++)
-      {
-        PString split=MyProcess::vmcfg.vmconf[i].splitcfg.Id;
-        split.Replace("\"","\\x22",TRUE,0);
-        message << "\"" << split << "\"" << ":[" << MyProcess::vmcfg.vmconf[i].splitcfg.vidnum;
-        for(unsigned j=0;j<MyProcess::vmcfg.vmconf[i].splitcfg.vidnum; j++)
-        {
-          VMPCfgOptions & vo=MyProcess::vmcfg.vmconf[i].vmpcfg[j];
-          message << ",[" << vo.posx << "," << vo.posy << "," << vo.width << "," << vo.height << "," << vo.border << "," << vo.label_mask << "]";
-        }
-        message << "]";
-        if(i+1<MyProcess::vmcfg.vmconfs) message << ",";
-      }
-      message << "};\n"
-        << "p." << MyProcess::Current().GetConferenceManager().GetMemberListOptsJavascript(conference) << "\n"
-        << "p." << MyProcess::Current().GetConferenceManager().GetConferenceOptsJavascript(conference) << "\n"
-        << "p.tl=Array" << conference.GetTemplateList() << "\n"
-        << "p.seltpl=\"" << conference.GetSelectedTemplateName() << "\"\n"
-        << "p.build_page();\n"
-        << "</script>\n";
+      PTRACE(1,"MyProcess\tCan not open log file: " << logFilename << "\n" << msg << flush);
+      logMutex.Signal();
+      return;
     }
-    else
-    { // no (no more) room -- redirect to /
-      MyProcess::Current().GetConferenceManager().GetConferenceListMutex().Signal();
-      message << "<script>top.location.href='/';</script>\n";
-      server.Write((const char*)message,message.GetLength());
-      server.flush();
-      return FALSE;
+    if(!logFile.SetPosition(0, PFile::End))
+    {
+      PTRACE(1,"MyProcess\tCan not change log position, log file name: " << logFilename << "\n" << msg << flush);
+      logFile.Close();
+      logMutex.Signal();
+      return;
     }
-    MyProcess::Current().GetConferenceManager().GetConferenceListMutex().Signal();
   }
-   
-  while(server.Write((const char*)message,message.GetLength())) {
-    server.flush();
-    int count=0;
-    message = MyProcess::Current().HttpGetEvents(idx,room);
-    while (message.GetLength()==0 && count < 20){
-      count++;
-      PThread::Sleep(100);
-      message = MyProcess::Current().HttpGetEvents(idx,room);
-    }
-    if(message.Find("<script>")==P_MAX_INDEX) message << "<script>p.alive()</script>\n";
+
+  if(!logFile.WriteLine(msg))
+  {
+    PTRACE(1,"MyProcess\tCan not write to log file: " << logFilename << "\n" << msg << flush);
   }
-  return FALSE;
- }
- /////////////////////////////////////////////////////////////////////////////////////////
- MCUVideoMixer* jpegMixer;
-
-void jpeg_init_destination(j_compress_ptr cinfo){
-  if(jpegMixer->myjpeg.GetSize()<32768)jpegMixer->myjpeg.SetSize(32768);
-  cinfo->dest->next_output_byte=&jpegMixer->myjpeg[0];
-  cinfo->dest->free_in_buffer=jpegMixer->myjpeg.GetSize();
+  logFile.Close();
+  logMutex.Signal();
 }
 
-boolean jpeg_empty_output_buffer(j_compress_ptr cinfo){
-  PINDEX oldsize=jpegMixer->myjpeg.GetSize();
-  jpegMixer->myjpeg.SetSize(oldsize+16384);
-  cinfo->dest->next_output_byte = &jpegMixer->myjpeg[oldsize];
-  cinfo->dest->free_in_buffer = jpegMixer->myjpeg.GetSize() - oldsize;
-  return true;
+void MyProcess::LogMessageHTML(PString str)
+{ // de-html :) special for palexa, http://openmcu.ru/forum/index.php/topic,351.msg6240.html#msg6240
+  PString str2, roomName;
+  PINDEX tabPos=str.Find("\t");
+  if(tabPos!=P_MAX_INDEX)
+  {
+    roomName=str.Left(tabPos);
+    str=str.Mid(tabPos+1,P_MAX_INDEX);
+  }
+  if(str.GetLength()>8)
+  {
+    if(str[1]==':') str=PString("0")+str;
+    if(!roomName.IsEmpty()) str=str.Left(8)+" "+roomName+str.Mid(9,P_MAX_INDEX);
+  }
+  BOOL tag=FALSE;
+  for (PINDEX i=0; i< str.GetLength(); i++)
+  if(str[i]=='<') tag=TRUE;
+  else if(str[i]=='>') tag=FALSE;
+  else if(!tag) str2+=str[i];
+  LogMessage(str2);
 }
 
-void jpeg_term_destination(j_compress_ptr cinfo){
-  jpegMixer->jpegSize=jpegMixer->myjpeg.GetSize() - cinfo->dest->free_in_buffer;
-  jpegMixer->jpegTime=(long)time(0);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+MCUURL::MCUURL(PString str)
+{
+  PINDEX delim1 = str.FindLast("[");
+  PINDEX delim2 = str.FindLast("]");
+  PINDEX delim3 = str.FindLast("<sip:");
+  PINDEX delim4 = str.FindLast(">");
+
+  if(delim3 != P_MAX_INDEX && delim4 != P_MAX_INDEX)
+  {
+    displayName = str.Left(delim3-1);
+    displayName.Replace("\"","",TRUE,0);
+    partyUrl = str.Mid(delim3+1, delim4-delim3-1);
+  }
+  else if(delim1 != P_MAX_INDEX && delim2 != P_MAX_INDEX)
+  {
+    displayName = str.Left(delim1-1);
+    partyUrl = str.Mid(delim1+1, delim2-delim1-1);
+  } else {
+    partyUrl = str;
+  }
+
+  if(partyUrl.Left(4) == "sip:") URLScheme = "sip";
+  else if(partyUrl.Left(5) == "h323:") URLScheme = "h323";
+  else { partyUrl = "h323:"+partyUrl; URLScheme = "h323"; }
+
+  Parse((const char *)partyUrl, URLScheme);
+  // parse old H.323 scheme
+  if(URLScheme == "h323" && partyUrl.Left(5) != "h323" && partyUrl.Find("@") == P_MAX_INDEX &&
+     m_hostname == "" && m_username != "")
+  {
+    m_hostname = m_username;
+    m_username = "";
+  }
+
+  memberName = displayName+" ["+partyUrl+"]";
+
+  urlId = URLScheme+":";
+  if(m_username != "") urlId += m_username;
+  else               urlId += displayName+"@"+m_hostname;
+
+  if(URLScheme == "sip")
+  {
+    sipProto = "*";
+    if(partyUrl.Find("transport=udp") != P_MAX_INDEX) sipProto = "udp";
+    if(partyUrl.Find("transport=tcp") != P_MAX_INDEX) sipProto = "tcp";
+  }
 }
 
-JpegFrameHTTP::JpegFrameHTTP(MyProcess & app, PHTTPAuthority & auth)
-  : PServiceHTTPString("Jpeg", "", "image/jpeg", auth),
-    app(app)
+ExternalVideoRecorderThread::ExternalVideoRecorderThread(const PString & _roomName)
+  : roomName(_roomName)
+{
+  state = 0;
+
+  PStringStream t; t << roomName << "__" // fileName format: room101__2013-0516-1058270__704x576x10
+    << PTime().AsString("yyyy-MMdd-hhmmssu", PTime::Local) << "__"
+    << MyProcess::Current().vr_framewidth << "x"
+    << MyProcess::Current().vr_frameheight << "x"
+    << MyProcess::Current().vr_framerate;
+  fileName = t;
+
+  t = MyProcess::Current().ffmpegCall;
+  t.Replace("%o",fileName,TRUE,0);
+  PString audio, video;
+#ifdef _WIN32
+  audio = "\\\\.\\pipe\\sound_" + roomName;
+  video = "\\\\.\\pipe\\video_" + roomName;
+#else
+#  ifdef SYS_PIPE_DIR
+  audio = PString(SYS_PIPE_DIR)+"/sound." + roomName;
+  video = PString(SYS_PIPE_DIR)+"/video." + roomName;
+#  else
+  audio = "sound." + roomName;
+  video = "video." + roomName;
+#  endif
+#endif
+  t.Replace("%A",audio,TRUE,0);
+  t.Replace("%V",video,TRUE,0);
+  PINDEX i;
+#ifdef _WIN32
+  PString t2; for(i=0;i<t.GetLength();i++) { char c=t[i]; if(c=='\\') t2+='\\'; t2+=c; } t=t2;
+#endif
+  //if(!ffmpegPipe.Open(t, /* PPipeChannel::ReadWrite */ PPipeChannel::WriteOnly, FALSE, FALSE)) { state=2; return; }
+  /*if(!ffmpegPipe.IsOpen()) { state=2; return; }
+  for (i=0;i<100;i++) if(ffmpegPipe.IsRunning()) {state=1; break; } else PThread::Sleep(12);
+  if(state != 1) { ffmpegPipe.Close(); state=2; return; }
+  */
+  PTRACE(2,"EVRT\tStarted new external recording thread for room " << roomName << ", CL: " << t);
+//  char buf[100]; while(ffmpegPipe.Read(buf, 100)) PTRACE(1,"EVRT\tRead data: " << buf);//<--thread overloaded, never FALSE?
+}
+
+ExternalVideoRecorderThread::~ExternalVideoRecorderThread()
 {
 }
 
-bool JpegFrameHTTP::OnGET (PHTTPServer & server, const PHTTPConnectionInfo & connectInfo)
-{
-  { PHTTPRequest * req = CreateRequest(server, connectInfo);
-    if(!CheckAuthority(server, *req, connectInfo)) {
-      delete req; 
-      return false;
-    }
-    delete req;
-  }
-
-  PStringToString data;
-  { PString request = connectInfo.GetURL().AsString(); 
-	PINDEX q;
-    if((q = request.Find("?")) != P_MAX_INDEX) { 
-      request = request.Mid(q+1, P_MAX_INDEX); 
-      PURL::SplitQueryVars(request, data); 
-    }
-  }
-  
-  PString room=data("room"); if (room.GetLength()==0) return FALSE;
-
-  int width=atoi(data("w"));
-  int height=atoi(data("h"));
-
-  unsigned requestedMixer=0;
-  if(data.Contains("mixer")) requestedMixer=(unsigned)data("mixer").AsInteger();
-
-  const unsigned long t1=(unsigned long)time(0);
-
-//  PWaitAndSignal m(mutex); // no more required: the following mutex will do the same:
-  app.GetConferenceManager().GetConferenceListMutex().Wait(); // fix it - browse read cause access_v on serv. stop
-
-  ConferenceListType & conferenceList = app.GetConferenceManager().GetConferenceList();
-  for(ConferenceListType::iterator r = conferenceList.begin(); r != conferenceList.end(); ++r)
-  {
-    Conference & conference = *(r->second);
-    if(conference.GetNumber()==room)
-    {
-      if(conference.videoMixerList==NULL){ app.GetConferenceManager().GetConferenceListMutex().Signal(); return FALSE; }
-      PWaitAndSignal m3(conference.videoMixerListMutex);
-      jpegMixer=conference.VMLFind(requestedMixer);
-      if(jpegMixer==NULL) { app.GetConferenceManager().GetConferenceListMutex().Signal(); return FALSE; }
-      if(t1-(jpegMixer->jpegTime)>1)
-      {
-        if(width<1||height<1||width>2048||height>2048)
-        { width=MyProcess::vmcfg.vmconf[jpegMixer->GetPositionSet()].splitcfg.mockup_width;
-          height=MyProcess::vmcfg.vmconf[jpegMixer->GetPositionSet()].splitcfg.mockup_height;
-        }
-        struct jpeg_compress_struct cinfo; struct jpeg_error_mgr jerr;
-        JSAMPROW row_pointer[1];
-        int row_stride;
-        cinfo.err = jpeg_std_error(&jerr);
-        jpeg_create_compress(&cinfo);
-        cinfo.image_width = width;
-        cinfo.image_height = height;
-        cinfo.input_components = 3;
-        cinfo.in_color_space = JCS_RGB;
-
-        PINDEX amount=width*height*3/2;
-        unsigned char *videoData=new unsigned char[amount];
-
-        ((MCUSimpleVideoMixer*)jpegMixer)->ReadMixedFrame((void*)videoData,width,height,amount);
-        PColourConverter * converter = PColourConverter::Create("YUV420P", "RGB24", width, height);
-        converter->SetDstFrameSize(width, height);
-        unsigned char * bitmap = new unsigned char[width*height*3];
-        converter->Convert(videoData,bitmap);
-        delete converter;
-        delete videoData;
-
-        jpeg_set_defaults(&cinfo);
-        cinfo.dest = new jpeg_destination_mgr;
-        cinfo.dest->init_destination = &jpeg_init_destination;
-        cinfo.dest->empty_output_buffer = &jpeg_empty_output_buffer;
-        cinfo.dest->term_destination = &jpeg_term_destination;
-        jpeg_start_compress(&cinfo,TRUE);
-        row_stride = cinfo.image_width * 3;
-        while (cinfo.next_scanline < cinfo.image_height)
-        { row_pointer[0] = (JSAMPLE *) & bitmap [cinfo.next_scanline * row_stride];
-          (void) jpeg_write_scanlines(&cinfo, row_pointer, 1);
-        }
-        jpeg_finish_compress(&cinfo);
-        delete bitmap; delete cinfo.dest; cinfo.dest=NULL;
-        jpeg_destroy_compress(&cinfo);
-        jpegMixer->jpegTime=t1;
-      }
-
-      PTime now;
-      PStringStream message;
-      message << "HTTP/1.1 200 OK\r\n"
-              << "Date: " << now.AsString(PTime::RFC1123, PTime::GMT) << "\r\n"
-              << "Server: OpenMCU-ru\r\n"
-              << "MIME-Version: 1.0\r\n"
-              << "Cache-Control: no-cache, must-revalidate\r\n"
-              << "Expires: Sat, 26 Jul 1997 05:00:00 GMT\r\n"
-              << "Content-Type: image/jpeg\r\n"
-              << "Content-Length: " << jpegMixer->jpegSize << "\r\n"
-              << "Connection: Close\r\n"
-              << "\r\n";  //that's the last time we need to type \r\n instead of just \n
-
-      server.Write((const char*)message,message.GetLength());
-      server.Write(jpegMixer->myjpeg.GetPointer(),jpegMixer->jpegSize);
-
-      app.GetConferenceManager().GetConferenceListMutex().Signal();
-      server.flush();
-      return TRUE;
-    }
-  }
-  app.GetConferenceManager().GetConferenceListMutex().Signal();
-  return FALSE;
-}
-// Final del Archivo
+ // Final del Archivo
