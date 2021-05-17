@@ -1,52 +1,46 @@
 /*
  * custom.cxx
- *
- * PWLib application source file for OPAL Server
- *
- * Customisable application configurationfor OEMs.
- *
- * Copyright (c) 2003 Equivalence Pty. Ltd.
- *
- * The contents of this file are subject to the Mozilla Public License
- * Version 1.0 (the "License"); you may not use this file except in
- * compliance with the License. You may obtain a copy of the License at
- * http://www.mozilla.org/MPL/
- *
- * Software distributed under the License is distributed on an "AS IS"
- * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
- * the License for the specific language governing rights and limitations
- * under the License.
- *
- * The Original Code is Portable Windows Library.
- *
- * The Initial Developer of the Original Code is Equivalence Pty. Ltd.
- *
- * Contributor(s): ______________________________________.
- *
+ * 
+ * Copyright 2020 ajoi1011 <ajoi1011@debian>
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ * 
+ * 
  */
 
 #ifdef RC_INVOKED
 #include <winver.h>
 #else
-#include <ptlib.h>
 #include "custom.h"
 #endif
 
 #include "version.h"
 
-
 ////////////////////////////////////////////////////
 //
-// Variables required for PHTTPServiceProcess
+// Variables requeridas por PHTTPServiceProcess
 //
 ////////////////////////////////////////////////////
 
 #ifndef PRODUCT_NAME_TEXT
-#define	PRODUCT_NAME_TEXT	"Servidor OpalServer"
+#define	PRODUCT_NAME_TEXT	"OpalMCU-EIE"
 #endif
 
 #ifndef EXE_NAME_TEXT
-#define	EXE_NAME_TEXT	        "servidor"
+#define	EXE_NAME_TEXT	    "Servidor"
 #endif
 
 #ifndef MANUFACTURER_TEXT
@@ -58,13 +52,13 @@
 #endif
 
 #ifndef GIF_NAME
-#define GIF_NAME  		NULL
+#define GIF_NAME  		    NULL
 #define	GIF_WIDTH  100
 #define GIF_HEIGHT 100
 #endif
 
 #ifndef EMAIL
-#define	EMAIL                   "angeloramas87@gmail.com"
+#define	EMAIL               "angeloramas87@gmail.com"
 #endif
 
 #ifndef HOME_PAGE
@@ -72,19 +66,17 @@
 #endif
 
 #ifndef PRODUCT_NAME_HTML
-#define	PRODUCT_NAME_HTML NULL
+#define	PRODUCT_NAME_HTML   NULL
 #endif
-
-
 
 #ifdef RC_INVOKED
 
 #define AlphaCode alpha
-#define BetaCode beta
+#define BetaCode  beta
 #define ReleaseCode pl
 
 #define MkStr2(s) #s
-#define MkStr(s) MkStr2(s)
+#define MkStr(s)  MkStr2(s)
 
 #if BUILD_NUMBER==0
 #define VERSION_STRING \
@@ -93,7 +85,6 @@
 #define VERSION_STRING \
     MkStr(MAJOR_VERSION) "." MkStr(MINOR_VERSION) MkStr(BUILD_TYPE) MkStr(BUILD_NUMBER)
 #endif
-
 
 VS_VERSION_INFO VERSIONINFO
 #define alpha 1
@@ -122,7 +113,7 @@ BEGIN
             VALUE "FileDescription",  PRODUCT_NAME_TEXT "\0"
             VALUE "FileVersion",      VERSION_STRING "\0"
             VALUE "InternalName",     EXE_NAME_TEXT "\0"
-            VALUE "LegalCopyright",   "Copyright © " COPYRIGHT_HOLDER " 2003\0"
+            VALUE "LegalCopyright",   "Copyright Â© " COPYRIGHT_HOLDER " 2003\0"
             VALUE "OriginalFilename", EXE_NAME_TEXT ".exe\0"
             VALUE "ProductName",      PRODUCT_NAME_TEXT "\0"
             VALUE "ProductVersion",   VERSION_STRING "\0"
@@ -130,14 +121,11 @@ BEGIN
     END
     BLOCK "VarFileInfo"
     BEGIN
-        VALUE "Translation", 0xc09, 1200
+            VALUE "Translation", 0xc09, 1200
     END
 END
 
 #else
-
-
-
 
 PHTTPServiceProcess::Info ProductInfo = {
     PRODUCT_NAME_TEXT,
@@ -155,8 +143,6 @@ PHTTPServiceProcess::Info ProductInfo = {
     GIF_HEIGHT
 };
 
-
 #endif
-
 
 // End of File ///////////////////////////////////////////////////////////////
