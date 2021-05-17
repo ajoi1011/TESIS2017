@@ -158,4 +158,4 @@ void MySIPEndPoint::AutoRegisterCisco(const PString & server, const PString & wi
     }
   }
 }
-#endif // OPAL_H323 Final del Archivo
+#endif 
