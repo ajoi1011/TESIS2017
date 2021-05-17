@@ -1,14 +1,35 @@
+/*
+ * call.cxx
+ * 
+ * Copyright 2020 ajoi1011 <ajoi1011@debian>
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ * 
+ * 
+ */
 
-#include "call.h"
-#include "config.h"
-#include "manager.h"
+
+#include "managers.h"
 
 static struct
 {
   PVarType::BasicType m_type;
   unsigned            m_size;
   const char *        m_name;
-} const CDRFields[MyCall::NumFieldCodes] = {
+} const CDRFields[MCUCall::NumFieldCodes] = {
   { PVarType::VarDynamicString,  36, "CallId"                       },
   { PVarType::VarTime,            0, "StartTime"                    },
   { PVarType::VarTime,            0, "ConnectTime"                  },
@@ -34,8 +55,8 @@ static PString GetDefaultTextHeadings()
 {
   PStringStream strm;
 
-  for (MyCall::FieldCodes f = MyCall::BeginFieldCodes; f < MyCall::EndFieldCodes; ++f) {
-    if (f > MyCall::BeginFieldCodes)
+  for (MCUCall::FieldCodes f = MCUCall::BeginFieldCodes; f < MCUCall::EndFieldCodes; ++f) {
+    if (f > MCUCall::BeginFieldCodes)
       strm << ',';
     strm << CDRFields[f].m_name;
   }
@@ -47,8 +68,8 @@ static PString GetDefaultTextFormats()
 {
   PStringStream strm;
 
-  for (MyCall::FieldCodes f = MyCall::BeginFieldCodes; f < MyCall::EndFieldCodes; ++f) {
-    if (f > MyCall::BeginFieldCodes)
+  for (MCUCall::FieldCodes f = MCUCall::BeginFieldCodes; f < MCUCall::EndFieldCodes; ++f) {
+    if (f > MCUCall::BeginFieldCodes)
       strm << ',';
     if (CDRFields[f].m_type != PVarType::VarDynamicString)
       strm << '%' << CDRFields[f].m_name << '%';
@@ -61,15 +82,45 @@ static PString GetDefaultTextFormats()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool MyManager::ConfigureCDR(PConfig & cfg, PConfigPage * rsrc)
+Manager::CDRList::const_iterator Manager::BeginCDR()
+{
+  m_cdrMutex.Wait();
+  return m_cdrList.begin();
+}
+
+bool Manager::FindCDR(const PString & guid, MCUCallDetailRecord & cdr)
+{
+  PWaitAndSignal mutex(m_cdrMutex);
+
+  for (Manager::CDRList::const_iterator it = m_cdrList.begin(); it != m_cdrList.end(); ++it) {
+    if (it->GetGUID() == guid) {
+      cdr = *it;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool Manager::NotEndCDR(const CDRList::const_iterator & it)
+{
+  if (it != m_cdrList.end())
+    return true;
+
+  m_cdrMutex.Signal();
+  return false;
+}
+
+
+bool Manager::ConfigureCDR(PConfig & cfg)
 {
   m_cdrMutex.Wait();
 
   m_cdrTextFile.Close();
 
-  PString filename = rsrc->AddStringField(CDRTextFileKey, 0, m_cdrTextFile.GetFilePath(), "Nombre del archivo de texto CDR.", 1, 30);
-  PString cdrHeadings = rsrc->AddStringField(CDRTextHeadingsKey, 0, GetDefaultTextHeadings(), "Headers del CDR en el texto de salida.", 1, 30);
-  m_cdrFormat = rsrc->AddStringField(CDRTextFormatKey, 0, GetDefaultTextFormats(), "Formato de salida de texto CDR.", 1, 30);
+  PString filename = cfg.GetString("Generals","CDRTextFileKey",m_cdrTextFile.GetFilePath());
+  PString cdrHeadings = cfg.GetString("Generals", "CDRTextHeadingsKey", GetDefaultTextHeadings());
+  m_cdrFormat = cfg.GetString("Generals","CDRTextFormatKey",GetDefaultTextFormats());
 
   if (!filename.IsEmpty()) {
     if (m_cdrTextFile.Open(filename, PFile::WriteOnly, PFile::Create)) {
@@ -81,15 +132,14 @@ bool MyManager::ConfigureCDR(PConfig & cfg, PConfigPage * rsrc)
       PSYSTEMLOG(Error, "Could not open CDR text file \"" << filename << '"');
   }
 
-  m_cdrListMax = rsrc->AddIntegerField(CDRWebPageLimitKey, 1, 1000000, m_cdrListMax,
-                                       "", "Máximo número de registros CDR guardados para mostrar en página web.");
+  m_cdrListMax = cfg.GetInteger("Generals","CDRWebPageLimitKey", 1);
 
   m_cdrMutex.Signal();
 
   return true;
 }
 
-void MyManager::DropCDR(const MyCall & call, bool final)
+void Manager::DropCDR(const MCUCall & call, bool final)
 {
   m_cdrMutex.Wait();
 
@@ -109,7 +159,7 @@ void MyManager::DropCDR(const MyCall & call, bool final)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-MyCallDetailRecord::MyCallDetailRecord()
+MCUCallDetailRecord::MCUCallDetailRecord()
   : m_ConnectTime(0)
   , m_EndTime(0)
   , m_CallState(CallSetUp)
@@ -117,7 +167,7 @@ MyCallDetailRecord::MyCallDetailRecord()
 {
 }
 
-PString MyCallDetailRecord::ListMedia() const
+PString MCUCallDetailRecord::ListMedia() const
 {
   PStringStream strm;
 
@@ -136,7 +186,7 @@ PString MyCallDetailRecord::ListMedia() const
   return strm;
 }
 
-PString MyCallDetailRecord::GetCallState() const
+PString MCUCallDetailRecord::GetCallState() const
 {
   static const char * const CallStates[] = {
     "Completed", "Setting Up", "Proceeding", "Alerting", "Connected", "Established"
@@ -148,7 +198,7 @@ PString MyCallDetailRecord::GetCallState() const
   return psprintf("CallState=%u", m_CallState);
 }
 
-MyCall::Media MyCallDetailRecord::GetMedia(const OpalMediaType & mediaType) const
+MCUCall::Media MCUCallDetailRecord::GetMedia(const OpalMediaType & mediaType) const
 {
   for (MediaMap::const_iterator it = m_media.begin(); it != m_media.end(); ++it) {
     if (it->second.m_Codec.GetMediaType() == mediaType)
@@ -158,11 +208,11 @@ MyCall::Media MyCallDetailRecord::GetMedia(const OpalMediaType & mediaType) cons
   return Media();
 }
 
-void MyCallDetailRecord::OutputDetailedHTML(PHTML & html) const
+void MCUCallDetailRecord::OutputDetailedHTML(PHTML & html) const
 {
   html << PHTML::TableStart(PHTML::Border1, PHTML::CellPad4);
 
-  for (MyCall::FieldCodes f = MyCall::BeginFieldCodes; f < MyCall::EndFieldCodes; ++f) {
+  for (MCUCall::FieldCodes f = MCUCall::BeginFieldCodes; f < MCUCall::EndFieldCodes; ++f) {
     html << PHTML::TableRow()
          << PHTML::TableHeader() << CDRFields[f].m_name
          << PHTML::TableData();
@@ -238,7 +288,7 @@ void MyCallDetailRecord::OutputDetailedHTML(PHTML & html) const
   html << PHTML::TableEnd();
 }
 
-void MyCallDetailRecord::OutputSummaryHTML(PHTML & html) const
+void MCUCallDetailRecord::OutputSummaryHTML(PHTML & html) const
 {
   html << PHTML::TableRow()
        << PHTML::TableData() << PHTML::HotLink("CDR?guid=" + m_GUID.AsString()) << "<span style='color:blue'>" << m_GUID << "</span>" <<PHTML::HotLink()
@@ -253,7 +303,7 @@ void MyCallDetailRecord::OutputSummaryHTML(PHTML & html) const
     html << OpalConnection::GetCallEndReasonText(m_CallResult);
 }
 
-void MyCallDetailRecord::OutputText(ostream & strm, const PString & format) const
+void MCUCallDetailRecord::OutputText(ostream & strm, const PString & format) const
 {
   PINDEX percent = format.Find('%');
   PINDEX last = 0;
@@ -364,15 +414,15 @@ void MyCallDetailRecord::OutputText(ostream & strm, const PString & format) cons
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-MyCall::MyCall(MyManager & manager)
+MCUCall::MCUCall(Manager & manager)
   : OpalCall(manager)
   , m_manager(manager)
 {
 }
 
-PBoolean MyCall::OnAlerting(OpalConnection & connection)
+PBoolean MCUCall::OnAlerting(OpalConnection & connection)
 {
-  m_CallState = MyCall::CallAlerting;
+  m_CallState = MCUCall::CallAlerting;
   connection.GetRemoteAddress().GetIpAndPort(m_DestinationSignalAddress);
 
   m_manager.DropCDR(*this, false);
@@ -380,9 +430,9 @@ PBoolean MyCall::OnAlerting(OpalConnection & connection)
   return OpalCall::OnAlerting(connection);
 }
 
-void MyCall::OnCleared()
+void MCUCall::OnCleared()
 {
-  m_CallState = MyCall::CallCompleted;
+  m_CallState = MCUCall::CallCompleted;
   m_CallResult = GetCallEndReason();
   m_EndTime.SetCurrentTime();
 
@@ -391,10 +441,10 @@ void MyCall::OnCleared()
   OpalCall::OnCleared();
 }
 
-PBoolean MyCall::OnConnected(OpalConnection & connection)
+PBoolean MCUCall::OnConnected(OpalConnection & connection)
 {
   m_ConnectTime.SetCurrentTime();
-  m_CallState = MyCall::CallConnected;
+  m_CallState = MCUCall::CallConnected;
   connection.GetRemoteAddress().GetIpAndPort(m_DestinationSignalAddress);
 
   m_manager.DropCDR(*this, false);
@@ -402,18 +452,18 @@ PBoolean MyCall::OnConnected(OpalConnection & connection)
   return OpalCall::OnConnected(connection);
 }
 
-void MyCall::OnEstablishedCall()
+void MCUCall::OnEstablishedCall()
 {
-  m_CallState = MyCall::CallEstablished;
+  m_CallState = MCUCall::CallEstablished;
 
   m_manager.DropCDR(*this, false);
 
   OpalCall::OnEstablishedCall();
 }
 
-void MyCall::OnProceeding(OpalConnection & connection)
+void MCUCall::OnProceeding(OpalConnection & connection)
 {
-  m_CallState = MyCall::CallProceeding;
+  m_CallState = MCUCall::CallProceeding;
   m_DestinationURI = GetPartyB();
   connection.GetRemoteAddress().GetIpAndPort(m_DestinationSignalAddress);
 
@@ -422,7 +472,7 @@ void MyCall::OnProceeding(OpalConnection & connection)
   OpalCall::OnProceeding(connection);
 }
 
-PBoolean MyCall::OnSetUp(OpalConnection & connection)
+PBoolean MCUCall::OnSetUp(OpalConnection & connection)
 {
   if (!OpalCall::OnSetUp(connection))
     return false;
@@ -446,7 +496,7 @@ PBoolean MyCall::OnSetUp(OpalConnection & connection)
   return true;
 }
 
-void MyCall::OnStartMediaPatch(OpalConnection & connection, OpalMediaPatch & patch)
+void MCUCall::OnStartMediaPatch(OpalConnection & connection, OpalMediaPatch & patch)
 {
   OpalMediaStream & stream = patch.GetSource();
 
@@ -464,7 +514,7 @@ void MyCall::OnStartMediaPatch(OpalConnection & connection, OpalMediaPatch & pat
   session->GetRemoteAddress().GetIpAndPort(&connection == GetConnection(0) ? media.m_OriginatorAddress : media.m_DestinationAddress);
 }
 
-void MyCall::OnStopMediaPatch(OpalMediaPatch & patch)
+void MCUCall::OnStopMediaPatch(OpalMediaPatch & patch)
 {
   OpalMediaStream & stream = patch.GetSource();
 
@@ -477,4 +527,4 @@ void MyCall::OnStopMediaPatch(OpalMediaPatch & patch)
   if (duration > 0)
     m_Bandwidth += stats.m_totalBytes * 8 / duration;
 #endif
-} // Final del Archivo
+} 
