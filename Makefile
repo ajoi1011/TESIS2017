@@ -17,9 +17,9 @@
 #
 #
 
-PROG = telemedicina
-SOURCES	:=  custom.cxx main.cxx manager.cxx h323.cxx sip.cxx mixer.cxx call.cxx html.cxx
 
+PROG		= opaleie
+SOURCES		= custom.cxx call.cxx html.cxx  managers.cxx main.cxx  h323.cxx conference.cxx video.cxx 
 
 OPAL_MAKE_DIR := $(if $(OPALDIR),$(OPALDIR)/make,$(shell pkg-config opal --variable=makedir))
 ifeq ($(OPAL_MAKE_DIR),)
