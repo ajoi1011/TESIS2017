@@ -86,3 +86,21 @@ opalvoip MediaFormat void OpalMediaFormatInternal::DeconflictPayloadTypes(OpalMe
     conflictingFormat->SetPayloadType((RTP_DataFrame::PayloadTypes)nextUnused);
   }
 }
+
+20  apt install build-essential 
+   21  apt install build-essential automake flex bison
+   22  apt install build-essential automake flex bison autoconf
+   23  apt install build-essential automake flex bison autoconf gnu-standards 
+   24  apt install build-essential automake flex bison autoconf gnu-standards  make cmake
+   26  apt install git g++
+   27  apt install git g++ libpcap-dev libexpat-dev
+   28  apt install git libpcap-dev libexpat-dev
+   29  apt install git libpcap-dev libexpat1-dev
+   30  apt install git libpcap-dev libexpat1-dev libssl1.0-dev
+   31  apt install git libpcap-dev libexpat1-dev libssl-dev  libsasl2-dev  libldap2-dev unixodbc-dev  liblua5.2-dev libv8-dev libncurses5-dev libsdl2-dev libgstr
+   32  apt install git libpcap-dev libexpat1-dev libssl-dev  libsasl2-dev  libldap2-dev unixodbc-dev  liblua5.2-dev libv8-dev libncurses5-dev libsdl2-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev 
+   33  apt install git libpcap-dev libexpat1-dev libssl-dev  libsasl2-dev  libldap2-dev unixodbc-dev  liblua5.2-dev libv8-dev libncurses5-dev libsdl2-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev 
+   34  apt install lm-sensors cpulimit
+   56  apt install xserver-xorg-video-all
+   99  apt install libx264-dev libvpx-dev libtheora-dev 
+  100  apt install libgsm1-dev libspeex-dev libopus-dev libspandsp-dev 
