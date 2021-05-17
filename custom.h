@@ -25,7 +25,7 @@
  *
  */
 
-#include <ptclib/httpsvc.h>
+#include "precompile.h"
 
 enum {
   SkName, SkCompany, SkEMail,
