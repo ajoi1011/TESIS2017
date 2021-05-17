@@ -1,162 +1,167 @@
-/*************************************************************************/
-/*************************************************************************/
-/*                                                                       */
-/*                       C O N F I G  H E A D E R                        */
-/*                                                                       */
-/*************************************************************************/
-/*                                                                       */
-/* <Descripción>                                                         */
-/*   Header que contiene los "keys" para la plantilla de configuración   */
-/*  de la aplicación y otras definiciones.                               */
-/*                                                                       */
-/*************************************************************************/
+/*
+ * config.h
+ * 
+ * Copyright 2020 ajoi1011 <ajoi1011@debian>
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ * 
+ * 
+ */
 
-#ifndef _CONFIG_H
-#define _CONFIG_H
-
+#ifndef _OPAL_SERVER_CONFIG_H
+#define _OPAL_SERVER_CONFIG_H
 #include "precompile.h"
+const WORD DefaultHTTPPort = 1719;
 
-//MyClearLogPage
-static const PConstString ClearLogFileStr("Clear Log File");
-static const PConstString RotateLogFilesStr("Rotate Log Files");
+// don't forget to add the same into quote.txt:
+#define OTFC_UNMUTE                    0
+#define OTFC_MUTE                      1
+#define OTFC_MUTE_ALL                  2
+#define OTFC_REMOVE_FROM_VIDEOMIXERS   3
+#define OTFC_REFRESH_VIDEO_MIXERS      4
+#define OTFC_ADD_AND_INVITE            5
+#define OTFC_DROP_MEMBER               7
+#define OTFC_VAD_NORMAL                8
+#define OTFC_VAD_CHOSEN_VAN            9
+#define OTFC_VAD_DISABLE_VAD          10
+#define OTFC_REMOVE_VMP               11
+#define OTFC_MOVE_VMP                 12
+#define OTFC_SET_VMP_STATIC           13
+#define OTFC_VAD_CLICK                14
+#define OTFC_MIXER_ARRANGE_VMP        15
+#define OTFC_MIXER_SCROLL_LEFT        16
+#define OTFC_MIXER_SHUFFLE_VMP        17
+#define OTFC_MIXER_SCROLL_RIGHT       18
+#define OTFC_MIXER_CLEAR              19
+#define OTFC_MIXER_REVERT             20
+#define OTFC_GLOBAL_MUTE              21
+#define OTFC_SET_VAD_VALUES           22
+#define OTFC_TEMPLATE_RECALL          23
+#define OTFC_SAVE_TEMPLATE            24
+#define OTFC_DELETE_TEMPLATE          25
+#define OTFC_INVITE                   32
+#define OTFC_REMOVE_OFFLINE_MEMBER    33
+#define OTFC_DROP_ALL_ACTIVE_MEMBERS  64
+#define OTFC_INVITE_ALL_INACT_MMBRS   65
+#define OTFC_REMOVE_ALL_INACT_MMBRS   66
+#define OTFC_SAVE_MEMBERS_CONF        67
+#define OTFC_YUV_FILTER_MODE          68
+#define OTFC_TAKE_CONTROL             69
+#define OTFC_DECONTROL                70
+#define OTFC_ADD_VIDEO_MIXER          71
+#define OTFC_DELETE_VIDEO_MIXER       72
+#define OTFC_SET_VIDEO_MIXER_LAYOUT   73
+#define OTFC_SET_MEMBER_VIDEO_MIXER   74
+#define OTFC_VIDEO_RECORDER_START     75
+#define OTFC_VIDEO_RECORDER_STOP      76
+#define OTFC_TOGGLE_TPL_LOCK          77
+#define OTFC_UNMUTE_ALL               78
+#define OTFC_AUDIO_GAIN_LEVEL_SET     79
+#define OTFC_OUTPUT_GAIN_SET          80
+///////////////////////////////////////////////
 
-//MyProcess
-const  WORD  DefaultHTTPPort = 1719;
-static const PConstString UserNameKey("Usuario");
-static const PConstString PasswordKey("Contraseña");
-static const PConstString LevelKey("Nivel Trazo Log");
-static const PConstString FileKey("Archivo Trazo Log");
-static const PConstString RotateDirKey("Directorio Trazo Log");
-static const PConstString RotatePrefixKey("Prefijo Trazo Log");
-static const PConstString RotateTemplateKey("Plantilla Trazo Log");
-static const PConstString RotateSizeKey("Tamaño Trazo Log");
-static const PConstString RotateCountKey("Conteo Trazo Log");
-static const PConstString RotateAgeKey("Historial Trazo Log");
-static const PConstString HTTPPortKey("Puerto HTTP");
-static const PConstString HTTPInterfacesKey("Interfaces HTTP");
+// enable/disable libjpeg (live video frames in Room Control Page)
+#define USE_LIBJPEG	0
 
-//MyManager
-static const PConstString DisplayNameKey("Display");
-static const PConstString OverrideProductInfoKey("Anular Info");
-static const PConstString DeveloperNameKey("Desarrollador");
-static const PConstString ProductNameKey("Nombre");
-static const PConstString ProductVersionKey("Version");
-static const PConstString MaxSimultaneousCallsKey("N° Llamadas");
-static const PConstString MediaTransferModeKey("Transferencia de Media");
-static const PConstString AutoStartKeyPrefix("Auto Start");
-static const PConstString PreferredMediaKey("Codecs Preferidos");
-static const PConstString RemovedMediaKey("Codecs Removidos");
-static const PConstString MinJitterKey("Mínimo Jitter");
-static const PConstString MaxJitterKey("Máximo Jitter");
-static const PConstString InBandDTMFKey("Deshabilitar In-DTMF");
-static const PConstString SilenceDetectorKey("Detector de Silencio");
-static const PConstString NoMediaTimeoutKey("Timeout RX Media");
-static const PConstString TxMediaTimeoutKey("Timeout TX Media");
-static const PConstString TCPPortBaseKey("Puerto TCP Base");
-static const PConstString TCPPortMaxKey("Puerto TCP Max");
-static const PConstString RTPPortBaseKey("Puerto RTP Base");
-static const PConstString RTPPortMaxKey("Puerto RTP Max");
-static const PConstString RTPTOSKey("Tipo de Servicio RTP");
-#if P_NAT
-static const PConstString NATActiveKey("Activo");
-static const PConstString NATServerKey("Servidor");
-static const PConstString NATInterfaceKey("Interfaz");
+#define MAX_SUBFRAMES        100
+#define FRAMESTORE_TIMEOUT 60 /* s */
+
+#define CIF_WIDTH     352
+#define CIF_HEIGHT    288
+#define CIF_SIZE      (CIF_WIDTH*CIF_HEIGHT*3/2)
+
+#define QCIF_WIDTH    (CIF_WIDTH / 2)
+#define QCIF_HEIGHT   (CIF_HEIGHT / 2)
+#define QCIF_SIZE     (QCIF_WIDTH*QCIF_HEIGHT*3/2)
+
+#define SQCIF_WIDTH    (QCIF_WIDTH / 2)
+#define SQCIF_HEIGHT   (QCIF_HEIGHT / 2)
+#define SQCIF_SIZE     (SQCIF_WIDTH*SQCIF_HEIGHT*3/2)
+
+#define CIF4_WIDTH     (CIF_WIDTH * 2)
+#define CIF4_HEIGHT    (CIF_HEIGHT * 2)
+#define CIF4_SIZE      (CIF4_WIDTH*CIF4_HEIGHT*3/2)
+
+#define CIF16_WIDTH     (CIF4_WIDTH * 2)
+#define CIF16_HEIGHT    (CIF4_HEIGHT * 2)
+#define CIF16_SIZE      (CIF16_WIDTH*CIF16_HEIGHT*3/2)
+
+#define SQ3CIF_WIDTH    116
+#define SQ3CIF_HEIGHT   96
+#define SQ3CIF_SIZE     (SQ3CIF_WIDTH*SQ3CIF_HEIGHT*3/2)
+
+#define Q3CIF_WIDTH    (2*SQ3CIF_WIDTH)
+#define Q3CIF_HEIGHT   (2*SQ3CIF_HEIGHT)
+#define Q3CIF_SIZE     (Q3CIF_WIDTH*Q3CIF_HEIGHT*3/2)
+
+#define Q3CIF4_WIDTH    (4*SQ3CIF_WIDTH)
+#define Q3CIF4_HEIGHT   (4*SQ3CIF_HEIGHT)
+#define Q3CIF4_SIZE     (Q3CIF4_WIDTH*Q3CIF4_HEIGHT*3/2)
+
+#define Q3CIF16_WIDTH    (8*SQ3CIF_WIDTH)
+#define Q3CIF16_HEIGHT   (8*SQ3CIF_HEIGHT)
+#define Q3CIF16_SIZE     (Q3CIF16_WIDTH*Q3CIF16_HEIGHT*3/2)
+
+#define SQ5CIF_WIDTH    140
+#define SQ5CIF_HEIGHT   112
+#define SQ5CIF_SIZE     (SQ5CIF_WIDTH*SQ5CIF_HEIGHT*3/2)
+
+#define Q5CIF_WIDTH    (2*SQ5CIF_WIDTH)
+#define Q5CIF_HEIGHT   (2*SQ5CIF_HEIGHT)
+#define Q5CIF_SIZE     (Q5CIF_WIDTH*Q5CIF_HEIGHT*3/2)
+
+#define TCIF_WIDTH    (CIF_WIDTH*3)
+#define TCIF_HEIGHT   (CIF_HEIGHT*3)
+#define TCIF_SIZE     (TCIF_WIDTH*TCIF_HEIGHT*3/2)
+
+#define TQCIF_WIDTH    (CIF_WIDTH*3 / 2)
+#define TQCIF_HEIGHT   (CIF_HEIGHT*3 / 2)
+#define TQCIF_SIZE     (TQCIF_WIDTH*TQCIF_HEIGHT*3/2)
+
+#define TSQCIF_WIDTH    (CIF_WIDTH*3 / 4)
+#define TSQCIF_HEIGHT   (CIF_HEIGHT*3 / 4)
+#define TSQCIF_SIZE     (TSQCIF_WIDTH*TSQCIF_HEIGHT*3/2)
+
+#define _IMGST 1
+#define _IMGST1 2
+#define _IMGST2 4
+
+/// Video Mixer Configurator - Begin ///
+#define VMPC_CONFIGURATION_NAME                 "layouts.conf"
+#define VMPC_DEFAULT_ID                         "undefined"
+#define VMPC_DEFAULT_FW                         704
+#define VMPC_DEFAULT_FH                         576
+#define VMPC_DEFAULT_POSX                       0
+#define VMPC_DEFAULT_POSY                       0
+#define VMPC_DEFAULT_WIDTH                      VMPC_DEFAULT_FW/2
+#define VMPC_DEFAULT_HEIGHT                     VMPC_DEFAULT_FH/2
+#define VMPC_DEFAULT_MODE_MASK                  0
+#define VMPC_DEFAULT_BORDER                     1
+#define VMPC_DEFAULT_VIDNUM                     0
+#define VMPC_DEFALUT_SCALE_MODE                 1
+#define VMPC_DEFAULT_REALLOCATE_ON_DISCONNECT   1
+#define VMPC_DEFAULT_NEW_FROM_BEGIN             1
+#define VMPC_DEFAULT_MOCKUP_WIDTH               388
+#define VMPC_DEFAULT_MOCKUP_HEIGHT              218
+
+/// Video Mixer Configurator - End ///
+
+#  define PATH_SEPARATOR   "/"
+#  define SYS_CONFIG_DIR   "/home/ajoi1011/proyectos/testing/tesis2.0/conf"
+#  define SYS_RESOURCE_DIR "/home/ajoi1011/proyectos/testing/tesis2.0/resource"
+#  define SERVER_LOGS      "/home/ajoi1011/proyectos/testing/tesis2.0/log"
+
 #endif
-#if OPAL_VIDEO
-static const PConstString ConfVideoManagerKey("Resolución Estándar de Video");
-static const PConstString ConfVideoMaxManagerKey("Resolución max de Video");
-static const PConstString FrameRateManagerKey("Video Frame Rate");
-static const PConstString BitRateManagerKey("Video Bit Rate");
-#endif
-
-//MyH323EndPoint
-#if OPAL_H323
-#define H323RegistrationSection "Registro H.323\\"
-#define H323RegistrationNewSection H323RegistrationSection "Nuevo"
-#define H323RegistrationEncryptedSection H323RegistrationSection"Encriptado"
-static const PINDEX H323GatekeeperPasswordSize = 30;
-static const PConstString H323AliasesKey("Alias H.323");
-static const PConstString DisableFastStartKey("Deshabilitar Fast Start");
-static const PConstString DisableH245TunnelingKey("Deshabilitar H.245 Tunneling");
-static const PConstString DisableH245inSetupKey("Deshabilitar H.245 in Setup");
-static const PConstString ForceSymmetricTCSKey("Forzar TCS Simétrico");
-static const PConstString H239ControlKey("Habilitar Control H.239");
-static const PConstString H323BandwidthKey("Ancho de Banda H.323");
-static const PConstString GatekeeperEnableKey("Habilitar GK Remoto");
-static const PConstString GatekeeperAddressKey("Dirección GK Remoto");
-static const PConstString RemoteGatekeeperIdentifierKey("ID GK Remoto");
-static const PConstString GatekeeperInterfaceKey("Interfaz GK Remoto");
-static const PConstString GatekeeperPasswordKey("Contraseña GK Remoto");
-static const PConstString GatekeeperTokenOIDKey("Token OID GK Remoto");
-static const PConstString GatekeeperTimeToLiveKey("Tiempo GK Remoto");
-static const PConstString GatekeeperAliasLimitKey("Limite Alias GK Remoto");
-static const PConstString GatekeeperRegistrationDelayKey("Delay en Registro GK Remoto");
-static const PConstString GatekeeperSimulatePatternKey("Patrón simulado GK Remoto");
-static const PConstString GatekeeperRasRedirectKey("Redirección RAS GK Remoto");
-static const PConstString ServerGatekeeperEnableKey("Habilitar Servidor GK");
-static const PConstString ServerGatekeeperIdentifierKey("ID Servidor GK");
-static const PConstString AvailableBandwidthKey("Ancho de Banda Total GK");
-static const PConstString DefaultBandwidthKey("Designar Ancho de Banda Por Defecto");
-static const PConstString MaximumBandwidthKey("Designar Ancho de Banda Máximo");
-static const PConstString DefaultTimeToLiveKey("Tiempo GK Por Defecto");
-static const PConstString CallHeartbeatTimeKey("Tiempo de validación llamada GK");
-static const PConstString DisengageOnHearbeatFailKey("Colgar Si Falla Tiempo de Validación");
-static const PConstString OverwriteOnSameSignalAddressKey("Sobreescritura de registro GK");
-static const PConstString CanHaveDuplicateAliasKey("Duplicar Alias GK");
-static const PConstString CanOnlyCallRegisteredEPKey("Solo LLamada de Terminales Registrados");
-static const PConstString CanOnlyAnswerRegisteredEPKey("Solo Respuesta de Terminales Registrados");
-static const PConstString AnswerCallPreGrantedARQKey("Responder Pregarantizando ARQ");
-static const PConstString MakeCallPreGrantedARQKey("Llamar Pregarantizando ARQ");
-static const PConstString IsGatekeeperRoutedKey("GK Enrutado");
-static const PConstString AliasCanBeHostNameKey("Alias H.323 como Hostname");
-static const PConstString MinAliasToAllocateKey("Alias Mínimos a Designar");
-static const PConstString MaxAliasToAllocateKey("Alias Máximos a Designar");
-static const PConstString RequireH235Key("GK Requiere Autentificación H.235");
-static const PConstString UserNameH235Key("Usuario");
-static const PConstString PasswordH235Key("Password");
-static const PConstString RouteAliasKey("Alias");
-static const PConstString RouteHostKey("Host");
-static const PConstString GkServerListenersKey("Interfaces Servidor GK");
-static const PConstString AuthenticationCredentialsName("Usuarios Autentificados GK");
-static const PConstString AuthenticationCredentialsKey("Credenciales %u\\");
-static const PConstString AliasRouteMapsName("Mapas de Alias");
-static const PConstString AliasRouteMapsKey("Mapa de Rutas \\Mapping %u\\");
-#endif // OPAL_H323
-
-//MySIPEndPoint
-#if OPAL_SIP
-#define REGISTRATIONS_SECTION "Registro SIP"
-#define REGISTRATIONS_KEY     REGISTRATIONS_SECTION"\\Registro %u\\"
-static const PConstString SIPUsernameKey("Usuario SIP");
-static const PConstString SIPPrackKey("Respuestas SIP Provisionales");
-static const PConstString SIPProxyKey("Proxy URL SIP");
-static const PConstString SIPLocalRegistrarKey("Registrar Dominios SIP");
-static const PConstString SIPCiscoDeviceTypeKey("Tipo Dispositivo SIP Cisco");
-static const PConstString SIPCiscoDevicePatternKey("Patrón Dispositivo SIP Cisco");
-#if OPAL_H323
-static const PConstString SIPAutoRegisterH323Key("Auto-Registro H.323");
-#endif
-static const PConstString SIPAddressofRecordKey("Dirección");
-static const PConstString SIPAuthIDKey("ID");
-static const PConstString SIPPasswordKey("Contraseña");
-static const PConstString SIPRegTTLKey("TTL");
-static const PConstString SIPCompatibilityKey("Compatibilidad");
-#endif // OPAL_SIP
-
-static const PConstString CDRTextFileKey("Archivo de Texto CDR");
-static const PConstString CDRTextHeadingsKey("Headings CDR");
-static const PConstString CDRTextFormatKey("Formato Texto CDR");
-static const PConstString CDRWebPageLimitKey("Limite CDR WebPage");
-
-#if OPAL_HAS_MIXER
-static const PConstString ConfAudioOnlyKey("Solo Audio en Conferencia");
-static const PConstString ConfMediaPassThruKey("Media Pass Through");
-static const PConstString ConfVideoResolutionKey("Resolución de VideoConferencia");
-static const PConstString ConfMixingModeKey("Modo de video");
-#endif // OPAL_HAS_MIXER
-
-#define PATH_SEPARATOR   "/"
-#define SYS_RESOURCE_DIR "/home/ajoi1011/proyecto/project/resource"
-
-#endif // CONFIG_H
-/************************Final del Header*********************************/
