@@ -466,7 +466,7 @@ class PVXMLSession : public PIndirectChannel
     bool             m_bargeIn;
     bool             m_bargingIn;
 
-    std::map<PString, unsigned> m_eventCount;
+    std::map<std::string, unsigned> m_eventCount;
     unsigned                    m_promptCount;
 
     PVXMLGrammar *   m_grammar;

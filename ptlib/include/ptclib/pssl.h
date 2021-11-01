@@ -43,6 +43,7 @@ struct evp_cipher_ctx_st;
 struct dh_st;
 struct aes_key_st;
 struct SHAstate_st;
+struct bio_method_st;
 struct bio_st;
 
 
@@ -658,7 +659,22 @@ class PSSLCipherContext : public PObject
 
   protected:
     PadMode             m_padMode;
+    bool                m_encrypt;
     evp_cipher_ctx_st * m_context;
+
+    // ciphertext stealing code based on a OpenSSL patch by An-Cheng Huang
+    unsigned char m_pad_buf[32];        // Saved partial block of input data
+    unsigned char m_pad_final_buf[32];  // Last processed block of output data
+    int           m_pad_buf_len;        // Number of bytes in m_pad_buf
+    bool          m_pad_final_used;     // Indicates whether the final buffer is used
+    bool UpdateCTS(unsigned char *out, int *outl, const unsigned char *in, int inl);
+    bool EncryptFinalCTS(unsigned char *out, int *outl);
+    bool DecryptFinalCTS(unsigned char *out, int *outl);
+
+    // Relaxed decryption that doesn't verify contents of the padding in the last decrypted block
+    bool UpdateLoose(unsigned char *out, int *outl, const unsigned char *in, int inl);
+    bool DecryptUpdateLoose(unsigned char *out, int *outl, const unsigned char *in, int inl);
+    bool DecryptFinalLoose(unsigned char *out, int *outl);
 
   private:
     PSSLCipherContext(const PSSLCipherContext &) { }
@@ -1028,6 +1044,7 @@ class PSSLChannel : public PIndirectChannel
     PSSLContext  * m_context;
     bool           m_autoDeleteContext;
     ssl_st       * m_ssl;
+    bio_method_st* m_bioMethod;
     bio_st       * m_bio;
     VerifyNotifier m_verifyNotifier;
     PDECLARE_MUTEX(m_writeMutex);

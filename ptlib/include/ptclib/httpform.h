@@ -35,6 +35,7 @@
 
 #include <ptclib/http.h>
 #include <ptclib/html.h>
+#include <ptclib/pjson.h>
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -182,6 +183,21 @@ class PHTTPField : public PObject
       PConfig & cfg   // Configuration for value transfer.
     ) const;
 
+    /** Get the value of the JSON to the sub-field. If the field is not
+        composite then it always sets the value as for the non-indexed version.
+        @return true if no configuration set and a default should be used.
+    */
+    virtual void LoadFromJSON(
+      const PJSON::Base & json   // JSON for value transfer.
+    );
+
+    /** Set the value of the sub-field into the JSON. If the field is not
+        composite then it always sets the value as for the non-indexed version.
+    */
+    virtual void SaveToJSON(
+      PJSON::Base & json   // JSON for value transfer.
+    ) const;
+
     /** Validate the new field value before <code>SetValue()</code> is called.
 
        @return
@@ -243,6 +259,7 @@ class PHTTPDividerField : public PHTTPField
     virtual PString GetValue(PBoolean dflt = false) const;
     virtual void SetValue(const PString & newValue);
     virtual void SaveToConfig(PConfig & cfg) const;
+    virtual void SaveToJSON(PJSON::Base & json) const;
 };
 
 
@@ -292,6 +309,13 @@ class PHTTPCompositeField : public PHTTPField
     );
     virtual void SaveToConfig(
       PConfig & cfg   // Configuration for value transfer.
+    ) const;
+
+    virtual void LoadFromJSON(
+      const PJSON::Base & json   // JSON for value transfer.
+    );
+    virtual void SaveToJSON(
+      PJSON::Base & json   // JSON for value transfer.
     ) const;
 
     virtual void GetAllNames(PStringArray & names) const;
@@ -374,6 +398,13 @@ class PHTTPFieldArray : public PHTTPCompositeField
     );
     virtual void SaveToConfig(
       PConfig & cfg   // Configuration for value transfer.
+    ) const;
+
+    virtual void LoadFromJSON(
+      const PJSON::Base & json   // JSON for value transfer.
+    );
+    virtual void SaveToJSON(
+      PJSON::Base & json   // JSON for value transfer.
     ) const;
 
 
@@ -549,6 +580,13 @@ class PHTTPIntegerField : public PHTTPField
       PConfig & cfg   ///< Configuration for value transfer.
     ) const;
 
+    virtual void LoadFromJSON(
+      const PJSON::Base & json   // JSON for value transfer.
+    );
+    virtual void SaveToJSON(
+      PJSON::Base & json   // JSON for value transfer.
+    ) const;
+
     virtual PBoolean Validated(
       const PString & newVal,
       PStringStream & msg
@@ -599,6 +637,13 @@ class PHTTPBooleanField : public PHTTPField
     );
     virtual void SaveToConfig(
       PConfig & cfg   ///< Configuration for value transfer.
+    ) const;
+
+    virtual void LoadFromJSON(
+      const PJSON::Base & json   // JSON for value transfer.
+    );
+    virtual void SaveToJSON(
+      PJSON::Base & json   // JSON for value transfer.
     ) const;
 
 
@@ -857,7 +902,7 @@ class PHTTPForm : public PHTTPString
     );
 
 
-  protected:
+protected:
     PHTTPCompositeField m_fields;
     PStringSet          m_fieldNames;
 };
@@ -904,7 +949,19 @@ class PHTTPConfig : public PHTTPForm
 
     /** Load all of the values for the resource from the configuration.
      */
-    bool LoadFromConfig();
+    void LoadFromConfig();
+
+    /** Set the value of the JSON to the pages fields.
+    */
+    void LoadFromJSON(
+      const PJSON & json   // JSON for value transfer.
+    );
+
+    /** Set the value of the pages fields into the JSON.
+      */
+    void SaveToJSON(
+      PJSON & json   // JSON for value transfer.
+    );
 
     /** Get the configuration file section that the page will alter.
 

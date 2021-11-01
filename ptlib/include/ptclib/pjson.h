@@ -64,7 +64,7 @@ class PJSON : public PObject
 
     typedef long double NumberType;
 
-    class Object : public Base, public std::map<PString, Base *>
+    class Object : public Base, public std::map<std::string, Base *>
     {
       public:
         Object() { }
@@ -98,6 +98,8 @@ class PJSON : public PObject
         uint64_t GetUnsigned64(const PString & name) const;
         NumberType GetNumber(const PString & name) const;
         bool GetBoolean(const PString & name) const;
+        PTime GetTime(const PString & name) const;
+        PTimeInterval GetInterval(const PString & name) const;
 
         bool Set(const PString & name, Types type);
         bool Set(const PString & name, const Base & toInsert);
@@ -107,6 +109,10 @@ class PJSON : public PObject
         bool SetString(const PString & name, const PString & value);
         bool SetNumber(const PString & name, NumberType value);
         bool SetBoolean(const PString & name, bool value);
+        bool SetTime(const PString & name, const PTime & value);
+        bool SetInterval(const PString & name, const PTimeInterval & value);
+
+        bool Remove(const PString & name);
 
       private:
         Object(const Object &) { }
@@ -139,6 +145,8 @@ class PJSON : public PObject
         uint64_t GetUnsigned64(size_t index) const;
         NumberType GetNumber(size_t index) const;
         bool GetBoolean(size_t index) const;
+        PTime GetTime(size_t index) const;
+        PTimeInterval GetInterval(size_t index) const;
 
         void Append(Types type);
         void Append(const Base & toAppend);
@@ -148,6 +156,10 @@ class PJSON : public PObject
         void AppendString(const PString & value);
         void AppendNumber(NumberType value);
         void AppendBoolean(bool value);
+        void AppendTime(const PTime & value);
+        void AppendInterval(const PTimeInterval & value);
+
+        bool Remove(size_t index);
 
       private:
         Array(const Array &) { }

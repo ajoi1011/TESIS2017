@@ -1320,7 +1320,8 @@ class PHTTPServer : public PHTTP
     unsigned            m_transactionCount;
     PTimeInterval       m_nextTimeout;
 
-    std::map<PString, WebSocketNotifier> m_webSocketNotifiers;
+    typedef std::map<std::string, WebSocketNotifier> WebSocketNotifierMap;
+    WebSocketNotifierMap m_webSocketNotifiers;
 
     P_REMOVE_VIRTUAL(PBoolean,OnGET(const PURL&,const PMIMEInfo&, const PHTTPConnectionInfo&),false);
     P_REMOVE_VIRTUAL(PBoolean,OnHEAD(const PURL&,const PMIMEInfo&,const PHTTPConnectionInfo&),false);

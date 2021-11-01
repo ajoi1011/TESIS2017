@@ -209,6 +209,7 @@ class PMIMEInfo : public PStringOptions
 
     static const PCaselessString & TextPlain();
     static const PCaselessString & TextHTML();
+    static const PCaselessString & ApplicationJSON();
 
 
     /** Set an association between a file type and a MIME content type. The
@@ -282,7 +283,12 @@ class PMIMEInfo : public PStringOptions
 //////////////////////////////////////////////////////////////////////////////
 // PMultiPartInfo
 
-/** This object describes the information associated with one part of a multi-part body.
+/** This object describes the information associated with one part of a
+    multi-part body.
+
+    Note, the MIME headers are set, if not already set, from the fields such
+    as m_contentType, m_encoding etc, when PMIMEInfo::AddMultiPartList() is
+    executed. 
   */
 class PMultiPartInfo : public PObject
 {
@@ -302,8 +308,12 @@ class PMultiPartInfo : public PObject
 
     virtual void PrintOn(ostream & strm) const;
 
+    /// Set the m_mime headers from fields
+    void SetMIME();
+
     PCaselessString m_contentType;
-    PCaselessString m_encoding;    // "base64", "7bit", "UTF-8", or "8bit"
+    PCaselessString m_charset;     // UTF-8, UTF-16, UCS-2
+    PCaselessString m_encoding;    // "base64", "7bit", "binary", or "8bit"
     PCaselessString m_disposition;
     PMIMEInfo       m_mime;
     PString         m_textBody;

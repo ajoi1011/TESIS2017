@@ -565,12 +565,12 @@ class PHMAC_SHA : public PHMAC
 {
     PCLASSINFO(PHMAC_SHA, PHMAC)
   protected:
-    typedef struct env_md_st Algorithm;
+    typedef struct evp_md_st const * Algorithm;
 
-    explicit PHMAC_SHA(Algorithm const * algo);
+    explicit PHMAC_SHA(Algorithm algo);
     virtual void InternalProcess(const void * data, PINDEX len, PHMAC::Result & result);
 
-    Algorithm const * m_algorithm;
+    Algorithm m_algorithm;
 };
 
 
