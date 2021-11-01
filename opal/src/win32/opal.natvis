@@ -2,21 +2,19 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
   <Type Name="OpalEndPoint">
-    <DisplayString>{{{prefixName} connections={connectionsActive}}}</DisplayString>
+    <DisplayString>{{{m_prefixName} connections={m_connectionsActive}}}</DisplayString>
   </Type>
 
   <Type Name="OpalConnection">
-    <DisplayString>{{{endpoint.prefixName} call={ownerCall}}}</DisplayString>
+    <DisplayString>{{{m_endpoint.m_prefixName} {m_callToken} {m_ownerCall.m_token}}}</DisplayString>
   </Type>
 
   <Type Name="OpalCall">
-    <DisplayString>{{token={myToken}}}</DisplayString>
-    <Expand>
-      <Item Name="Token">myToken</Item>
-      <Item Name="A-Party">m_partyA</Item>
-      <Item Name="B-Party">m_partyB</Item>
-      <Item Name="Connections">connectionsActive</Item>
-    </Expand>
+    <DisplayString>{{{m_token} A={m_partyA} B={m_partyB}}}</DisplayString>
+  </Type>
+
+  <Type Name="OpalMediaStream">
+    <DisplayString>{{{m_identifier} {m_mediaFormat} session={m_sessionID}}}</DisplayString>
   </Type>
 
   <Type Name="OpalMediaFormat">

@@ -77,6 +77,7 @@ PStringList OpalSDPEndPoint::GetAvailableStringOptions() const
     #ifdef OPAL_ICE
       OPAL_OPT_OFFER_ICE,
     #endif
+    OPAL_OPT_ALLOW_MUSIC_ON_HOLD,
     OPAL_OPT_AV_BUNDLE,
     OPAL_OPT_USE_MEDIA_STREAMS,
     OPAL_OPT_INACTIVE_AUDIO_FLOW,
@@ -928,7 +929,7 @@ bool OpalSDPConnection::OnSendAnswerSDP(const SDPSessionDescription & sdpOffer, 
     }
   }
 
-  bool holdFromRemote = sdpOffer.IsHold();
+  bool holdFromRemote = sdpOffer.IsHold(AllowMusicOnHold());
   if (m_holdFromRemote != holdFromRemote) {
     PTRACE(3, "Remote " << (holdFromRemote ? "" : "retrieve from ") << "hold detected");
     m_holdFromRemote = holdFromRemote;
@@ -938,6 +939,12 @@ bool OpalSDPConnection::OnSendAnswerSDP(const SDPSessionDescription & sdpOffer, 
   StartMediaStreams();
 
   return true;
+}
+
+
+bool OpalSDPConnection::AllowMusicOnHold() const
+{
+  return m_stringOptions.GetBoolean(OPAL_OPT_ALLOW_MUSIC_ON_HOLD, true);
 }
 
 
@@ -1472,23 +1479,9 @@ void OpalSDPConnection::FinaliseRtx(const OpalMediaStreamPtr & stream, SDPMediaD
     return;
   }
 
-  PTRACE(4, "Finalising RTX as " << rtxPT << " for primary " << primaryPT << " on stream " << *stream);
-
-  OpalRTPSession::Direction dir = stream->IsSource() ? OpalRTPSession::e_Receiver : OpalRTPSession::e_Sender;
-
   // Adjust the session SSRCs
-  RTP_SyncSourceArray ssrcs = rtpSession->GetSyncSources(dir);
-  for (RTP_SyncSourceArray::iterator it = ssrcs.begin(); it != ssrcs.end(); ++it) {
-    RTP_SyncSourceId primarySSRC = *it;
-    RTP_SyncSourceId rtxSSRC = rtpSession->GetRtxSyncSource(primarySSRC, dir, true);
-    if (dir == OpalRTPSession::e_Sender)
-      rtpSession->EnableSyncSourceRtx(primarySSRC, rtxPT, rtxSSRC); // If no rtxSSRC (==0), create one
-    else if (rtxSSRC != 0)
-      rtpSession->EnableSyncSourceRtx(primarySSRC, primaryPT, rtxSSRC);
-    else {
-      PTRACE(3, "Primary receiver SSRC=" << RTP_TRACE_SRC(primarySSRC) << " has no RTX SSRC, invalid SDP");
-    }
-  }
+  PTRACE(4, "Finalising RTX as " << rtxPT << " for primary " << primaryPT << " on stream " << *stream);
+  rtpSession->FinaliseSyncSourceRtx(primaryPT, rtxPT, stream->IsSource() ? OpalRTPSession::e_Receiver : OpalRTPSession::e_Sender);
 }
 
 

@@ -2031,7 +2031,7 @@ bool SDPRTPAVPMediaDescription::FromSession(OpalMediaSession * session,
 {
   OpalRTPSession * rtpSession = dynamic_cast<OpalRTPSession *>(session);
   if (rtpSession != NULL) {
-    PTRACE(4, "Setting SDP from RTP session " << *rtpSession);
+    PTRACE(4, *rtpSession << "setting SDP from RTP session");
     m_label = rtpSession->GetLabel();
 
     if (offer != NULL) {
@@ -2041,6 +2041,11 @@ bool SDPRTPAVPMediaDescription::FromSession(OpalMediaSession * session,
     else {
       if (m_stringOptions.GetBoolean(OPAL_OPT_RTP_ABS_SEND_TIME)) {
         RTPHeaderExtensionInfo ext(OpalRTPSession::GetAbsSendTimeHdrExtURI());
+        SetHeaderExtension(ext);
+      }
+
+      if (m_stringOptions.GetBoolean(OPAL_OPT_RTP_AUDIO_LEVEL) && m_mediaType == OpalMediaType::Audio()) {
+        RTPHeaderExtensionInfo ext(OpalRTPSession::GetAudioLevelHdrExtURI());
         SetHeaderExtension(ext);
       }
 
@@ -2068,7 +2073,7 @@ bool SDPRTPAVPMediaDescription::FromSession(OpalMediaSession * session,
         if (rtx != formats.end()) {
           RTP_DataFrame::PayloadTypes pt = rtx->GetOptionPayloadType(OpalRtx::AssociatedPayloadTypeOption());
           if (pt != RTP_DataFrame::IllegalPayloadType) {
-            PTRACE(4, "Making sure RTX links in place before offer.");
+            PTRACE(4, *rtpSession << "making sure RTX links in place before offer.");
             RTP_SyncSourceArray ssrcs2 = ssrcs;
             for (RTP_SyncSourceArray::iterator itSSRC = ssrcs2.begin(); itSSRC != ssrcs2.end(); ++itSSRC) {
               RTP_SyncSourceId ssrc = *itSSRC;
@@ -2083,7 +2088,7 @@ bool SDPRTPAVPMediaDescription::FromSession(OpalMediaSession * session,
         }
       }
 
-      PTRACE(4, "Adding " << ssrcs.size() << " sender SSRC entries.");
+      PTRACE(4, *rtpSession << "adding " << ssrcs.size() << " sender SSRC entries.");
       for (RTP_SyncSourceArray::iterator itSSRC = ssrcs.begin(); itSSRC != ssrcs.end(); ++itSSRC) {
         RTP_SyncSourceId ssrc = *itSSRC;
         PStringOptions & info = m_ssrcInfo[ssrc];
@@ -2100,7 +2105,7 @@ bool SDPRTPAVPMediaDescription::FromSession(OpalMediaSession * session,
 
         RTP_SyncSourceId rtxSSRC = rtpSession->GetRtxSyncSource(ssrc, OpalRTPSession::e_Sender, true);
         if (rtxSSRC != 0) {
-          PTRACE(4, "Adding flow (FID) for " << RTP_TRACE_SRC(ssrc) << ", " << RTP_TRACE_SRC(rtxSSRC));
+          PTRACE(4, *rtpSession << "adding flow (FID) for " << RTP_TRACE_SRC(ssrc) << ", " << RTP_TRACE_SRC(rtxSSRC));
           RTP_SyncSourceArray fid(2);
           fid[0] = ssrc;
           fid[1] = rtxSSRC;
@@ -2110,7 +2115,7 @@ bool SDPRTPAVPMediaDescription::FromSession(OpalMediaSession * session,
     }
 
     PStringList groups = rtpSession->GetGroups();
-    PTRACE_IF(4, !groups.empty(), "Adding groups: " << setfill(',') << groups);
+    PTRACE_IF(4, !groups.empty(), *rtpSession << "adding groups: " << setfill(',') << groups);
     for (PStringList::iterator it = groups.begin(); it != groups.end(); ++it) {
       if (singleSSRC != 0)
         m_groups.SetAt(*it, PSTRSTRM(rtpSession->GetGroupMediaId(*it) << '_' << singleSSRC));
@@ -2142,7 +2147,7 @@ bool SDPRTPAVPMediaDescription::ToSession(OpalMediaSession * session, RTP_SyncSo
 {
   OpalRTPSession * rtpSession = dynamic_cast<OpalRTPSession *>(session);
   if (rtpSession != NULL) {
-    PTRACE(4, "Setting SDP to RTP session " << *rtpSession);
+    PTRACE(4, *rtpSession << "setting SDP to RTP session.");
 
     /* Set single port or disjoint RTCP port, must be done before Open()
        and before SDPMediaDescription::ToSession() */
@@ -2162,7 +2167,7 @@ bool SDPRTPAVPMediaDescription::ToSession(OpalMediaSession * session, RTP_SyncSo
         if (!oldCname.IsEmpty() && oldCname != cname)
           rtpSession->RemoveSyncSource(ssrc PTRACE_PARAM(, "cname changed"));
         if (rtpSession->AddSyncSource(ssrc, OpalRTPSession::e_Receiver, cname) == ssrc) {
-          PTRACE(4, "Session " << session->GetSessionID() << ", added receiver SSRC " << RTP_TRACE_SRC(ssrc));
+          PTRACE(4, *rtpSession << "added receiver SSRC " << RTP_TRACE_SRC(ssrc));
         }
         rtpSession->SetMediaTrackId(it->second.GetString("label"), ssrc, OpalRTPSession::e_Receiver);
         rtpSession->SetMediaStreamId(it->second.GetString("mslabel"), ssrc, OpalRTPSession::e_Receiver);
@@ -2202,7 +2207,7 @@ bool SDPRTPAVPMediaDescription::ToSession(OpalMediaSession * session, RTP_SyncSo
           if (primaryCNAME == rtxCNAME)
             rtpSession->EnableSyncSourceRtx(primarySSRC, rtxPT, rtxSSRC);
           else {
-            PTRACE(3, "Flow grouping not using same CNAME:"
+            PTRACE(3, *rtpSession << "flow grouping not using same CNAME:"
                       " SSRC1=" << RTP_TRACE_SRC(primarySSRC) << " CNAME1=\"" << primaryCNAME << "\""
                       " SSRC2=" << RTP_TRACE_SRC(rtxSSRC) << " CNAME2=\"" << rtxCNAME << '"');
           }
@@ -3189,7 +3194,7 @@ SDPMediaDescription::Direction SDPSessionDescription::GetDirection(unsigned sess
 }
 
 
-bool SDPSessionDescription::IsHold() const
+bool SDPSessionDescription::IsHold(bool allowMusicOnHold) const
 {
   if (defaultConnectAddress.IsEmpty()) // Old style "hold"
     return true;
@@ -3199,9 +3204,20 @@ bool SDPSessionDescription::IsHold() const
 
   PINDEX i;
   for (i = 0; i < mediaDescriptions.GetSize(); i++) {
-    SDPMediaDescription::Direction dir = mediaDescriptions[i].GetDirection();
-    if ((dir == SDPMediaDescription::Undefined) || ((dir & SDPMediaDescription::RecvOnly) != 0))
-      return false;
+    Direction dir = mediaDescriptions[i].GetDirection();
+    if (dir == Undefined)
+      return false; // If undefined, then cannot be hold
+
+    if (allowMusicOnHold) {
+      // Here hold is Inactive or SendOnly
+      if (dir != Inactive && dir != SendOnly)
+        return false;
+    }
+    else {
+      // Here hold is only when Inactive
+      if (dir != Inactive)
+        return false;
+    }
   }
 
   return true;

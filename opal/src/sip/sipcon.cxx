@@ -1356,6 +1356,16 @@ PString SIPConnection::GetSupportedFeatures() const
 }
 
 
+bool SIPConnection::AllowMusicOnHold() const
+{
+  for (PMultiPartList::const_iterator it = m_multiPartMIME.begin(); it != m_multiPartMIME.end(); ++it) {
+    if (it->m_disposition == "recording-session")
+      return false;
+  }
+  return OpalSDPConnection::AllowMusicOnHold();
+}
+
+
 bool SIPConnection::OnHoldStateChanged(bool PTRACE_PARAM(placeOnHold))
 {
   return SendReINVITE(PTRACE_PARAM(placeOnHold ? "put connection on hold" : "retrieve connection from hold"));
@@ -1365,12 +1375,6 @@ bool SIPConnection::OnHoldStateChanged(bool PTRACE_PARAM(placeOnHold))
 PString SIPConnection::GetPrefixName() const
 {
   return m_dialog.GetRequestURI().GetScheme();
-}
-
-
-PString SIPConnection::GetIdentifier() const
-{
-  return m_dialog.GetCallID();
 }
 
 
@@ -1548,7 +1552,8 @@ bool SIPConnection::OnReceivedResponseToINVITE(SIPTransaction & transaction, SIP
   // If we are in a dialog, then m_dialog needs to be updated in the 2xx/1xx
   // response for a target refresh request
   m_dialog.Update(response);
-  response.DecodeSDP(*this, m_multiPartMIME);
+  PString sdpText;
+  response.DecodeSDP(*this, sdpText, m_multiPartMIME);
 
   const SIPMIMEInfo & responseMIME = response.GetMIME();
 
@@ -1581,8 +1586,10 @@ bool SIPConnection::OnReceivedResponseToINVITE(SIPTransaction & transaction, SIP
   // Update internal variables on remote part names/number/address
   UpdateRemoteAddresses();
 
-  if (reInvite)
+  if (reInvite) {
+    m_sipEndpoint.OnReINVITE(*this, false, sdpText);
     return statusCode >= 200;
+  }
 
   bool collapseForks;
   if (statusCode < 200)
@@ -1632,7 +1639,9 @@ bool SIPConnection::OnReceivedResponseToINVITE(SIPTransaction & transaction, SIP
 
     // And end connect mode on the transport
     m_dialog.SetInterface(transaction.GetInterface());
-    m_contactAddress = transaction.GetMIME().GetContact();
+    SIPURL url = m_contactAddress = transaction.GetMIME().GetContact();
+    url.Sanitise(SIPURL::ExternalURI);
+    m_localPartyURL = url.AsString();
   }
 
   if (statusCode < 200) {
@@ -1826,6 +1835,8 @@ void SIPConnection::UpdateRemoteAddresses()
     m_localPartyName = m_dialog.GetLocalURI().GetUserName();
 
   m_ownerCall.SetPartyNames();
+
+  m_identifier = m_dialog.GetCallID();
 }
 
 
@@ -2278,7 +2289,6 @@ void SIPConnection::OnReceivedINVITE(SIP_PDU & request)
 
   // We received a Re-INVITE for a current connection
   if (isReinvite) {
-    m_lastReceivedINVITE->DecodeSDP(*this, m_multiPartMIME);
     OnReceivedReINVITE(request);
     return;
   }
@@ -2299,7 +2309,9 @@ void SIPConnection::OnReceivedINVITE(SIP_PDU & request)
   // Fill in all the various connection info, note our to/from is their from/to
   mime.GetProductInfo(m_remoteProductInfo);
 
-  m_contactAddress = request.GetURI();
+  SIPURL url = m_contactAddress = request.GetURI();
+  url.Sanitise(SIPURL::ExternalURI);
+  m_localPartyURL = url.AsString();
 
   mime.SetTo(m_dialog.GetLocalURI());
 
@@ -2456,8 +2468,11 @@ void SIPConnection::OnReceivedReINVITE(SIP_PDU & request)
   m_needReINVITE = true;
   m_handlingINVITE = true;
 
+  PString sdpText;
+  m_lastReceivedINVITE->DecodeSDP(*this, sdpText, m_multiPartMIME);
+
   // send the 200 OK response
-  if (!OnSendAnswer(SIP_PDU::Successful_OK, false))
+  if (!m_sipEndpoint.OnReINVITE(*this, true, sdpText) || !OnSendAnswer(SIP_PDU::Successful_OK, false))
     SendInviteResponse(SIP_PDU::Failure_NotAcceptableHere);
 
   SIPURL newRemotePartyID(request.GetMIME(), RemotePartyID);
@@ -3007,15 +3022,13 @@ void SIPConnection::OnReceivedOK(SIPTransaction & transaction, SIP_PDU & respons
      return;
 
     case SIP_PDU::Method_REFER :
-      if (m_referOfRemoteState != eNoRemoteRefer &&
-              (response.GetStatusCode() != SIP_PDU::Successful_Accepted || !response.GetMIME().GetBoolean(ReferSubHeader, true))) {
-      /*if (m_referOfRemoteState == eNoRemoteRefer)
+      if (m_referOfRemoteState == eNoRemoteRefer)
         return; // Ignore
       if (response.GetStatusCode() == SIP_PDU::Successful_Accepted && response.GetMIME().GetBoolean(ReferSubHeader, true)) {
         PTRACE(3, "Transfer accepted, with NOTIFY.");
-       m_referOfRemoteState = eReferNotifyConfirmed;
+        m_referOfRemoteState = eReferNotifyConfirmed;
       }
-      else {*/
+      else {
         // Used RFC4488 to indicate we are NOT doing NOTIFYs, release now
         PTRACE(3, "Blind transfer accepted, without NOTIFY so ending local call.");
         m_referOfRemoteState = eNoRemoteRefer;
@@ -3041,7 +3054,7 @@ void SIPConnection::OnReceivedOK(SIPTransaction & transaction, SIP_PDU & respons
   if (GetPhase() >= ConnectedPhase)
     OnReceivedAnswer(response, &transaction);  // Re-INVITE
   else {
-    // Don't use OnConnectedInternal() as need to process SDP between setting connected
+    // Don't use InternalOnConnected() as need to process SDP between setting connected
     // state locally and other half of call processing SetConnected()
     SetPhase(ConnectedPhase);
 
@@ -3343,7 +3356,7 @@ void SIPConnection::OnReceivedPRACK(SIP_PDU & request)
 }
 
 
-void SIPConnection::OnUserInputInlineRFC2833(OpalRFC2833Info & info, INT type)
+void SIPConnection::OnUserInputInlineRFC2833(OpalRFC2833Info & info, OpalRFC2833Proto::NotifyState state)
 {
   switch (m_receivedUserInputMethod) {
     case ReceivedINFO :
@@ -3355,7 +3368,7 @@ void SIPConnection::OnUserInputInlineRFC2833(OpalRFC2833Info & info, INT type)
       // Do default case
 
     default:
-      OpalRTPConnection::OnUserInputInlineRFC2833(info, type);
+      OpalRTPConnection::OnUserInputInlineRFC2833(info, state);
   }
 }
 
@@ -3434,8 +3447,20 @@ void SIPConnection::OnReceivedINFO(SIP_PDU & request)
 #endif
   else {
     PString package = mimeInfo("Info-Package");
-    if (!package.IsEmpty() && OnReceivedInfoPackage(package, request.GetEntityBody()))
-      status = SIP_PDU::Successful_OK;
+    if (!package.IsEmpty()) {
+      PString content = request.GetEntityBody();
+      PMultiPartList parts;
+      if (contentType.NumCompare("multipart/") == PObject::EqualTo) {
+        if (!mimeInfo.DecodeMultiPartList(parts, content)) {
+          PTRACE(3, "Invalid multipart MIME.");
+          parts.RemoveAll();
+        }
+      }
+      if (parts.IsEmpty())
+        parts.AddPart(content, contentType);
+      if (OnReceivedInfoPackage(package, parts))
+        status = SIP_PDU::Successful_OK;
+    }
   }
 
   request.SendResponse(status);
@@ -3453,9 +3478,9 @@ void SIPConnection::OnReceivedINFO(SIP_PDU & request)
 }
 
 
-bool SIPConnection::OnReceivedInfoPackage(const PString & package, const PString & body)
+bool SIPConnection::OnReceivedInfoPackage(const PString & package, const PMultiPartList & content)
 {
-  return m_sipEndpoint.OnReceivedInfoPackage(*this, package, body);
+  return m_sipEndpoint.OnReceivedInfoPackage(*this, package, content);
 }
 
 
@@ -3734,17 +3759,6 @@ void SIPConnection::OnSessionTimeout()
   //SIPTransaction * invite = new SIPInvite(*this, GetTransport(), rtpSessions);  
   //invite->Start();  
   //sessionTimer = 10000;
-}
-
-
-PString SIPConnection::GetLocalPartyURL() const
-{
-  if (m_contactAddress.IsEmpty())
-    return OpalRTPConnection::GetLocalPartyURL();
-
-  SIPURL url = m_contactAddress;
-  url.Sanitise(SIPURL::ExternalURI);
-  return url.AsString();
 }
 
 

@@ -2615,10 +2615,16 @@ bool SIP_PDU::IsContentSDP(bool emptyOK) const
 
 bool SIP_PDU::DecodeSDP(SIPConnection & connection, PMultiPartList & parts)
 {
+  PString sdpText;
+  return DecodeSDP(connection, sdpText, parts);
+}
+
+
+bool SIP_PDU::DecodeSDP(SIPConnection & connection, PString & sdpText, PMultiPartList & parts)
+{
   if (m_SDP != NULL)
     return true;
 
-  PString sdpText;
   if (!m_mime.GetSDP(m_entityBody, sdpText, parts))
     return false;
 
@@ -4010,9 +4016,9 @@ PObject::Comparison SIPSubscribe::EventPackage::InternalCompare(PINDEX offset, P
       return EqualTo;
     if (theArray[idx+offset] == ';' || cstr[idx] == ';')
       break;
-    Comparison c = PCaselessString::InternalCompare(idx+offset, cstr[idx]);
-    if (c != EqualTo)
-      return c;
+    int c = internal_strncmp(theArray+idx+offset, cstr+idx, 1);
+    if (c != 0)
+      return PObject::Compare2(c, 0);
     idx++;
   }
 
