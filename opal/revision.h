@@ -1,11 +1,9 @@
 /*
- * version.h
+ * revision.h 
  *
- * Version number header file for OPAL library.
+ * GIT commit string header file for OPAL
  *
- * A H.323 "net telephone" application.
- *
- * Copyright (c) 2000-2002 Equivalence Pty. Ltd.
+ * Copyright (c) 2010-2016 Equivalence Pty. Ltd.
  *
  * The contents of this file are subject to the Mozilla Public License
  * Version 1.0 (the "License"); you may not use this file except in
@@ -17,32 +15,21 @@
  * the License for the specific language governing rights and limitations
  * under the License.
  *
- * The Original Code is Open Phone Abstraction Library.
+ * The Original Code is Portable Windows Library.
+ * Subsequenty renamed to Portalble Tools Library
  *
  * The Initial Developer of the Original Code is Equivalence Pty. Ltd.
  *
  * Contributor(s): ______________________________________.
  */
 
-#ifndef _OPAL_VERSION_H
-#define _OPAL_VERSION_H
+#ifndef _OPAL_REVISION_H
+#define _OPAL_REVISION_H
 
+#define SVN_REVISION 0
+#define GIT_COMMIT ""
 
-
-/* WARNING: You MUST NOT add any comments to the #defines which follow
-   or add extra commented out #defines, or have more than one space
-   between the name and the value, as this will confuse the parser
-   which extracts the version numbers
- */
-
-#define MAJOR_VERSION 3
-#define MINOR_VERSION 19
-#define BUILD_TYPE AlphaCode
-#define PATCH_VERSION 5
-#define OEM_VERSION 0
-
-
-#endif  // _OPAL_VERSION_H
+#endif  // _OPAL_REVISION_H
 
 
 // End of File ///////////////////////////////////////////////////////////////

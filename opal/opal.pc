@@ -1,0 +1,44 @@
+Name: opal
+Description: Open Phone Application Library
+Version: 3.19.5
+Requires: ptlib
+
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+datarootdir=${prefix}/share
+makedir=${datarootdir}/opal/make
+plugindir=${libdir}/opal-3.19.5
+target_cpu=x86
+target_os=linux
+target=linux_x86
+suffix=
+objdir=obj/linux_x86${suffix}
+
+cppflags= -Wall -Wno-unknown-pragmas  -I${includedir}/opal
+cxxflags= -Wall -Wno-unknown-pragmas  -I${includedir}/opal -Wno-overloaded-virtual -fno-omit-frame-pointer -march=i686  -Wno-deprecated-declarations
+Cflags:  -Wall -Wno-unknown-pragmas  -I${includedir}/opal -fno-omit-frame-pointer -march=i686 
+Libs:  -L${libdir} -lopal${suffix} -lspeexdsp  
+
+#Optional OPAL features
+OPAL_H323=yes
+OPAL_SIP=yes
+OPAL_IAX2=no
+OPAL_VIDEO=yes
+OPAL_ZRTP=no
+OPAL_LID=yes
+OPAL_IVR=yes
+OPAL_HAS_H224=yes
+OPAL_HAS_H281=yes
+OPAL_H460=no
+OPAL_SRTP=yes
+OPAL_RFC4175=yes
+OPAL_AEC=yes
+OPAL_G711PLC=yes
+OPAL_T38_CAP=yes
+OPAL_FAX=yes
+OPAL_JAVA=no
+OPAL_HAS_MSRP=yes
+OPAL_HAS_SIPIM=yes
+OPAL_HAS_RFC4103=yes
