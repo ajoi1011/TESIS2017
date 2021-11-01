@@ -1,11 +1,12 @@
 /*
- * null-auth.h
+ * aes_icm.h
+ *
+ * Header for AES Integer Counter Mode.
  *
  * David A. McGrew
  * Cisco Systems, Inc.
  *
  */
-
 /*
  *
  * Copyright (c) 2001-2017, Cisco Systems, Inc.
@@ -42,21 +43,57 @@
  *
  */
 
-#ifndef NULL_AUTH_H
-#define NULL_AUTH_H
+#ifndef AES_ICM_H
+#define AES_ICM_H
 
-#include "auth.h"
+#include "cipher.h"
+#include "datatypes.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifdef OPENSSL
+
+#include <openssl/evp.h>
+#include <openssl/aes.h>
 
 typedef struct {
-    char foo;
-} srtp_null_auth_ctx_t;
+    v128_t counter; /* holds the counter value          */
+    v128_t offset;  /* initial offset value             */
+    int key_size;
+    EVP_CIPHER_CTX *ctx;
+} srtp_aes_icm_ctx_t;
 
-#ifdef __cplusplus
-}
-#endif
+#endif /* OPENSSL */
 
-#endif /* NULL_AUTH_H */
+#ifdef MBEDTLS
+
+#include <mbedtls/aes.h>
+typedef struct {
+    v128_t counter; /* holds the counter value          */
+    v128_t offset;  /* initial offset value             */
+    v128_t stream_block;
+    size_t nc_off;
+    int key_size;
+    mbedtls_aes_context *ctx;
+} srtp_aes_icm_ctx_t;
+
+#endif /* MBEDTLS */
+
+#ifdef NSS
+
+#define NSS_PKCS11_2_0_COMPAT 1
+
+#include <nss.h>
+#include <pk11pub.h>
+
+typedef struct {
+    v128_t counter;
+    v128_t offset;
+    int key_size;
+    uint8_t iv[16];
+    NSSInitContext *nss;
+    PK11SymKey *key;
+    PK11Context *ctx;
+} srtp_aes_icm_ctx_t;
+
+#endif /* NSS */
+
+#endif /* AES_ICM_H */

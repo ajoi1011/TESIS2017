@@ -1,14 +1,6 @@
 /*
- * null-auth.h
  *
- * David A. McGrew
- * Cisco Systems, Inc.
- *
- */
-
-/*
- *
- * Copyright (c) 2001-2017, Cisco Systems, Inc.
+ * Copyright(c) 2001-2017 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,21 +34,29 @@
  *
  */
 
-#ifndef NULL_AUTH_H
-#define NULL_AUTH_H
+#ifndef SRTP_CIHPER_PRIV_H
+#define SRTP_CIHPER_PRIV_H
 
-#include "auth.h"
+#include "cipher.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct {
-    char foo;
-} srtp_null_auth_ctx_t;
+/*
+ * A trivial platform independent random source.
+ * For use in test only.
+ */
+void srtp_cipher_rand_for_tests(void *dest, uint32_t len);
+
+/*
+ * A trivial platform independent 32 bit random number.
+ * For use in test only.
+ */
+uint32_t srtp_cipher_rand_u32_for_tests(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* NULL_AUTH_H */
+#endif /* SRTP_CIPHER_PRIV_H */
