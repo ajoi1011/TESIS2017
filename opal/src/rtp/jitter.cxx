@@ -487,14 +487,16 @@ PBoolean OpalAudioJitterBuffer::WriteData(const RTP_DataFrame & frame, const PTi
   /*Calculate the time between packets. While not actually dictated by any
     standards, this is invariably a constant. We just need to allow for if we
     are unlucky at the start and get a missing packet, in which case we are
-    twice as big (or more) as we should be. Se we make sure we do not have
-    a missing packet by inspecting sequence numbers. */
+    twice as big (or more) as we should be. So, we make sure we do not have
+    a missing packet by inspecting sequence numbers. Also, do not involve
+    comfort noise packets in the calculation, as they generally are a
+    different time between packets than the nominal one for audio. */
   if (m_lastSequenceNum != USHRT_MAX) {
     if (timestamp < m_lastTimestamp) {
       PTRACE_J(2, "Timestamps abruptly changed from " << m_lastTimestamp << " to " << timestamp << ", resynching");
       InternalReset();
     }
-    else if (m_lastSequenceNum+1 == currentSequenceNum) {
+    else if (m_lastSequenceNum+1 == currentSequenceNum && frame.GetPayloadType() != RTP_DataFrame::CN) {
       RTP_Timestamp delta = timestamp - m_lastTimestamp;
       PTRACE_IF(std::min(sm_EveryPacketLogLevel,5U), m_maxJitterDelay > 0 && m_packetTime == 0, "Wait frame time :"
                      " ts=" << timestamp << ","
@@ -522,13 +524,23 @@ PBoolean OpalAudioJitterBuffer::WriteData(const RTP_DataFrame & frame, const PTi
       }
     }
     else {
-      PTRACE_J(4, "Lost packet(s), resetting frame time average, sn=" << currentSequenceNum);
+      PTRACE_J(4, "Lost packet(s), or CN detected, resetting frame time average, sn=" << currentSequenceNum);
       m_frameTimeSum = 0;
       m_frameTimeCount = 0;
     }
   }
-  m_lastSequenceNum = currentSequenceNum;
-  m_lastTimestamp = timestamp;
+
+  /* Due to a bug in a PBX that shall not be named, they put the marker bit
+     on the LAST packet of the talk burst, not the first, which completely
+     breaks the above algorithm. So, as the accumulator and count are reset on
+     that marker bit packet, we need to start calculating TS deltas on the next
+     packet after it. To do this we delay the above by not setting the
+     m_lastTimestamp on the packet on which the marker bit is set. Assuming the
+     marker bits are valid at all ... */
+  if (m_consecutiveMarkerBits == 0 || m_consecutiveMarkerBits >= m_maxConsecutiveMarkerBits) {
+    m_lastSequenceNum = currentSequenceNum;
+    m_lastTimestamp = timestamp;
+  }
 
 
   /* Fail safe for infinite queueing, for example, if other thread is not
