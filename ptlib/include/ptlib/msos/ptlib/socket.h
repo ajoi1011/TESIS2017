@@ -37,6 +37,8 @@
     virtual PBoolean Read(void * buf, PINDEX len);
     virtual PBoolean Write(const void * buf, PINDEX len);
     virtual PBoolean Close();
+    virtual PString GetErrorText(ErrorGroup group = NumErrorGroups) const;
+    static PString GetErrorText(Errors lastError, int osError = 0) { return PChannel::GetErrorText(lastError, osError); }
 
   protected:
     virtual HANDLE GetAsyncReadHandle() const;
