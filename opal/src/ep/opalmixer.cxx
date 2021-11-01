@@ -388,7 +388,7 @@ bool OpalAudioMixer::MixStreams(RTP_DataFrame & frame)
 {
   // Expected to already be mutexed
 
-  if (m_stereo)
+  if (m_stereo && m_inputStreams.size() <= 2)
     MixStereo(frame);
   else {
     PreMixStreams();
@@ -615,7 +615,7 @@ bool OpalVideoMixer::MixVideo()
 
 bool OpalVideoMixer::StartMix(unsigned & x, unsigned & y, unsigned & w, unsigned & h, unsigned & left)
 {
-  switch (m_style) {
+  switch (m_inputStreams.size() > 2 ? eGrid : m_style) {
     case eSideBySideLetterbox:
       x = left = 0;
       y = m_height / 4;
@@ -1009,9 +1009,9 @@ OpalMixerConnection::OpalMixerConnection(PSafePtr<OpalMixerNode> node,
 
   const PStringSet & names = node->GetNames();
   if (names.IsEmpty())
-    m_localPartyName = node->GetGUID().AsString();
+    SetLocalPartyName(node->GetGUID().AsString());
   else
-    m_localPartyName = *names.begin();
+    SetLocalPartyName(*names.begin());
 
   PTRACE(4, "Constructed");
 }
@@ -1173,19 +1173,10 @@ PBoolean OpalMixerMediaStream::Open()
 
   SetPaused(IsSink() && m_listenOnly);
 
-  return OpalMediaStream::Open();
-}
-
-
-PBoolean OpalMixerMediaStream::Start()
-{
-  if (!OpalMediaStream::Start())
+  if (!IsPaused() && !m_node->AttachStream(this))
     return false;
 
-  if (IsSink() && m_listenOnly)
-    return true;
-
-  return m_node->AttachStream(this);
+  return OpalMediaStream::Open();
 }
 
 
@@ -1822,6 +1813,9 @@ bool OpalAudioStreamMixer::OnPush()
 
   for (StreamDict::iterator it = m_outputStreams.begin(); it != m_outputStreams.end(); ++it) {
     PSafePtr<OpalMixerMediaStream> stream = it->second;
+    if (stream == NULL)
+      continue;
+
     m_mutex.Wait(); // Signal() call for this mutex is inside PushOne()
 
     // Check for full participant, so can subtract their signal
@@ -1945,8 +1939,9 @@ bool OpalVideoStreamMixer::OnMixed(RTP_DataFrame * & output)
       }
 
       PStringStream keyPackets;
+      
       keyPackets << mediaFormat << ' ' << width << 'x' << height;
-
+      
       CachedPackets::iterator itPackets = cachedPackets.find(keyPackets);
       if (itPackets == cachedPackets.end()) {
         OpalTranscoder * transcoder = m_transcoders.GetAt(keyPackets);

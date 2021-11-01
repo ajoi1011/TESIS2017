@@ -193,12 +193,6 @@ OpalIVRConnection::~OpalIVRConnection()
 }
 
 
-PString OpalIVRConnection::GetLocalPartyURL() const
-{
-  return GetPrefixName() + ':' + m_vxmlScript.Left(m_vxmlScript.FindOneOf("\r\n"));
-}
-
-
 void OpalIVRConnection::OnStartMediaPatch(OpalMediaPatch & patch)
 {
   OpalLocalConnection::OnStartMediaPatch(patch);
@@ -244,6 +238,7 @@ void OpalIVRConnection::SetVXML(const PString & vxml)
   m_vxmlScript = vxml.Mid(prefixLength);
   if (m_vxmlScript.IsEmpty() || m_vxmlScript == "*")
     m_vxmlScript = endpoint.GetDefaultVXML();
+  m_localPartyURL = GetPrefixName() + ':' + PURL::TranslateString(m_vxmlScript.Left(m_vxmlScript.FindOneOf("\r\n")), PURL::LoginTranslation);
 
   m_stringOptions.Merge(ExtractOptionsFromVXML(m_vxmlScript), PStringOptions::e_MergeOverwrite);
 }
@@ -266,7 +261,19 @@ PBoolean OpalIVRConnection::StartVXML()
   m_vxmlSession.SetVar("session.connection.remote.uri", remoteURL);
   m_vxmlSession.SetVar("session.connection.remote.ip", remoteURL.GetHostName());
   m_vxmlSession.SetVar("session.connection.remote.port", remoteURL.GetPort());
-  m_vxmlSession.SetVar("session.time", PTime().AsString());
+
+  PSafePtr<OpalConnection> network = GetOtherPartyConnection();
+  if (network != NULL) {
+    PString redirect = network->GetRedirectingParty();
+    m_vxmlSession.SetVar("session.connection.redirect.uri", redirect);
+
+    if (!OpalIsE164(redirect)) {
+      redirect = PURL(redirect).GetUserName();
+      if (!OpalIsE164(redirect))
+        redirect.MakeEmpty();
+    }
+    m_vxmlSession.SetVar("session.connection.redirect.ani", redirect);
+  }
 
   return m_vxmlSession.Load(m_vxmlScript) || StartScript();
 }
@@ -385,7 +392,7 @@ OpalMediaStream * OpalIVRConnection::CreateMediaStream(const OpalMediaFormat & m
   if (mediaFormat.GetMediaType() == OpalMediaType::Audio())
     return new OpalIVRMediaStream(*this, mediaFormat, sessionID, isSource, m_vxmlSession);
 
-#if P_VXML_VIDEO
+#if OPAL_VIDEO && P_VXML_VIDEO
   if (mediaFormat.GetMediaType() == OpalMediaType::Video()) {
     if (isSource)
       return new OpalVideoMediaStream(*this, mediaFormat, sessionID, &m_vxmlSession.GetVideoSender(), NULL, false, false);

@@ -235,11 +235,18 @@ PSoundChannel * OpalPCSSEndPoint::CreateSoundChannel(const OpalPCSSConnection & 
   if (!isSource)
     return CreateSoundChannel(connection, mediaFormat, sessionID, isSource, connection.GetSoundChannelPlayDevice());
 
-  if (connection.GetCall().IsOnHold())
+  if (connection.GetCall().IsOnHold()) {
+    PTRACE(4, "Creating sound channel for on hold");
     return CreateSoundChannel(connection, mediaFormat, sessionID, isSource, connection.GetSoundChannelOnHoldDevice());
+  }
 
-  if (connection.GetPhase() < OpalConnection::AlertingPhase && !connection.GetSoundChannelOnRingDevice().IsEmpty())
-    return CreateSoundChannel(connection, mediaFormat, sessionID, isSource, connection.GetSoundChannelOnRingDevice());
+  if (!connection.GetSoundChannelOnRingDevice().IsEmpty() && connection.GetPhase() < OpalConnection::AlertingPhase) {
+    PSafePtr<OpalConnection> other = connection.GetOtherPartyConnection();
+    if (other != NULL && other->GetPhase() < OpalConnection::ConnectedPhase) {
+      PTRACE(4, "Creating sound channel for on ring");
+      return CreateSoundChannel(connection, mediaFormat, sessionID, isSource, connection.GetSoundChannelOnRingDevice());
+    }
+  }
 
   return CreateSoundChannel(connection, mediaFormat, sessionID, isSource, connection.GetSoundChannelRecordDevice());
 }
@@ -718,13 +725,13 @@ bool OpalPCSSConnection::GetAudioMute(bool source, bool & mute)
 }
 
 
-unsigned OpalPCSSConnection::GetAudioSignalLevel(PBoolean source)
+int OpalPCSSConnection::GetAudioLevelDB(bool source)
 {
   PSafePtr<OpalAudioMediaStream> stream = PSafePtrCast<OpalMediaStream, OpalAudioMediaStream>(GetMediaStream(OpalMediaType::Audio(), source));
   if (stream == NULL)
-    return UINT_MAX;
+    return INT_MAX;
 
-  return stream->GetAverageSignalLevel();
+  return stream->GetAudioLevelDB();
 }
 
 
