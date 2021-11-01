@@ -214,8 +214,8 @@ void PVideoFrameInfo::PrintOn(ostream & strm) const
 
 PBoolean PVideoFrameInfo::SetFrameSize(unsigned width, unsigned height)
 {
-  /*if (!PAssert(width >= 1 && height >= 1 && width < 65536 && height < 65536, PInvalidParameter))
-    return false;*/
+  if (!PAssert(width >= 1 && height >= 1 && width < 65536 && height < 65536, PInvalidParameter))
+    return false;
 
   m_frameWidth = width;
   m_frameHeight = height;
@@ -1967,9 +1967,11 @@ bool PVideoInputEmulatedDevice::InternalGetFrameData(BYTE * buffer, PINDEX & byt
 
       case Channel_PlayAndRepeat:
         m_frameNumber = 0;
-        if (!InternalReadFrameData(readBuffer)) {
+        // Reclaculate, in case derived class has altered these values
+        frameBytes = GetMaxFrameBytes();
+        readBuffer = m_converter != NULL ? m_frameStore.GetPointer(frameBytes) : buffer;
+        if (!InternalReadFrameData(readBuffer))
           return false;
-        }
         break;
 
       case Channel_PlayAndKeepLast:

@@ -1645,6 +1645,7 @@ PIPSocket::Address::Address()
 
 
 PIPSocket::Address::Address(const PString & dotNotation)
+  : m_version(0)
 {
   operator=(dotNotation);
 }
@@ -1805,8 +1806,9 @@ PIPSocket::Address & PIPSocket::Address::operator=(const PString & dotNotation)
 PString PIPSocket::Address::AsString(bool IPV6_PARAM(bracketIPv6),
                                      bool IPV6_PARAM(excludeScope)) const
 {
+  static const PConstString InvalidIP("<invalid-IP>");
   if (!IsValid())
-    return "<invalid-IP>";
+    return InvalidIP;
 
 #if defined(P_VXWORKS)
   char ipStorage[INET_ADDR_LEN];
@@ -1819,7 +1821,16 @@ PString PIPSocket::Address::AsString(bool IPV6_PARAM(bracketIPv6),
       return bracketIPv6 ? "[::]" : "::";
     char str[INET6_ADDRSTRLEN+3];
     PIPSocket::sockaddr_wrapper sa(*this, 0);
-    PAssertOS(getnameinfo(sa, sa.GetSize(), &str[bracketIPv6], INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST) == 0);
+    int error = getnameinfo(sa, sa.GetSize(), &str[bracketIPv6], INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST);
+    if (error != 0) {
+#if WIN32
+      error = PWIN32ErrorFlag|GetLastError();
+#else
+      error |= PGAIErrorFlag;
+#endif
+      PTRACE(2, "Error in getnameinfo: " << error << ' ' << GetErrorText(ProtocolFailure, error));
+      return InvalidIP;
+    }
     if (bracketIPv6) {
       str[0] = '[';
       int len = strlen(str);
@@ -1839,9 +1850,10 @@ PString PIPSocket::Address::AsString(bool IPV6_PARAM(bracketIPv6),
 #endif // P_HAS_IPV6
 # if defined(P_HAS_INET_NTOP)
   char str[INET_ADDRSTRLEN+1];
-  if (inet_ntop(AF_INET, (const void *)&m_v.m_four, str, INET_ADDRSTRLEN) == NULL)
-    return PString::Empty();
-  return str;
+  if (inet_ntop(AF_INET, (const void *)&m_v.m_four, str, INET_ADDRSTRLEN) != NULL)
+    return str;
+  PTRACE(2, "Error in inet_ntop: " << errno << ' ' << GetErrorText(ProtocolFailure, errno));
+  return InvalidIP;
 # else
   static PCriticalSection x;
   PWaitAndSignal m(x);
@@ -1853,82 +1865,93 @@ PString PIPSocket::Address::AsString(bool IPV6_PARAM(bracketIPv6),
 
 PBoolean PIPSocket::Address::FromString(const PString & str)
 {
-  m_version = 0;
-  memset(&m_v, 0, sizeof(m_v));
-  if (str.IsEmpty())
-    return false;
+  PString iface;
+  if (str[0] == '%')
+    iface = str.Mid(1);
+  else {
+    m_version = 0;
+    memset(&m_v, 0, sizeof(m_v));
+    if (str.IsEmpty())
+      return false;
 
 #if P_HAS_IPV6
-  m_scope6 = 0;
+    m_scope6 = 0;
 
-  struct addrinfo *res = NULL;
-  struct addrinfo hints = { AI_NUMERICHOST, PF_UNSPEC }; // Could be IPv4: x.x.x.x or IPv6: x:x:x:x::x
+    struct addrinfo *res = NULL;
+    struct addrinfo hints = { AI_NUMERICHOST, PF_UNSPEC }; // Could be IPv4: x.x.x.x or IPv6: x:x:x:x::x
 
-  // Find out if string is in brackets [], as in ipv6 address
-  PINDEX lbracket = str.Find('[');
-  PINDEX rbracket = str.Find(']', lbracket);
-  if (lbracket == P_MAX_INDEX || rbracket == P_MAX_INDEX)
-    getaddrinfo((const char *)str, NULL , &hints, &res);
-  else {
-    PString ip6 = str(lbracket+1, rbracket-1);
-    if (getaddrinfo((const char *)ip6, NULL , &hints, &res) != 0) {
-      PINDEX percent = ip6.Find('%');
-      if (percent > 0 && percent != P_MAX_INDEX) {
-        // If have a scope qualifier, remove it as it might be for the remote system
-        ip6.Delete(percent, P_MAX_INDEX);
-        getaddrinfo((const char *)ip6, NULL , &hints, &res);
+    // Find out if string is in brackets [], as in ipv6 address
+    PINDEX lbracket = str.Find('[');
+    PINDEX rbracket = str.Find(']', lbracket);
+    if (lbracket == P_MAX_INDEX || rbracket == P_MAX_INDEX)
+      getaddrinfo((const char *)str, NULL, &hints, &res);
+    else {
+      PString ip6 = str(lbracket+1, rbracket-1);
+      if (getaddrinfo((const char *)ip6, NULL, &hints, &res) != 0) {
+        PINDEX percent = ip6.Find('%');
+        if (percent > 0 && percent != P_MAX_INDEX) {
+          // If have a scope qualifier, remove it as it might be for the remote system
+          ip6.Delete(percent, P_MAX_INDEX);
+          getaddrinfo((const char *)ip6, NULL, &hints, &res);
+        }
       }
     }
-  }
 
-  if (res != NULL) {
-    if (res->ai_family == PF_INET6) {
-      // IPv6 addr
-      struct sockaddr_in6 * addr_in6 = (struct sockaddr_in6 *)res->ai_addr;
-      m_version = 6;
-      m_v.m_six = addr_in6->sin6_addr;
-      m_scope6  = addr_in6->sin6_scope_id;
-    }
-    else {
-      // IPv4 addr
-      struct sockaddr_in * addr_in = (struct sockaddr_in *)res->ai_addr;
-      m_version  = 4;
-      m_v.m_four = addr_in->sin_addr;
-    }
+    if (res != NULL) {
+      if (res->ai_family == PF_INET6) {
+        // IPv6 addr
+        struct sockaddr_in6 * addr_in6 = (struct sockaddr_in6 *)res->ai_addr;
+        m_version = 6;
+        m_v.m_six = addr_in6->sin6_addr;
+        m_scope6 = addr_in6->sin6_scope_id;
+      }
+      else {
+        // IPv4 addr
+        struct sockaddr_in * addr_in = (struct sockaddr_in *)res->ai_addr;
+        m_version = 4;
+        m_v.m_four = addr_in->sin_addr;
+      }
 
-    freeaddrinfo(res);
-    return true;
-  }
-
-  // Failed to parse, so check for IPv4 with %interface
-#endif // P_HAS_IPV6
-
-  PINDEX percent = str.FindSpan("0123456789.");
-  if (percent != P_MAX_INDEX && str[percent] != '%')
-    return false;
-
-  if (percent > 0) {
-    PString ip4 = str.Left(percent);
-    DWORD iaddr;
-    if ((iaddr = ::inet_addr((const char *)ip4)) != (DWORD)INADDR_NONE) {
-      m_version = 4;
-      m_v.m_four.s_addr = iaddr;
+      freeaddrinfo(res);
       return true;
     }
-  }
 
-  PString iface = str.Mid(percent+1);
-  if (iface.IsEmpty())
-    return false;
+    // Failed to parse, so check for IPv4 with %interface
+#endif // P_HAS_IPV6
+
+    PINDEX percent = str.FindSpan("0123456789.");
+    if (percent != P_MAX_INDEX && str[percent] != '%')
+      return false;
+
+    if (percent > 0) {
+      PString ip4 = str.Left(percent);
+      DWORD iaddr;
+      if ((iaddr = ::inet_addr((const char *)ip4)) != (DWORD)INADDR_NONE) {
+        m_version = 4;
+        m_v.m_four.s_addr = iaddr;
+        return true;
+      }
+    }
+
+    iface = str.Mid(percent+1);
+    if (iface.IsEmpty())
+      return false;
+  }
 
   PIPSocket::InterfaceTable interfaceTable;
   if (!PIPSocket::GetInterfaceTable(interfaceTable))
     return false;
 
+  unsigned interfaceVersion = GetVersion();
+  if (interfaceVersion == 0)
+    interfaceVersion = 4;
   for (PINDEX i = 0; i < interfaceTable.GetSize(); i++) {
     if (interfaceTable[i].GetName().NumCompare(iface) == EqualTo) {
-      *this = interfaceTable[i].GetAddress();
-      return true;
+      Address possibleAddress = interfaceTable[i].GetAddress();
+      if (interfaceVersion == possibleAddress.GetVersion()) {
+        *this = possibleAddress;
+        return true;
+      }
     }
   }
 
@@ -2086,7 +2109,7 @@ bool PIPSocket::Address::IsSubNet(const Address & network, const Address & mask)
 }
 
 
-bool PIPSocket::Address::IsRFC1918() const
+bool PIPSocket::Address::IsPrivate() const
 {
   PINDEX offset = 0;
 #if P_HAS_IPV6
@@ -2103,19 +2126,11 @@ bool PIPSocket::Address::IsRFC1918() const
 
   BYTE b1 = (*this)[offset];
   BYTE b2 = (*this)[offset+1];
-  return (b1 == 10)
-          ||
-          (
-            (b1 == 172)
-            &&
-            (b2 >= 16) && (b2 <= 31)
-          )
-          ||
-          (
-            (b1 == 192) 
-            &&
-            (b2 == 168)
-          );
+  return  ((b1 == 10)                      ) || // RFC1918
+          ((b1 == 100) && ((b2&0xc0) == 64)) || // RFC6598
+          ((b1 == 169) && (b2 == 254)      ) || // RFC3927
+          ((b1 == 172) && ((b2&0xf0) == 16)) || // RFC1918
+          ((b1 == 192) && (b2 == 168)      ) ;  // RFC1918
 }
 
 
@@ -2232,7 +2247,7 @@ PIPSocket::Address PIPSocket::GetNetworkInterface(unsigned version)
   if (PIPSocket::GetInterfaceTable(interfaceTable)) {
     for (PINDEX i = 0; i < interfaceTable.GetSize(); ++i) {
       PIPSocket::Address localAddr = interfaceTable[i].GetAddress();
-      if (localAddr.GetVersion() == version && !localAddr.IsLoopback() && !localAddr.IsRFC1918())
+      if (localAddr.GetVersion() == version && !localAddr.IsLoopback() && !localAddr.IsPrivate())
         return localAddr;
     }
   }

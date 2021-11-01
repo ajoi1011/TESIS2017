@@ -39,10 +39,14 @@ extern "C" int vsprintf(char *, const char *, va_list);
 #endif
 
 #if P_REGEX
-#include <regex.h>
+  #include <regex.h>
 #else
-#include "regex/regex.h"
+  #include "regex/regex.h"
 #endif
+
+#if P_HAS_ICONV
+  #include <iconv.h>
+#endif // P_HAS_ICONV
 
 
 #if !P_USE_INLINES
@@ -740,30 +744,26 @@ PString::PString(const char * cstr)
 
 #ifdef P_HAS_WCHAR
 
-PString::PString(const wchar_t * ustr)
+PString::PString(const wchar_t * wstr)
 {
-  if (ustr == NULL)
+  if (wstr == NULL)
     MakeEmpty();
-  else {
-    PINDEX len = 0;
-    while (ustr[len] != 0)
-      len++;
-    InternalFromUCS2(ustr, len);
-  }
+  else
+    InternalFromWChar(wstr, wcslen(wstr));
 }
 
-PString::PString(const wchar_t * ustr, PINDEX len)
+PString::PString(const wchar_t * wstr, PINDEX len)
 {
-  InternalFromUCS2(ustr, len);
+  InternalFromWChar(wstr, len);
 }
 
 
-PString::PString(const PWCharArray & ustr)
+PString::PString(const PWCharArray & wstr)
 {
-  PINDEX size = ustr.GetSize();
-  if (size > 0 && ustr[size-1] == 0) // Stip off trailing NULL if present
+  PINDEX size = wstr.GetSize();
+  if (size > 0 && wstr[size-1] == 0) // Stip off trailing NULL if present
     size--;
-  InternalFromUCS2(ustr, size);
+  InternalFromWChar(wstr, size);
 }
 
 #endif // P_HAS_WCHAR
@@ -1490,6 +1490,18 @@ PString PString::Mid(PINDEX start, PINDEX len) const
     return operator()(start, start+len-1);
 }
 
+PString PString::Ellipsis(PINDEX maxLength, PINDEX fromEnd) const
+{
+  if (GetLength() <= maxLength)
+    return *this;
+
+  maxLength -= 3;
+  if (fromEnd > maxLength)
+    fromEnd = maxLength;
+
+  return Left(maxLength-fromEnd) + "..." + Right(fromEnd);
+}
+
 
 bool PString::operator*=(const char * cstr) const
 {
@@ -1535,22 +1547,6 @@ PObject::Comparison PString::NumCompare(const char * cstr, PINDEX count, PINDEX 
 }
 
 
-PObject::Comparison PString::InternalCompare(PINDEX offset, char c) const
-{
-#if PINDEX_SIGNED
-  if (offset < 0)
-    return LessThan;
-#endif
-
-  const int ch = theArray[offset] & 0xff;
-  if (ch < (c & 0xff))
-    return LessThan;
-  if (ch > (c & 0xff))
-    return GreaterThan;
-  return EqualTo;
-}
-
-
 PObject::Comparison PString::InternalCompare(PINDEX offset, PINDEX length, const char * cstr) const
 {
 #if PINDEX_SIGNED
@@ -1561,22 +1557,21 @@ PObject::Comparison PString::InternalCompare(PINDEX offset, PINDEX length, const
   if (offset == 0 && theArray == cstr)
     return EqualTo;
 
-  if (cstr == NULL)
-    return IsEmpty() ? EqualTo : LessThan;
+  const char * s1 = theArray+offset;
+  const char * s2 = cstr != NULL ? cstr : "";
+  return Compare2(length != P_MAX_INDEX ? internal_strncmp(s1, s2, length) : internal_strcmp(s1, s2), 0);
+}
 
-  int retval;
-  if (length == P_MAX_INDEX)
-    retval = strcmp(theArray+offset, cstr);
-  else
-    retval = strncmp(theArray+offset, cstr, length);
 
-  if (retval < 0)
-    return LessThan;
+int PString::internal_strcmp(const char * s1, const char *s2) const
+{
+  return strcmp(s1, s2);
+}
 
-  if (retval > 0)
-    return GreaterThan;
 
-  return EqualTo;
+int PString::internal_strncmp(const char * s1, const char *s2, size_t n) const
+{
+  return strncmp(s1, s2, n);
 }
 
 
@@ -1589,7 +1584,7 @@ PINDEX PString::Find(char ch, PINDEX offset) const
 
   PINDEX len = GetLength();
   while (offset < len) {
-    if (InternalCompare(offset, ch) == EqualTo)
+    if (InternalCompare(offset, 1, &ch) == EqualTo)
       return offset;
     offset++;
   }
@@ -1658,7 +1653,7 @@ PINDEX PString::FindLast(char ch, PINDEX offset) const
   if (offset >= len)
     offset = len-1;
 
-  while (InternalCompare(offset, ch) != EqualTo) {
+  while (InternalCompare(offset, 1, &ch) != EqualTo) {
     if (offset == 0)
       return P_MAX_INDEX;
     offset--;
@@ -1720,7 +1715,7 @@ PINDEX PString::FindOneOf(const char * cset, PINDEX offset) const
   while (offset < len) {
     const char * p = cset;
     while (*p != '\0') {
-      if (InternalCompare(offset, *p) == EqualTo)
+      if (InternalCompare(offset, 1, p) == EqualTo)
         return offset;
       p++;
     }
@@ -1743,7 +1738,7 @@ PINDEX PString::FindSpan(const char * cset, PINDEX offset) const
   PINDEX len = GetLength();
   while (offset < len) {
     const char * p = cset;
-    while (InternalCompare(offset, *p) != EqualTo) {
+    while (InternalCompare(offset, 1, p) != EqualTo) {
       if (*++p == '\0')
         return offset;
     }
@@ -2084,63 +2079,124 @@ double PString::AsReal() const
 }
 
 
-#ifdef P_HAS_WCHAR
+#if P_HAS_WCHAR
 
-PWCharArray PString::AsUCS2() const
+#if P_HAS_ICONV
+  namespace {
+    struct PCharsetConverter : PObject
+    {
+      iconv_t m_cd;
+      char  * m_inPtr;
+      size_t  m_inLen;
+      char  * m_outPtr;
+      size_t  m_outLen;
+
+      PCharsetConverter(
+        const char * from,
+        const char * to,
+        const void * inPtr,
+        size_t inLen,
+        void * outPtr,
+        size_t outLen
+      )
+        : m_inPtr((char *)inPtr)
+        , m_inLen(inLen)
+        , m_outPtr((char *)outPtr)
+        , m_outLen(outLen)
+      {
+        m_cd = iconv_open(to, from);
+        PAssert(m_cd != (iconv_t)-1, PInvalidParameter);
+      }
+
+      ~PCharsetConverter()
+      {
+        if (m_cd != (iconv_t)-1)
+          iconv_close(m_cd);
+      }
+
+      int Convert()
+      {
+        return iconv(m_cd, &m_inPtr, &m_inLen, &m_outPtr, &m_outLen) != (size_t)-1 ? 0 : errno;
+      }
+
+      void EmitOutput(const void * data, size_t len)
+      {
+        if (len <= m_outLen) {
+          memcpy(m_outPtr, data, len);
+          m_outPtr += len;
+          m_outLen -= len;
+        }
+      }
+    };
+  };
+#endif // P_HAS_ICONV
+
+
+PWCharArray PString::AsWide() const
 {
-  PWCharArray ucs2(1); // Null terminated empty string
+  PWCharArray wide(1); // Null terminated empty string
 
   if (IsEmpty())
-    return ucs2;
+    return wide;
 
-#ifdef P_HAS_G_CONVERT
+#if P_HAS_ICONV
 
-  gsize g_len = 0;
-  gchar * g_ucs2 = g_convert(theArray, GetSize()-1, "UCS-2", "UTF-8", 0, &g_len, 0);
-  if (g_ucs2 != NULL) {
-    if (ucs2.SetSize(g_len+1))
-      memcpy(ucs2.GetPointer(), g_ucs2, g_len*2);
-    g_free(g_ucs2);
-    return ucs2;
+  if (!PAssert(wide.SetSize(GetLength()), POutOfMemory))
+    return wide;
+
+  static const wchar_t BadChar = 0xFFFD;
+  PCharsetConverter cvt("UTF-8", "WCHAR_T", GetPointer(), GetLength(), wide.GetPointer(), wide.GetSize()*sizeof(wchar_t));
+  for (;;) {
+    int err = cvt.Convert();
+    switch (err) {
+      case EILSEQ :
+        do {
+          ++cvt.m_inPtr;
+          --cvt.m_inLen;
+        } while (cvt.m_inLen > 0 && (*cvt.m_inPtr & 0xc0) == 0x80);
+        cvt.EmitOutput(&BadChar, sizeof(BadChar));
+        break;
+
+      case EINVAL :
+        cvt.EmitOutput(&BadChar, sizeof(BadChar));
+        // Do next case
+
+      case 0 :
+        wide.SetSize(wide.GetSize() - cvt.m_outLen/sizeof(wchar_t) + 1);
+        return wide;
+
+      default :
+        PAssertAlways(PSTRSTRM("Could not convert UTF-8 to wchar_t string: error=" << err << " - " << strerror(err)));
+        return PWCharArray(1);
+    }
   }
-
-  PTRACE(1, "PTLib\tg_convert failed with error " << errno);
 
 #elif defined(_WIN32)
 
-  // Note that MB_ERR_INVALID_CHARS is the only dwFlags value supported by Code page 65001 (UTF-8). Windows XP and later.
-  PINDEX len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, theArray, GetLength(), NULL, 0);
-  if (len > 0 && ucs2.SetSize(len+1)) { // Allow for trailing NULL
-    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, theArray, GetLength(), ucs2.GetPointer(), ucs2.GetSize());
-    return ucs2;
-  }
+  PINDEX len = MultiByteToWideChar(CP_UTF8, 0, theArray, GetLength(), NULL, 0);
+  if (PAssert(len > 0, PSTRSTRM("MultiByteToWideChar failed with error " << ::GetLastError())) &&
+      PAssert(wide.SetSize(len+1), POutOfMemory))
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, theArray, GetLength(), wide.GetPointer(), wide.GetSize());
 
-#if PTRACING
-  if (GetLastError() == ERROR_NO_UNICODE_TRANSLATION)
-    PTRACE(1, "PTLib\tMultiByteToWideChar failed on non legal UTF-8 \"" << theArray << '"');
-  else
-    PTRACE(1, "PTLib\tMultiByteToWideChar failed with error " << ::GetLastError());
-#endif
+#else // _WIN32 || _POSIX_VERSION
 
-#endif
-
-  if (ucs2.SetSize(GetSize())) { // Will be at least this big
+  if (PAssert(wide.SetSize(GetSize()), POutOfMemory)) { // Will be at least this big
     PINDEX count = 0;
     PINDEX i = 0;
     PINDEX length = GetLength()+1; // Include the trailing '\0'
     while (i < length) {
       int c = theArray[i];
       if ((c&0x80) == 0)
-        ucs2[count++] = (BYTE)theArray[i++];
+        wide[count++] = (BYTE)theArray[i++];
       else if ((c&0xe0) == 0xc0) {
         if (i < length-1)
-          ucs2[count++] = (WORD)(((theArray[i  ]&0x1f)<<6)|
+          wide[count++] = (WORD)(((theArray[i  ]&0x1f)<<6)|
                                   (theArray[i+1]&0x3f));
         i += 2;
       }
       else if ((c&0xf0) == 0xe0) {
         if (i < length-2)
-          ucs2[count++] = (WORD)(((theArray[i  ]&0x0f)<<12)|
+          wide[count++] = (WORD)(((theArray[i  ]&0x0f)<<12)|
                                  ((theArray[i+1]&0x3f)<< 6)|
                                   (theArray[i+2]&0x3f));
         i += 3;
@@ -2153,77 +2209,132 @@ PWCharArray PString::AsUCS2() const
         else
           i += 6;
         if (i <= length)
-          ucs2[count++] = 0xffff;
+          wide[count++] = 0xfffd;
       }
     }
 
-    ucs2.SetSize(count);  // Final size
+    wide.SetSize(count+1);  // Final size
   }
+#endif // _WIN32 || _POSIX_VERSION
 
-  return ucs2;
+  return wide;
 }
 
 
-void PString::InternalFromUCS2(const wchar_t * ptr, PINDEX len)
+void PString::InternalFromWChar(const wchar_t * wstr, PINDEX len)
 {
-  if (ptr == NULL || len <= 0) {
+  if (wstr == NULL || len <= 0) {
     MakeEmpty();
     return;
   }
 
-#ifdef P_HAS_G_CONVERT
+#if P_HAS_ICONV
 
-  gsize g_len = 0;
-  gchar * g_utf8 = g_convert(ptr, len, "UTF-8", "UCS-2", 0, &g_len, 0);
-  if (g_utf8 == NULL) {
+  if (!PAssert(SetSize(len*6+1), POutOfMemory)) {
     MakeEmpty();
     return;
   }
 
-  m_length = g_len;
-  if (SetSize(m_length+1))
-    memcpy(theArray, g_char, g_len);
-  g_free(g_utf8);
+  static const char BadChar[] = { '\xef', '\xbf', '\xbd' }; // 0xFFFD
+  PCharsetConverter cvt("WCHAR_T", "UTF-8", wstr, len*sizeof(wchar_t), theArray, GetSize());
+  for (;;) {
+    int err = cvt.Convert();
+    switch (err) {
+      case EILSEQ :
+        cvt.m_inPtr += sizeof(wchar_t);
+        cvt.m_inLen -= sizeof(wchar_t);
+        cvt.EmitOutput(BadChar, sizeof(BadChar));
+        break;
 
-#elif defined(_WIN32)
+      case EINVAL :
+        cvt.EmitOutput(BadChar, sizeof(BadChar));
+        // Do next case
 
-  m_length = WideCharToMultiByte(CP_UTF8, 0, ptr, len, NULL, 0, NULL, NULL);
-  if (SetSize(m_length+1))
-    WideCharToMultiByte(CP_UTF8, 0, ptr, len, theArray, GetSize(), NULL, NULL);
+      case 0 :
+        m_length = GetSize() - cvt.m_outLen;
+        SetSize(m_length+1);
+        return;
 
-#else
-
-  PINDEX i;
-  PINDEX count = 0;
-  for (i = 0; i < len; i++) {
-    if (ptr[i] < 0x80)
-      count++;
-    else if (ptr[i] < 0x800)
-      count += 2;
-    else
-      count += 3;
-  }
-
-  m_length = count;
-  if (SetSize(m_length+1)) {
-    count = 0;
-    for (i = 0; i < len; i++) {
-      unsigned v = *ptr++;
-      if (v < 0x80)
-        theArray[count++] = (char)v;
-      else if (v < 0x800) {
-        theArray[count++] = (char)(0xc0+(v>>6));
-        theArray[count++] = (char)(0x80+(v&0x3f));
-      }
-      else {
-        theArray[count++] = (char)(0xe0+(v>>12));
-        theArray[count++] = (char)(0x80+((v>>6)&0x3f));
-        theArray[count++] = (char)(0x80+(v&0x3f));
-      }
+      default :
+        PAssertAlways(PSTRSTRM("Could not convert wchar_t string to UTF-8: error=" << err << " - " << strerror(err)));
+        MakeEmpty();
+        return;
     }
   }
 
-#endif
+#elif defined(_WIN32)
+
+  int outLen = WideCharToMultiByte(CP_UTF8, 0, wstr, len, NULL, 0, NULL, NULL);
+  if (PAssert(outLen > 0, PSTRSTRM("Could not convert wchar_t to UTF-8: errno=" << ::GetLastError())) &&
+      PAssert(SetSize((PINDEX)outLen + 1), POutOfMemory))
+    WideCharToMultiByte(CP_UTF8, 0, wstr, len, GetPointerAndSetLength(outLen), GetSize(), NULL, NULL);
+
+#else // _WIN32 || _POSIX_VERSION
+
+  PINDEX i;
+  m_length = 0;
+  const wchar_t * ptr;
+  for (ptr = wstr, i = 0; i < len; i++) {
+    unsigned v = *ptr++;
+    if (v < 0x80)
+      m_length++;
+    else if (v < 0x800)
+      m_length += 2;
+    else if (v < 0x10000)
+      m_length += 3;
+    else if (v < 0x200000)
+      m_length += 4;
+    else if (v < 0x4000000)
+      m_length += 5;
+    else if (v < 0x80000000)
+      m_length += 6;
+  }
+
+  if (!PAssert(SetSize(m_length+1), POutOfMemory)) {
+    MakeEmpty();
+    return;
+  }
+
+  char * out = theArray;
+  for (ptr = wstr, i = 0; i < len; i++) {
+    unsigned v = *ptr++;
+    if (v > 0 && v < 0x80) // Allow for an embedded zero
+      *out++ = (char)v;
+    else if (v < 0x800) {
+      *out++ = (char)(0xc0|(v>>6  ));
+      *out++ = (char)(0x80|(v&0x3f));
+    }
+    else if (v < 0x10000) {
+      *out++ = (char)(0xe0|( v>>12     ));
+      *out++ = (char)(0x80|((v>>6)&0x3f));
+      *out++ = (char)(0x80|( v    &0x3f));
+    }
+    else if (v < 0x200000) {
+      *out++ = (char)(0xf0|( v>>18      ));
+      *out++ = (char)(0x80|((v>>12)&0x3f));
+      *out++ = (char)(0x80|((v>> 6)&0x3f));
+      *out++ = (char)(0x80|( v     &0x3f));
+    }
+    else if (v < 0x4000000) {
+      *out++ = (char)(0xf8|( v>>24      ));
+      *out++ = (char)(0x80|((v>>18)&0x3f));
+      *out++ = (char)(0x80|((v>>12)&0x3f));
+      *out++ = (char)(0x80|((v>> 6)&0x3f));
+      *out++ = (char)(0x80|( v     &0x3f));
+    }
+    else if (v < 0x80000000) {
+      *out++ = (char)(0xfc+( v>>30)      );
+      *out++ = (char)(0x80+((v>>24)&0x3f));
+      *out++ = (char)(0x80+((v>>18)&0x3f));
+      *out++ = (char)(0x80+((v>>12)&0x3f));
+      *out++ = (char)(0x80+((v>> 6)&0x3f));
+      *out++ = (char)(0x80+( v     &0x3f));
+    }
+    // Ignore
+  }
+
+  *out = '\0';
+#endif // _WIN32 || _POSIX_VERSION
 }
 
 #endif // P_HAS_WCHAR
@@ -2362,42 +2473,16 @@ PObject * PCaselessString::Clone() const
 }
 
 
-PObject::Comparison PCaselessString::InternalCompare(PINDEX offset, char c) const
+int PCaselessString::internal_strcmp(const char * s1, const char *s2) const
 {
-#if PINDEX_SIGNED
-  if (offset < 0)
-    return LessThan;
-#endif
-
-  int c1 = toupper(theArray[offset] & 0xff);
-  int c2 = toupper(c & 0xff);
-  if (c1 < c2)
-    return LessThan;
-  if (c1 > c2)
-    return GreaterThan;
-  return EqualTo;
+  return strcasecmp(s1, s2);
 }
 
 
-PObject::Comparison PCaselessString::InternalCompare(
-                         PINDEX offset, PINDEX length, const char * cstr) const
+int PCaselessString::internal_strncmp(const char * s1, const char *s2, size_t n) const
 {
-#if PINDEX_SIGNED
-  if (offset < 0 || length < 0)
-    return LessThan;
-#endif
-
-  if (cstr == NULL)
-    return IsEmpty() ? EqualTo : LessThan;
-
-  while (length-- > 0 && (theArray[offset] != '\0' || *cstr != '\0')) {
-    Comparison c = PCaselessString::InternalCompare(offset++, *cstr++);
-    if (c != EqualTo)
-      return c;
-  }
-  return EqualTo;
+  return strncasecmp(s1, s2, n);
 }
-
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -3222,7 +3307,7 @@ PRegularExpression::PRegularExpression(const PString & pattern, CompileOptions o
   , m_compileOptions(options)
   , m_compiledRegex(NULL)
 {
-  PAssert(InternalCompile(), "Regular expression compile failed: " + GetErrorText());
+  InternalCompile(true);
 }
 
 
@@ -3231,7 +3316,7 @@ PRegularExpression::PRegularExpression(const char * pattern, CompileOptions opti
   , m_compileOptions(options)
   , m_compiledRegex(NULL)
 {
-  PAssert(InternalCompile(), "Regular expression compile failed: " + GetErrorText());
+  InternalCompile(true);
 }
 
 
@@ -3240,10 +3325,7 @@ PRegularExpression::PRegularExpression(const PRegularExpression & from)
   , m_compileOptions(from.m_compileOptions)
   , m_compiledRegex(NULL)
 {
-  if (m_pattern.IsEmpty())
-    m_lastError = NotCompiled;
-  else
-    PAssert(InternalCompile(), "Regular expression compile failed: " + GetErrorText());
+  InternalCompile(true);
 }
 
 
@@ -3252,7 +3334,7 @@ PRegularExpression & PRegularExpression::operator=(const PRegularExpression & fr
   if (&from != this) {
     m_pattern = from.m_pattern;
     m_compileOptions = from.m_compileOptions;
-    PAssert(InternalCompile(), "Regular expression compile failed: " + GetErrorText());
+    InternalCompile(true);
   }
 
   return *this;
@@ -3293,7 +3375,7 @@ bool PRegularExpression::Compile(const PString & pattern, CompileOptions options
 {
   m_pattern = pattern;
   m_compileOptions = options;
-  return InternalCompile();
+  return InternalCompile(false);
 }
 
 
@@ -3301,16 +3383,16 @@ bool PRegularExpression::Compile(const char * pattern, CompileOptions options)
 {
   m_pattern = pattern;
   m_compileOptions = options;
-  return InternalCompile();
+  return InternalCompile(false);
 }
 
 
-bool PRegularExpression::InternalCompile()
+bool PRegularExpression::InternalCompile(bool assertOnFail)
 {
   InternalClean();
 
   if (m_pattern.IsEmpty()) {
-    m_lastError = BadPattern;
+    m_lastError = assertOnFail ? NotCompiled : BadPattern;
     return false;
   }
 
@@ -3320,6 +3402,10 @@ bool PRegularExpression::InternalCompile()
     return true;
 
   InternalClean();
+
+  if (assertOnFail)
+    PAssertAlways(PSTRSTRM("Regular expression " << m_pattern.ToLiteral() << " failed to compile: " << GetErrorText()));
+
   return false;
 }
 

@@ -234,19 +234,41 @@ PTHREAD_MUTEX_RECURSIVE_NP
   void Unlock()    { mutex->Signal(); }
 #endif
   
-  struct ThreadLocalInfo {
-    ThreadLocalInfo()
-      : m_traceLevel(1)
-      , m_traceBlockIndentLevel(0)
-      , m_prefixLength(0)
-    { }
+  struct Context : PObject
+  {
+    Context(unsigned level, const char * fileName, int lineNum, const PObject * instance, const char * module)
+      : m_level(level)
+      , m_fileName(fileName)
+      , m_lineNum(lineNum)
+      , m_objectAddress(instance)
+      , m_objectClass(instance ? instance->GetClass() : "")
+      , m_threadAddress(PThread::Current())
+      , m_threadName(m_threadAddress ? m_threadAddress->GetThreadName() : "")
+      , m_contextIdentifier(instance ? instance->GetTraceContextIdentifier() : 0)
+      , m_module(module)
+      , m_tick(PTimer::Tick())
+      , m_blockIndentLevel(0)
+    {
+      if (m_contextIdentifier == 0 && m_threadAddress != NULL)
+        m_contextIdentifier = m_threadAddress->GetTraceContextIdentifier();
+    }
 
-    PStack<PStringStream> m_traceStreams;
-    unsigned              m_traceLevel;
-    unsigned              m_traceBlockIndentLevel;
-    PINDEX                m_prefixLength;
+    unsigned      m_level;
+    PFilePath     m_fileName;
+    int           m_lineNum;
+    void  const * m_objectAddress;
+    PString       m_objectClass;
+    PThread     * m_threadAddress;
+    PString       m_threadName;
+    unsigned      m_contextIdentifier;
+    PString       m_module;
+    PTime         m_dateTime;
+    PTimeInterval m_tick;
+    unsigned      m_blockIndentLevel;
+    PStringStream m_stream;
   };
-  PThreadLocalStorage<ThreadLocalInfo> m_threadStorage;
+  typedef PStack<Context> ContextStack;
+  PThreadLocalStorage<ContextStack> m_threadStorage;
 
   PTraceInfo()
     : m_currentLevel(0)
@@ -446,7 +468,7 @@ PTHREAD_MUTEX_RECURSIVE_NP
     }
 
     if (outputFirstLog) {
-      ostream & log = InternalBegin(false, 0, NULL, 0, NULL, NULL) << '\t';
+      ostream & log = *GetStream();
 
       if (PProcess::IsInitialised()) {
         PProcess & process = PProcess::Current();
@@ -482,12 +504,13 @@ PTHREAD_MUTEX_RECURSIVE_NP
         PFilePath fn(m_filename);
         log << " to \"" << fn.GetDirectory() << fn.GetTitle() << m_rolloverPattern << fn.GetType();
       }
-      log << '"' << endl;
+      log << '"';
+      InternalEnd(log);
     }
   }
 
   void InternalInitialise(unsigned level, const char * filename, const char * rolloverPattern, unsigned options);
-  std::ostream & InternalBegin(bool topLevel, unsigned level, const char * fileName, int lineNum, const PObject * instance, const char * module);
+  std::ostream & InternalBegin(unsigned level, const char * fileName, int lineNum, const PObject * instance, const char * module);
   std::ostream & InternalEnd(std::ostream & stream);
 };
 
@@ -652,6 +675,8 @@ void PTrace::Initialise(const PArgList & args,
         operation(options, ContextIdentifier);
       else if (optStr.NumCompare("single", P_MAX_INDEX, pos) == PObject::EqualTo)
         operation(options, SingleLine);
+      else if (optStr.NumCompare("json", P_MAX_INDEX, pos) == PObject::EqualTo)
+        operation(options, OutputJSON);
       else if (optStr.NumCompare("gmt", P_MAX_INDEX, pos) == PObject::EqualTo)
         operation(options, GMTTime);
       else if (optStr.NumCompare("daily", P_MAX_INDEX, pos) == PObject::EqualTo)
@@ -803,134 +828,35 @@ PBoolean PTrace::CanTrace(unsigned level)
 
 ostream & PTrace::Begin(unsigned level, const char * fileName, int lineNum, const PObject * instance, const char * module)
 {
-  return PTraceInfo::Instance().InternalBegin(true, level, fileName, lineNum, instance, module);
+  return PTraceInfo::Instance().InternalBegin(level, fileName, lineNum, instance, module);
 }
 
 
-ostream & PTraceInfo::InternalBegin(bool topLevel, unsigned level, const char * fileName, int lineNum, const PObject * instance, const char * module)
+ostream & PTraceInfo::InternalBegin(unsigned level, const char * fileName, int lineNum, const PObject * instance, const char * module)
 {
-  PThread * thread = NULL;
-  PTraceInfo::ThreadLocalInfo * threadInfo = NULL;
-  ostream * streamPtr = NULL;
+  if (!PProcess::IsInitialised())
+    return *GetStream();
 
-  if (topLevel) {
-    if (PProcess::IsInitialised()) {
-      thread = PThread::Current();
+  ContextStack * contexts = m_threadStorage.Get();
+  if (contexts == NULL)
+    return *GetStream();
 
-      threadInfo = m_threadStorage.Get();
-      if (threadInfo != NULL) {
-        PStringStream * stringStreamPtr = new PStringStream;
-        threadInfo->m_traceStreams.Push(stringStreamPtr);
-        streamPtr = stringStreamPtr;
-      }
-    }
+  Context * context = new Context(level, fileName, lineNum, instance, module);
+  contexts->Push(context);
 
-    Lock();
+  Lock();
 
-    if (!m_filename.IsEmpty() && HasOption(RotateLogMask)) {
-      unsigned rotateVal = GetRotateVal(m_options);
-      if (rotateVal != m_lastRotate || GetStream() == &cerr) {
-        m_lastRotate = rotateVal;
-        OpenTraceFile(m_filename, true);
-      }
+  if (!m_filename.IsEmpty() && HasOption(RotateLogMask)) {
+    unsigned rotateVal = GetRotateVal(m_options);
+    if (rotateVal != m_lastRotate || GetStream() == &cerr) {
+      m_lastRotate = rotateVal;
+      OpenTraceFile(m_filename, true);
     }
   }
 
-  ostream & stream = *(streamPtr ? streamPtr : m_stream);
+  Unlock();
 
-  // Before we do new trace, make sure we clear any errors on the stream
-  stream.clear();
-
-  if (!HasOption(SystemLogStream)) {
-    if (HasOption(DateAndTime)) {
-      PTime now;
-      stream << now.AsString(PTime::LoggingFormat, HasOption(GMTTime) ? PTime::GMT : PTime::Local) << '\t';
-    }
-
-    if (HasOption(Timestamp))
-      stream << setprecision(3) << setw(10) << (PTimer::Tick()-m_startTick) << '\t';
-  }
-
-  if (HasOption(TraceLevel))
-    stream << level << '\t';
-
-  if (HasOption(Thread)) {
-    PString name = thread != NULL ? thread->GetThreadName() : PThread::GetCurrentThreadName();
-#if P_64BIT && !defined(WIN32) && !defined(P_UNIQUE_THREAD_ID_FMT)
-    static const PINDEX ThreadNameWidth = 31;
-#else
-    static const PINDEX ThreadNameWidth = 23;
-#endif
-    if (name.GetLength() <= ThreadNameWidth)
-      stream << setw(ThreadNameWidth) << name;
-    else
-      stream << name.Left(10) << "..." << name.Right(ThreadNameWidth-13);
-    stream << '\t';
-  }
-
-  if (HasOption(ThreadAddress))
-    stream << hex << setfill('0') << setw(7) << (void *)thread << dec << setfill(' ') << '\t';
-
-  if (HasOption(FileAndLine)) {
-    const char * file;
-    if (fileName == NULL)
-      file = "-";
-    else {
-      file = strrchr(fileName, '/');
-      if (file != NULL)
-        file++;
-      else {
-        file = strrchr(fileName, '\\');
-        if (file != NULL)
-          file++;
-        else
-          file = fileName;
-      }
-    }
-    static unsigned const FileWidth = 16;
-    char buffer[FileWidth + 1];
-    buffer[FileWidth] = '\0';
-    stream << setw(FileWidth) << strncpy(buffer, file, FileWidth);
-
-    if (lineNum > 0)
-      stream << '(' << lineNum << ')';
-
-    stream << '\t';
-  }
-
-  if (HasOption(ObjectInstance)) {
-    if (instance != NULL)
-      stream << instance->GetClass() << ':' << instance;
-    stream << '\t';
-  }
-
-#if PTRACING==2
-  if (HasOption(ContextIdentifier)) {
-    unsigned id = instance != NULL ? instance->GetTraceContextIdentifier() : 0;
-    if (id == 0 && thread != NULL)
-      id = thread->GetTraceContextIdentifier();
-    if (id != 0)
-      stream << setfill('0') << setw(13) << id << setfill(' ');
-    else
-      stream << "- - - - - - -";
-    stream << '\t';
-  }
-#endif
-
-  if (module != NULL)
-    stream << left << setw(8) << module << right << '\t';
-
-  // Save log level for this message so End() function can use. This is
-  // protected by the PTraceMutex or is thread local
-  if (threadInfo == NULL)
-    m_currentLevel = level;
-  else {
-    threadInfo->m_traceLevel = level;
-    threadInfo->m_prefixLength = threadInfo->m_traceStreams.Top().GetLength();
-    Unlock();
-  }
-
-  return stream;
+  return context->m_stream;
 }
 
 
@@ -942,70 +868,138 @@ ostream & PTrace::End(ostream & paramStream)
 
 ostream & PTraceInfo::InternalEnd(ostream & paramStream)
 {
-  PTraceInfo::ThreadLocalInfo * threadInfo = PProcess::IsInitialised() ? m_threadStorage.Get() : NULL;
+  if (!PProcess::IsInitialised())
+    return paramStream;
 
-  int currentLevel;
+  Context * context = PTraceInfo::Instance().m_threadStorage.Get()->Pop();
+  if (context == NULL || &context->m_stream != &paramStream)
+    return paramStream;
 
-  if (threadInfo != NULL && !threadInfo->m_traceStreams.IsEmpty()) {
-    PStringStream * stackStream = threadInfo->m_traceStreams.Pop();
-    if (!PAssert(&paramStream == stackStream, PLogicError))
-      return paramStream;
+  paramStream << ends << flush;
 
-    *stackStream << ends << flush;
 
-    PINDEX tab = stackStream->Find('\t', threadInfo->m_prefixLength);
-    if (tab != P_MAX_INDEX) {
-      PINDEX len = tab - threadInfo->m_prefixLength;
-      if (len < 8)
-        stackStream->Splice("      ", tab, 0);
-    }
+  PStringStream output;
 
-    if (HasOption(SingleLine)) {
-        stackStream->Replace("\\", "\\\\", true);
-        stackStream->Replace("\r", "\\r", true);
-        stackStream->Replace("\n", "\\n", true);
-    }
+  bool outputJSON = HasOption(OutputJSON);
+  if (outputJSON)
+    output << '{';
 
-    if (stackStream->GetLength() > m_maxLength)
-      stackStream->Splice("...", m_maxLength - 4, P_MAX_INDEX);
-
-    Lock();
-
-    if (HasOption(SystemLogStream)) {
-      PSystemLog::OutputToTarget(PSystemLog::LevelFromInt(threadInfo->m_traceLevel), stackStream->GetPointer());
-      currentLevel = -1;
-    }
-    else {
-      *m_stream << *stackStream;
-      currentLevel = threadInfo->m_traceLevel;
-    }
-
-    delete stackStream;
-  }
-  else {
-    if (!PAssert(&paramStream == m_stream, PLogicError)) {
-      Unlock();
-      return paramStream;
-    }
-
-    currentLevel = m_currentLevel;
-    // Inherit lock from PTrace::Begin()
+  if (outputJSON || HasOption(DateAndTime)) {
+    // Use "@timestamp" for compatibility with ELK systems
+    if (outputJSON)
+      output << "\"@timestamp\":\"" << context->m_dateTime.AsString(PTime::LongISO8601) << "\",";
+    else if (!HasOption(SystemLogStream))
+      output << context->m_dateTime.AsString(PTime::LoggingFormat, HasOption(GMTTime) ? PTime::GMT : PTime::Local) << '\t';
   }
 
-  if (currentLevel >= 0) {
-    if (HasOption(SystemLogStream)) {
-      // Get the trace level for this message and set the stream width to that
-      // level so that the PSystemLog can extract the log level back out of the
-      // ios structure. There could be portability issues with this though it
-      // should work pretty universally.
-      m_stream->width(currentLevel + 1);
-    }
+  if (HasOption(Timestamp)) {
+    if (outputJSON)
+      output << "\"TimeSinceStart\":" << scientific << (context->m_tick-m_startTick) << ',';
     else
-      *m_stream << '\n';
-    m_stream->flush();
+      output << setprecision(3) << setw(10) << (context->m_tick-m_startTick) << '\t';
   }
 
-  Unlock();
+  if (HasOption(TraceLevel)) {
+    if (outputJSON)
+      output << "\"LogLevel\":";
+    output << context->m_level << (outputJSON ? ',' : '\t');
+  }
+
+  if (HasOption(Thread)) {
+#if P_64BIT && !defined(WIN32) && !defined(P_UNIQUE_THREAD_ID_FMT)
+    static const PINDEX ThreadNameWidth = 31;
+#else
+    static const PINDEX ThreadNameWidth = 23;
+#endif
+    if (outputJSON)
+      output << "\"ThreadName\":" << context->m_threadName.ToLiteral() << ',';
+    else
+      output << setw(ThreadNameWidth) << context->m_threadName.Ellipsis(ThreadNameWidth, ThreadNameWidth/2-2) << '\t';
+  }
+
+  if (HasOption(ThreadAddress)) {
+    if (outputJSON)
+      output << "\"ThreadAddress\":" << context->m_threadAddress << ',';
+    else
+      output << context->m_threadAddress << '\t';
+  }
+
+  if (HasOption(FileAndLine) && !context->m_fileName.IsEmpty()) {
+    if (outputJSON)
+      output << "\"FilePath\":" << context->m_fileName.ToLiteral() << ","
+                "\"FileLine\":" << context->m_lineNum << ',';
+    else {
+      static unsigned const FileWidth = 16;
+      output << setw(FileWidth) << context->m_fileName.GetFileName().Left(FileWidth);
+      if (context->m_lineNum > 0)
+        output << '(' << context->m_lineNum << ')';
+      output << '\t';
+    }
+  }
+
+  if (HasOption(ObjectInstance)) {
+    if (outputJSON)
+      output << "\"ObjectClass\":" << context->m_objectClass.ToLiteral() << ","
+                "\"ObjectAddress\":" << context->m_objectAddress << ',';
+    else {
+      if (context->m_objectAddress != NULL)
+        output << context->m_objectClass << ':' << context->m_objectAddress;
+      else
+        output << '-';
+      output << '\t';
+    }
+  }
+
+  if (HasOption(ContextIdentifier)) {
+    if (outputJSON)
+      output << "\"ContextIdentifier\":" << context->m_contextIdentifier << ',';
+    else {
+      if (context->m_contextIdentifier != 0)
+        output << setfill('0') << setw(13) << context->m_contextIdentifier << setfill(' ');
+      else
+        output << "- - - - - - -";
+      output << '\t';
+    }
+  }
+
+  PString & message = context->m_stream;
+  if (context->m_module.IsEmpty()) {
+    PINDEX tab = message.Find('\t');
+    if (tab != P_MAX_INDEX && tab < 16) {
+      context->m_module = message.Left(tab);
+      message.Delete(0, tab+1);
+    }
+  }
+
+  if (outputJSON)
+    output << "\"Module\":" << context->m_module.ToLiteral() << ',';
+  else
+    output << left << setw(8) << context->m_module << right << '\t';
+
+  if (HasOption(SingleLine)) {
+    message.Replace("\\", "\\\\", true);
+    message.Replace("\r", "\\r", true);
+    message.Replace("\n", "\\n", true);
+  }
+
+  if (message.GetLength() > m_maxLength)
+    message.Splice("...", m_maxLength - 4, P_MAX_INDEX);
+
+  if (outputJSON)
+    output << "\"Message\":" << message.ToLiteral() << '}';
+  else
+    output << message;
+
+  if (HasOption(SystemLogStream))
+    PSystemLog::OutputToTarget(PSystemLog::LevelFromInt(context->m_level), output);
+  else {
+    Lock();
+    *m_stream << output << endl;
+    Unlock();
+  }
+
+  delete context;
+
   return paramStream;
 }
 
@@ -1018,9 +1012,9 @@ PTrace::Block::Block(const char * fileName, int lineNum, const char * traceName)
   if (PTraceInfo::Instance().HasOption(Blocks)) {
     unsigned indent = 20;
 
-    PTraceInfo::ThreadLocalInfo * threadInfo = PTraceInfo::Instance().m_threadStorage.Get();
-    if (threadInfo != NULL)
-      indent = (threadInfo->m_traceBlockIndentLevel += 2);
+    PTraceInfo::ContextStack * contexts = PTraceInfo::Instance().m_threadStorage.Get();
+    if (contexts != NULL)
+      indent = (contexts->Top().m_blockIndentLevel += 2);
 
     ostream & s = PTrace::Begin(1, file, line);
     s << "B-Entry\t";
@@ -1044,10 +1038,11 @@ PTrace::Block::~Block()
   if (PTraceInfo::Instance().HasOption(Blocks)) {
     unsigned indent = 20;
 
-    PTraceInfo::ThreadLocalInfo * threadInfo = PTraceInfo::Instance().m_threadStorage.Get();
-    if (threadInfo != NULL) {
-      indent = threadInfo->m_traceBlockIndentLevel;
-      threadInfo->m_traceBlockIndentLevel -= 2;
+    PTraceInfo::ContextStack * contexts = PTraceInfo::Instance().m_threadStorage.Get();
+    if (contexts != NULL) {
+      PTraceInfo::Context & context = contexts->Top();
+      indent = context.m_blockIndentLevel;
+      context.m_blockIndentLevel -= 2;
     }
 
     ostream & s = PTrace::Begin(1, file, line);
@@ -1239,30 +1234,46 @@ bool PDirectory::Create(const PString & p, int perm, bool recurse)
 }
 
 
-bool PDirectory::GetEntries(Entries & entries, const PCaselessString & sortBy)
+PDirectory::Entries PDirectory::GetEntries(const PString & glob, Sorting sortBy)
+{
+  Entries entries;
+  GetEntries(entries, sortBy, glob);
+  return entries;
+}
+
+
+PDirectory::Entries PDirectory::GetEntries(const PString & glob, const PCaselessString & sortBy)
+{
+  Entries entries;
+  GetEntries(entries, sortBy, glob);
+  return entries;
+}
+
+
+bool PDirectory::GetEntries(Entries & entries, const PCaselessString & sortBy, const PString & glob)
 {
   if (sortBy.NumCompare("name") == EqualTo)
-    return GetEntries(entries, SortByName);
+    return GetEntries(entries, SortByName, glob);
 
   if (sortBy.NumCompare("type") == EqualTo)
-    return GetEntries(entries, SortByType);
+    return GetEntries(entries, SortByType, glob);
 
   if (sortBy.NumCompare("size") == EqualTo)
-    return GetEntries(entries, SortBySize);
+    return GetEntries(entries, SortBySize, glob);
 
   if (sortBy.NumCompare("created") == EqualTo)
-    return GetEntries(entries, SortByCreated);
+    return GetEntries(entries, SortByCreated, glob);
 
   if (sortBy.NumCompare("modified") == EqualTo)
-    return GetEntries(entries, SortByModified);
+    return GetEntries(entries, SortByModified, glob);
 
   if (sortBy.NumCompare("accessed") == EqualTo)
-    return GetEntries(entries, SortByAccessed);
+    return GetEntries(entries, SortByAccessed, glob);
 
   if (sortBy.NumCompare("permissions") == EqualTo)
-    return GetEntries(entries, SortByPermission);
+    return GetEntries(entries, SortByPermission, glob);
 
-  return GetEntries(entries);
+  return GetEntries(entries, glob);
 }
 
 struct PDirectorySortPred
@@ -1305,16 +1316,39 @@ struct PDirectorySortPred
 PDirectorySortPred::Table PDirectorySortPred::s_PredTable;
 
 
-bool PDirectory::GetEntries(Entries & entries, Sorting sortBy)
+bool PDirectory::GetEntries(Entries & entries, Sorting sortBy, const PString & glob)
 {
   if (!Open())
     return false;
+
+  // Convert glob to regex
+  PString regexStr = glob;
+  if (glob.GetLength() > 1) {
+    regexStr = PRegularExpression::EscapeString(glob);
+    for (PINDEX i = 0; i < regexStr.GetLength()-1; ++i) {
+      if ((i == 0 || regexStr[i-1] != '\\') && regexStr[i] == '\\') {
+        switch (regexStr[i+1]) {
+          case '*' :
+            regexStr[i] = '.';
+            break;
+          case '?' :
+            regexStr.Splice(".", i, 2);
+            break;
+          case '[' :
+          case ']' :
+            regexStr.Delete(i, 1);
+        }
+      }
+    }
+  }
+  PRegularExpression regex(regexStr);
 
   do {
     Entry entry;
     if (GetInfo(entry)) {
       entry.m_name = GetEntryName();
-      entries.push_back(entry);
+      if (glob.IsEmpty() || entry.m_name.MatchesRegEx(regex))
+        entries.push_back(entry);
     }
   } while (Next());
 
@@ -2024,7 +2058,7 @@ bool PArgList::Parse(const char * spec, PBoolean optionsBeforeParams)
       m_parameterIndex.SetSize(param+1);
       m_parameterIndex[param++] = arg;
     }
-    else if (argStr == "--") {
+    else if (argStr.FindSpan("-") == P_MAX_INDEX) { // Nothing but dashes
       if (optionsBeforeParams) {
         ++arg;
         break;
@@ -2342,8 +2376,22 @@ PString PConfigArgs::CharToString(char letter) const
 
 PProcess * PProcessInstance = NULL;
 
+
+P_PUSH_MSVC_WARNINGS(4702)
+static void AbortProcess(int exitCode)
+{
+  abort(); // Dump core
+  _exit(exitCode); // Fail safe if abort() didn't dump core and exit
+}
+P_POP_MSVC_WARNINGS()
+
+
 int PProcess::InternalMain(void *)
 {
+#ifdef P_HAS_WCHAR
+  setlocale(LC_CTYPE, "UTF-8"); // A PString is documented as UTF-8, so all conversions go there
+#endif
+
 #if P_SDL && defined(P_MACOSX)
   PVideoOutputDevice * device = PVideoOutputDevice::CreateDeviceByName(P_SDL_VIDEO_PREFIX);
   if (device != NULL && device->ApplicationMain())
@@ -2356,11 +2404,11 @@ int PProcess::InternalMain(void *)
   }
   catch (const std::exception & e) {
     PAssertAlways(PSTRSTRM("Exception (" << typeid(e).name() << " \"" << e.what() << "\") caught in process main, terminating"));
-    std::terminate();
+    AbortProcess(136);
   }
   catch (...) {
     PAssertAlways(PSTRSTRM("Exception caught in process main, terminating"));
-    std::terminate();
+    AbortProcess(137);
   }
 #else
   Main();
@@ -2696,7 +2744,7 @@ PProcess & PProcess::Current()
 {
   if (PProcessInstance == NULL) {
     PAssertAlways("Catastrophic failure, PProcess::Current() = NULL!!");
-    abort();
+    AbortProcess(132);
   }
   return *PProcessInstance;
 }
@@ -2808,6 +2856,15 @@ static int SignalsToHandle[] = {
   0
 };
 
+#if __cplusplus >=201100L
+void HandleTerminate()
+{
+  PTRACE(2, "PTLib", "Received std::terminate()");
+  AbortProcess(133);
+  abort(); // Dump core
+}
+#endif
+
 void PProcess::AddRunTimeSignalHandlers(const int * signals)
 {
   if (signals != SignalsToHandle)
@@ -2822,6 +2879,10 @@ void PProcess::AddRunTimeSignalHandlers(const int * signals)
     if (previous == NULL)
       previous = PlatformSetRunTimeSignalHandler(signal);
   }
+
+#if __cplusplus >= 201100L
+  std::set_terminate(HandleTerminate);
+#endif
 }
 
 
@@ -3137,12 +3198,14 @@ void PThread::InternalThreadMain()
     process.OnThreadEnded(*this);
   }
   catch (const std::exception & e) {
-    PAssertAlways(PSTRSTRM("Exception (" << typeid(e).name() << " \"" << e.what() << "\") caught in thread " << *this << ", terminating"));
-    std::terminate();
+    std::ostringstream msg;
+    msg << "in thread " << *this;
+    PAssertException(msg.str().c_str(), &e);
   }
   catch (...) {
-    PAssertAlways(PSTRSTRM("Exception caught in thread " << *this << ", terminating"));
-    std::terminate();
+    std::ostringstream msg;
+    msg << "in thread " << *this;
+    PAssertException(msg.str().c_str(), NULL);
   }
 #else
   process.OnThreadStart(*this);
@@ -4872,7 +4935,6 @@ bool PFile::RotateInfo::Rotate(PFile & file, bool force, const PTime & now)
 
     if (m_freeDisk != 0) {
       int64_t total, free;
-      //uint32_t cluster;
       DWORD cluster;
       while (!rotatedFiles.empty() && dir.GetVolumeSpace(total, free, cluster)) {
         int64_t limit = m_freeDisk > 0 ? m_freeDisk : (total * -m_freeDisk / 100);

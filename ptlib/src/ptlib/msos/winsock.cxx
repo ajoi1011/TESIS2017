@@ -577,61 +577,59 @@ PChannel::Errors PSocket::Select(SelectList & read,
 }
 
 
+static struct
+{
+  DWORD m_windows;
+  int   m_stdlib;
+} ErrorMap[] = {
+  { WSAEBADF, EBADF },
+  { WSAEINVAL, EINVAL },
+  { WSAEACCES, EACCES },
+  { WSAEINTR, EINTR },
+  { WSAEINPROGRESS, EINPROGRESS },
+  { WSAENOTSOCK, ENOTSOCK },
+  { WSAEOPNOTSUPP, EOPNOTSUPP },
+  { WSAEAFNOSUPPORT, EAFNOSUPPORT },
+  { WSAEADDRINUSE, EADDRINUSE },
+  { WSAEADDRNOTAVAIL, EADDRNOTAVAIL },
+  { WSAENETDOWN, ENETDOWN },
+  { WSAENETUNREACH, ENETUNREACH },
+  { WSAENETRESET, ENETRESET },
+  { WSAECONNABORTED, ECONNABORTED },
+  { WSAECONNRESET, ECONNRESET },
+  { WSAENOBUFS, ENOBUFS },
+  { WSAEISCONN, EISCONN },
+  { WSAENOTCONN, ENOTCONN },
+  { WSAECONNREFUSED, ECONNREFUSED },
+  { WSAEHOSTUNREACH, EHOSTUNREACH },
+  { WSAEMSGSIZE, EMSGSIZE },
+  { WSAEWOULDBLOCK, EWOULDBLOCK },
+  { WSAETIMEDOUT, ETIMEDOUT }
+};
+
+
 int PSocket::os_errno() const
 {
   DWORD err = WSAGetLastError();
   SetLastError(err);
 
-  switch (err) {
-    case WSAEBADF:
-      return EBADF;
-    case WSAEINVAL:
-      return EINVAL;
-    case WSAEACCES:
-      return EACCES;
-    case WSAEINTR:
-      return EINTR;
-    case WSAEINPROGRESS:
-      return EINPROGRESS;
-    case WSAENOTSOCK:
-      return ENOTSOCK;
-    case WSAEOPNOTSUPP:
-      return EOPNOTSUPP;
-    case WSAEAFNOSUPPORT:
-      return EAFNOSUPPORT;
-    case WSAEADDRINUSE:
-      return EADDRINUSE;
-    case WSAEADDRNOTAVAIL:
-      return EADDRNOTAVAIL;
-    case WSAENETDOWN:
-      return ENETDOWN;
-    case WSAENETUNREACH:
-      return ENETUNREACH;
-    case WSAENETRESET:
-      return ENETRESET;
-    case WSAECONNABORTED:
-      return ECONNABORTED;
-    case WSAECONNRESET:
-      return ECONNRESET;
-    case WSAENOBUFS:
-      return ENOBUFS;
-    case WSAEISCONN:
-      return EISCONN;
-    case WSAENOTCONN:
-      return ENOTCONN;
-    case WSAECONNREFUSED:
-      return ECONNREFUSED;
-    case WSAEHOSTUNREACH:
-      return EHOSTUNREACH;
-    case WSAEMSGSIZE:
-      return EMSGSIZE;
-    case WSAEWOULDBLOCK:
-      return EWOULDBLOCK;
-    case WSAETIMEDOUT:
-      return ETIMEDOUT;
+  for (PINDEX i = 0; i < PARRAYSIZE(ErrorMap); ++i) {
+    if (ErrorMap[i].m_windows == err)
+      return ErrorMap[i].m_stdlib;
   }
 
   return err|PWIN32ErrorFlag;
+}
+
+
+PString PSocket::GetErrorText(ErrorGroup group) const
+{
+  int err = m_status[group]->m_lastErrorNumber;
+  for (PINDEX i = 0; i < PARRAYSIZE(ErrorMap); ++i) {
+    if (ErrorMap[i].m_stdlib == err)
+      return PChannel::GetErrorText(m_status[group]->m_lastErrorCode, ErrorMap[i].m_windows|PWIN32ErrorFlag);
+  }
+  return PChannel::GetErrorText(m_status[group]->m_lastErrorCode, err);
 }
 
 
