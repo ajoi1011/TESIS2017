@@ -32,9 +32,9 @@
 
 #define PTLIB_MAJOR 2
 #define PTLIB_MINOR 19
-#define PTLIB_PATCH 2
+#define PTLIB_PATCH 4
 #define PTLIB_OEM 0
-#define PTLIB_VERSION "2.19.2"
+#define PTLIB_VERSION "2.19.4"
 
 #define PTLIB_VERSION_INT_OEM(major,minor,patch,oem) ((major<<24)|(minor<<16)|(patch<<8)|(oem))
 #define PTLIB_CHECK_VERSION_OEM(major,minor,patch,oem) \
@@ -139,7 +139,7 @@
 #define P_DYNALINK 1
 #define P_PLUGINMGR 1
 #define P_PLUGINS 1
-#define P_DEFAULT_PLUGIN_DIR "/usr/local/lib/ptlib-2.19.2"
+#define P_DEFAULT_PLUGIN_DIR "/usr/local/lib/ptlib-2.19.4"
 
 
 /////////////////////////////////////////////////
@@ -283,6 +283,10 @@
 #define USE_SYSTEM_SWAB /**/
 /* #undef P_SHM_VIDEO */
 /* #undef P_HAS_RDTSC */
+
+#if P_HAS_WCHAR
+  #define P_HAS_ICONV 1
+#endif
 
 
 /////////////////////////////////////////////////
@@ -642,7 +646,7 @@
 //
 
 #if P_SCRIPTS
-/*   #undef P_V8 */
+  #define P_V8 1
 
   #if defined(_MSC_VER)
 /*     #undef P_V8_WIN32 */
@@ -709,6 +713,11 @@
 
     #if defined(P_V8)
       #pragma include_alias(<v8.h>, <@V8_DIR@/include/v8.h>)
+      #pragma include_alias("v8config.h", "@V8_DIR@/include/v8config.h")
+      #pragma include_alias("v8-platform.h", "@V8_DIR@/include/v8-platform.h")
+      #pragma include_alias("libplatform/libplatform.h", "@V8_DIR@/include/libplatform/libplatform.h")
+      #pragma include_alias("libplatform/libplatform-export.h", "@V8_DIR@/include/libplatform/libplatform-export.h")
+      #pragma include_alias("libplatform/v8-tracing.h", "@V8_DIR@/include/libplatform/v8-tracing.h")
       #define V8_DIR "@V8_DIR@"
     #endif
   #endif // _MSC_VER
