@@ -363,10 +363,12 @@ enum PStandardAssertMessage {
 
 #define __CLASS__ NULL
 
-extern bool PAssertWalksStack;
+enum PAssertWalkStackModes { PAssertWalkStackDisabled, PAssertWalkStackSymbols, PAssertWalkStackNoSymbols };
+extern PAssertWalkStackModes PAssertWalkStackMode;
 extern unsigned PAssertCount;
 bool PAssertFunc(const PDebugLocation & location, PStandardAssertMessage msg);
 bool PAssertFunc(const PDebugLocation & location, const char * msg);
+bool PAssertException(const char * source, const std::exception * ex);
 
 
 /** This macro is used to assert that a condition must be true.
@@ -506,6 +508,7 @@ public:
     SystemLogStream   = 0x8000,   /**< SystemLog flag for tracing within a PServiceProcess
                                        application. Setting this flag will automatically
                                        execute <code>#SetStream(new PSystemLog)</code>. */
+    OutputJSON         = 0x10000,   ///< Output log in JSON format
     HasFilePermissions = 0x8000000, ///< Flag indicating file permissions are to be set
     FilePermissionMask = 0x7ff0000, /**< Mask for setting standard file permission mask as used in
                                          open() or creat() system function calls. */
@@ -524,6 +527,7 @@ public:
     "  file     source file name and line number\r" \
     "  object   PObject pointer\r" \
     "  context  context identifier\r" \
+    "  json     JSON format output\r" \
     "  single   single line output\r" \
     "  daily    rotate output file daily\r" \
     "  hour     rotate output file hourly\r" \
@@ -864,6 +868,18 @@ public:
   {
     Throttle() : ThrottleBase(lowLevel, interval, highLevel, maxShown) { }
   };
+
+  /** Output logging for an object.
+    */
+  template <class CLS> class InternalLogObject
+  {
+    const CLS & m_obj;
+  public:
+    inline InternalLogObject(const CLS & obj) : m_obj(obj) { }
+    friend inline ostream & operator<<(ostream & strm, const InternalLogObject & log) { log.m_obj.ToLogging(strm); return strm; }
+  };
+  template <class CLS> static inline InternalLogObject<CLS> LogObject(const CLS & obj) { return InternalLogObject<CLS>(obj); }
+
 
   static bool CanTrace(const ThrottleBase & throttle) { return const_cast<ThrottleBase &>(throttle).CanTrace(); }
 

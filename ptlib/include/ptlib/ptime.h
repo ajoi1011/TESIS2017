@@ -193,7 +193,7 @@ class PTime : public PObject
        The upper 32 bits are seconds since 1st January 1900 and the lower 32
        bits are 2^32'th of a second, or 0.23ns.
      */
-    void SetNTP(
+    PTime & SetNTP(
       PUInt64 ntp
     );
 
@@ -207,14 +207,14 @@ class PTime : public PObject
 
     /**Set the time in seconds and microseconds.
       */
-    void SetTimestamp(
+    PTime & SetTimestamp(
       time_t seconds,
       int64_t usecs = 0
     );
 
     /**Add the time in microseconds.
       */
-    void AddTimestamp(
+    PTime & AddTimestamp(
       int64_t usecs
     );
 
@@ -434,7 +434,7 @@ class PTime : public PObject
       RFC1123,        ///< Internet standard format. (eg. Wed, 09 Feb 2011 11:25:58 +01:00)
       RFC3339,        ///< Another Internet standard format. (eg. 2011-02-09T11:14:41ZZ)
       ShortISO8601,   ///< Short form ISO standard format. (eg. 20110209T111108Z)
-      LongISO8601,    ///< Long form ISO standard format. (eg. 2011-02-09T11:13:06Z)
+      LongISO8601,    ///< Long form ISO standard format. (eg. 2011-02-09T11:13:06.543Z)
       LongDateTime,   ///< Date with weekday, full month names and time with seconds.
       LongDate,       ///< Date with weekday, full month names and no time.
       LongTime,       ///< Time with seconds.

@@ -99,12 +99,10 @@ typedef PBaseArray<wchar_t> PWCharArray;
    memory allocated, and the length of the string may be different values.
 
    Also note that the PString is inherently an 8 bit string. The character set
-   is not defined for most operations and it may be any 8 bit character set.
-   However when conversions are being made to or from 2 byte formats then the
-   PString is assumed to be the UTF-8 format. The 2 byte format is nominally
-   UCS-2 (aka BMP string) and while it is not exactly the same as UNICODE
-   they are compatible enough for them to be treated the same for most real
-   world usage.
+   is generally defined as UTF-8, though this is only relevant when converting
+   to or from wchar_t or PWideString. The format of a wchar_t based string is
+   platform dependent. For Windows this is UTF-16. For GNU base builds
+   (typically Linux) this is UCS-4, 32 bit characters.
  */
 
 class PString : public PCharArray
@@ -152,30 +150,24 @@ class PString : public PCharArray
        a literal string, eg "hello". A new memory block is allocated of a size
        sufficient to take the length of the string and its terminating
        '\\0' character.
-
-       If UCS-2 is used then each char from the char pointer is mapped to a
-       single UCS-2 character.
      */
     PString(
       const char * cstr ///< Standard '\\0' terminated C string.
     );
 
-    /**Create a string from the UCS-2 string array.
+    /**Create a string from the wchar_t string array.
        A new memory block is allocated of a size sufficient to take the length
        of the string and its terminating '\\0' character.
      */
 #ifdef P_HAS_WCHAR
     PString(
-      const wchar_t * ustr ///< UCS-2 null terminated string.
+      const wchar_t * ustr ///< wchar_t null terminated string.
     );
 #endif
 
     /**Create a string from the array. A new memory block is allocated of
        a size equal to <code>len</code> plus one which is sufficient to take
        the string and a terminating '\\0' character.
-
-       If UCS-2 is used then each char from the char pointer is mapped to a
-       single UCS-2 character.
 
        Note that this function will allow a string with embedded '\\0'
        characters to be created, but most of the functions here will be unable
@@ -188,25 +180,10 @@ class PString : public PCharArray
       PINDEX len          ///< Length of the string in bytes.
     );
 
-    /**Create a string from the UCS-2 array. A new memory block is allocated
-       of a size equal to <code>len</code> plus one which is sufficient to take
-       the string and a terminating '\\0' character.
-
-       Note that this function will allow a string with embedded '\\0'
-       characters to be created, but most of the functions here will be unable
-       to access characters beyond the first '\\0'. Furthermore, if the
-       <code>MakeMinimumSize()</code> function is called, all data beyond that first
-       '\\0' character will be lost.
-     */
 #ifdef P_HAS_WCHAR
-    PString(
-      const wchar_t * ustr,  ///< Pointer to a string of UCS-2 characters.
-      PINDEX len          ///< Length of the string in bytes.
-    );
-
-    /**Create a string from the UCS-2 array. A new memory block is allocated
-       of a size equal to <code>len</code> plus one which is sufficient to take
-       the string and a terminating '\\0' character.
+    /**Create a UTF-8 string from the wchar_t array. A new memory block is
+       allocated of a size sufficient to take the converted string and a
+       terminating '\\0' character.
 
        Note that this function will allow a string with embedded '\\0'
        characters to be created, but most of the functions here will be unable
@@ -215,17 +192,29 @@ class PString : public PCharArray
        '\\0' character will be lost.
      */
     PString(
-      const PWCharArray & ustr ///< UCS-2 null terminated string.
+      const wchar_t * ustr,  ///< Pointer to a string of wchar_t characters.
+      PINDEX len             ///< Length of the string in characters.
     );
-#endif
+
+    /**Create a UTF-8 string from the wchar_t array. A new memory block is
+       allocated of a size sufficient to take the converted string and a
+       terminating '\\0' character.
+
+       Note that this function will allow a string with embedded '\\0'
+       characters to be created, but most of the functions here will be unable
+       to access characters beyond the first '\\0'. Furthermore, if the
+       <code>MakeMinimumSize()</code> function is called, all data beyond that first
+       '\\0' character will be lost.
+     */
+    PString(
+      const PWCharArray & ustr ///< wchar_t null terminated string.
+    );
+#endif // P_HAS_WCHAR
 
     /**Create a string from the single character. This is most commonly used
        as a type conversion constructor when a literal character, eg 'A' is
        used in a string expression. A new memory block is allocated of two
        characters to take the char and its terminating '\\0' character.
-
-       If UCS-2 is used then the char is mapped to a single UCS-2
-       character.
      */
     PString(
       char ch    ///< Single character to initialise string.
@@ -1479,6 +1468,12 @@ class PString : public PCharArray
       PINDEX len = P_MAX_INDEX  ///< Number of characters to extract.
     ) const;
 
+    /** Return a string up to a maximum length, substituting "..." to too long.
+      */
+    PString Ellipsis(
+      PINDEX maxLength,   ///< Maxmimum length of resulting string
+      PINDEX fromEnd = 0  ///< Number of characters at end of string adter "..."
+    ) const;
 
     /**Create a string consisting of all characters from the source string
        except all spaces at the beginning of the string. The original string
@@ -1800,10 +1795,13 @@ class PString : public PCharArray
     double AsReal() const;
      
 #ifdef P_HAS_WCHAR
-    /**Convert UTF-8 string to UCS-2.
+    /**Convert UTF-8 string to native wide character string.
        Note the resultant PWCharArray will have the trailing null included.
+       For Windows this is UTF-16, for GNU C (Linux) it is UCS-4.
       */
-    PWCharArray AsUCS2() const;
+    PWCharArray AsWide() const;
+
+    P_DEPRECATED PWCharArray AsUCS2() const { return AsWide(); }
 #endif
 
     /**Convert a standard null terminated string to a "pascal" style string.
@@ -1883,26 +1881,58 @@ class PString : public PCharArray
       This function overrides the ancestor function that returns a char *
       */
     virtual const char * GetPointer(PINDEX = 0) const { return (const char *)(*this); }
-
   //@}
 
+  /**@name std::string compatible functions */
+  //@{
+    __inline std::string::size_type size() const { return (std::string::size_type)GetLength(); }
+    __inline std::string::size_type length() const { return (std::string::size_type)GetLength(); }
+    __inline std::string::size_type capacity() const { return (std::string::size_type)(GetSize()-1); }
+    __inline bool empty() const { return IsEmpty(); }
+    __inline void clear() { MakeEmpty();  }
+    __inline const char * c_str() const { return GetPointer(); }
+    __inline char * data() { return PCharArray::GetPointer(); }
+    __inline void push_back(char ch) { *this += ch;  }
+    __inline PString & append(std::string::size_type count, char ch) { while (--count > 0) *this += ch; return *this; }
+    __inline PString & append(const char * s) { return *this += s; }
+    __inline PString & append(const std::string & s) { return *this += s.c_str();  }
+    __inline PString & insert(std::string::size_type index, std::string::size_type count, char ch) { while (--count > 0) Splice(&ch, index); return *this; }
+    __inline PString & insert(std::string::size_type index, const char * s) { return Splice(s, index); }
+    __inline PString & insert(std::string::size_type index, const std::string & s) { return Splice(s.c_str(), index);  }
+    __inline PString & erase(std::string::size_type index = 0, std::string::size_type count = std::string::npos) { return Delete(index, count != std::string::npos ? count : P_MAX_INDEX);  }
+    __inline PString & replace(std::string::size_type pos, std::string::size_type count, const char * s) { return Splice(s, pos, count); }
+    __inline PString & replace(std::string::size_type pos, std::string::size_type count, const std::string & s) { return Splice(s.c_str(), pos, count); }
+    __inline std::string substr(std::string::size_type pos = 0, std::string::size_type count = std::string::npos) const { return std::string(Mid(pos, count).GetPointer()); }
+    __inline std::string::size_type find(char c, std::string::size_type pos = 0) const { return StdStringPos(Find(c, pos)); }
+    __inline std::string::size_type find(const char * s, std::string::size_type pos = 0) const { return StdStringPos(Find(s, pos)); }
+    __inline std::string::size_type find(const std::string & s, std::string::size_type pos = 0) const { return StdStringPos(Find(s.c_str(), pos)); }
+    __inline std::string::size_type rfind(char c, std::string::size_type pos = 0) const { return StdStringPos(FindLast(c, pos)); }
+    __inline std::string::size_type rfind(const char * s, std::string::size_type pos = 0) const { return StdStringPos(FindLast(s, pos)); }
+    __inline std::string::size_type rfind(const std::string & s, std::string::size_type pos = 0) const { return StdStringPos(FindLast(s.c_str(), pos)); }
+    __inline std::string::size_type find_first_of(const char * s, std::string::size_type pos = 0) const { return StdStringPos(FindOneOf(s, pos)); }
+    __inline std::string::size_type find_first_of(const std::string & s, std::string::size_type pos = 0) const { return StdStringPos(FindOneOf(s.c_str(), pos)); }
+    __inline std::string::size_type find_first_not_of(const char * s, std::string::size_type pos = 0) const { return StdStringPos(FindSpan(s, pos)); }
+    __inline std::string::size_type find_first_not_of(const std::string & s, std::string::size_type pos = 0) const { return StdStringPos(FindSpan(s.c_str(), pos)); }
+    private:
+      __inline static std::string::size_type StdStringPos(PINDEX p) { return p != P_MAX_INDEX ? (std::string::size_type)p : std::string::npos; }
+    public:
+    //@}
 
   protected:
 #ifdef P_HAS_WCHAR
-    void InternalFromUCS2(
+    void InternalFromWChar(
       const wchar_t * ptr,
       PINDEX len
     );
 #endif
     virtual Comparison InternalCompare(
       PINDEX offset,      // Offset into string to compare.
-      char c              // Character to compare against.
-    ) const;
-    virtual Comparison InternalCompare(
-      PINDEX offset,      // Offset into string to compare.
       PINDEX length,      // Number of characters to compare.
       const char * cstr   // C string to compare against.
     ) const;
+    virtual int internal_strcmp(const char * s1, const char *s2) const;
+    virtual int internal_strncmp(const char * s1, const char *s2, size_t n) const;
+
     bool InternalSplit(
       const PString & delimiter,  // Delimiter around which tom plit the substrings
       PString & before,           // Substring before delimiter
@@ -1952,10 +1982,10 @@ inline wostream & operator<<(wostream & stream, const PString & string)
 
       PWideString() { }
       PWideString(const PWCharArray & arr) : PWCharArray(arr) { }
-      PWideString(const PString     & str) : PWCharArray(str.AsUCS2()) { }
+      PWideString(const PString     & str) : PWCharArray(str.AsWide()) { }
       PWideString(const char        * str);
       PWideString & operator=(const PWideString & str) { PWCharArray::operator=(str); return *this; }
-      PWideString & operator=(const PString     & str) { PWCharArray::operator=(str.AsUCS2()); return *this; }
+      PWideString & operator=(const PString     & str) { PWCharArray::operator=(str.AsWide()); return *this; }
       PWideString & operator=(const std::string & str);
       PWideString & operator=(const char        * str);
       friend inline ostream & operator<<(ostream & stream, const PWideString & string) { return stream << PString(string); }
@@ -2074,15 +2104,9 @@ class PCaselessString : public PString
 
   protected:
   // Overrides from class PString
-    virtual Comparison InternalCompare(
-      PINDEX offset,      // Offset into string to compare.
-      char c              // Character to compare against.
-    ) const;
-    virtual Comparison InternalCompare(
-      PINDEX offset,      // Offset into string to compare.
-      PINDEX length,      // Number of characters to compare.
-      const char * cstr   // C string to compare against.
-    ) const;
+    virtual int internal_strcmp(const char * s1, const char *s2) const;
+    virtual int internal_strncmp(const char * s1, const char *s2, size_t n) const;
+
     /* Internal function to compare the current string value against the
        specified C string.
 
@@ -2153,9 +2177,9 @@ typedef PConstantString<PCaselessString> PConstCaselessString;
 
 #ifdef _WIN32
 // Now have PConstString can have these definitions
-__inline PWideString::PWideString(const char * str) : PWCharArray(PConstString(str).AsUCS2()) { }
-__inline PWideString & PWideString::operator=(const std::string & str) { PWCharArray::operator=(PConstString(str.c_str()).AsUCS2()); return *this; }
-__inline PWideString & PWideString::operator=(const char        * str) { PWCharArray::operator=(PConstString(str).AsUCS2()); return *this; }
+__inline PWideString::PWideString(const char * str) : PWCharArray(PConstString(str).AsWide()) { }
+__inline PWideString & PWideString::operator=(const std::string & str) { PWCharArray::operator=(PConstString(str.c_str()).AsWide()); return *this; }
+__inline PWideString & PWideString::operator=(const char        * str) { PWCharArray::operator=(PConstString(str).AsWide()); return *this; }
 #endif
 
 
@@ -2273,7 +2297,10 @@ class PStringStream : public PString, public std::iostream
       char ch            ///< Character to assign.
     );
 
+    // Miscellanous fix ups
+    __inline void clear() { std::iostream::clear(); }
     virtual PINDEX GetLength() const;
+
 
   protected:
     virtual void AssignContents(const PContainer & cont);
@@ -3235,123 +3262,149 @@ class PStringOptions : public PStringToString
 
     /// Determine if the specified key is present.
     bool Contains(const char *              key   ) const { PConstCaselessString k(key); return PStringToString::Contains(k); }
+    bool Contains(const std::string     &   key   ) const { return PStringToString::Contains(PCaselessString(key)); }
     bool Contains(const PString         &   key   ) const { return PStringToString::Contains(PCaselessString(key)); }
     bool Contains(const PCaselessString &   key   ) const { return PStringToString::Contains(key); }
     bool Contains(const PCaselessString & (*key)()) const { return PStringToString::Contains(key()); }
 
     // Overide default PStringToString::SetAt() to make sure the key is caseless
     PString * GetAt(const char *              key   ) const { PConstCaselessString k(key); return PStringToString::GetAt(k); }
+    PString * GetAt(const std::string     &   key   ) const { return PStringToString::GetAt(PCaselessString(key)); }
     PString * GetAt(const PString         &   key   ) const { return PStringToString::GetAt(PCaselessString(key)); }
     PString * GetAt(const PCaselessString &   key   ) const { return PStringToString::GetAt(key); }
     PString * GetAt(const PCaselessString & (*key)()) const { return PStringToString::GetAt(key()); }
 
     // Overide default PStringToString::SetAt() to make sure the key is caseless
     PBoolean SetAt(const char *              key,    const PString & data) { PConstCaselessString k(key); return SetAt(k, data); }
+    PBoolean SetAt(const std::string     &   key,    const PString & data) { return SetAt(PCaselessString(key), data); }
     PBoolean SetAt(const PString         &   key,    const PString & data) { return SetAt(PCaselessString(key), data); }
     PBoolean SetAt(const PCaselessString &   key,    const PString & data) { MakeUnique(); return PStringToString::SetAt(key, data); }
     PBoolean SetAt(const PCaselessString & (*key)(), const PString & data) { return SetAt(key(), data); }
 
     // Overide default PStringToString::RemoveAt() to make sure the key is caseless
     PString * RemoveAt(const char *              key)    { PConstCaselessString k(key); return RemoveAt(k); }
+    PString * RemoveAt(const std::string     &   key)    { return RemoveAt(PCaselessString(key)); }
     PString * RemoveAt(const PString         &   key)    { return RemoveAt(PCaselessString(key)); }
     PString * RemoveAt(const PCaselessString &   key)    { MakeUnique(); return PStringToString::RemoveAt(key); }
     PString * RemoveAt(const PCaselessString & (*key)()) { return RemoveAt(key()); }
 
     /// Get an option value.
     PString GetString(const char *              key,    const char * dflt = NULL) const { PConstCaselessString k(key); return GetString(k, dflt); }
+    PString GetString(const std::string     &   key,    const char * dflt = NULL) const { return GetString(PCaselessString(key), dflt); }
     PString GetString(const PString         &   key,    const char * dflt = NULL) const { return GetString(PCaselessString(key), dflt); }
     PString GetString(const PCaselessString &   key,    const char * dflt = NULL) const;
     PString GetString(const PCaselessString & (*key)(), const char * dflt = NULL) const { return GetString(key(), dflt); }
 
     /// Set the option value.
     bool SetString(const char *              key,    const PString & value) { return SetAt(key, value); }
+    bool SetString(const std::string     &   key,    const PString & value) { return SetAt(key, value); }
     bool SetString(const PString         &   key,    const PString & value) { return SetAt(key, value); }
     bool SetString(const PCaselessString &   key,    const PString & value) { return SetAt(key, value); }
     bool SetString(const PCaselessString & (*key)(), const PString & value) { return SetAt(key, value); }
 
     /// Get the option value as a boolean.
     bool GetBoolean(const char *              key,    bool dflt = false) const { PConstCaselessString k(key); return GetBoolean(k, dflt); }
+    bool GetBoolean(const std::string     &   key,    bool dflt = false) const { return GetBoolean(PCaselessString(key), dflt); }
     bool GetBoolean(const PString         &   key,    bool dflt = false) const { return GetBoolean(PCaselessString(key), dflt); }
     bool GetBoolean(const PCaselessString &   key,    bool dflt = false) const;
     bool GetBoolean(const PCaselessString & (*key)(), bool dflt = false) const { return GetBoolean(key(), dflt); }
 
     /// Set the option value as a boolean.
     void SetBoolean(const char *              key,    bool value) { PConstCaselessString k(key); SetBoolean(k, value); }
+    void SetBoolean(const std::string     &   key,    bool value) { SetBoolean(PCaselessString(key), value); }
     void SetBoolean(const PString         &   key,    bool value) { SetBoolean(PCaselessString(key), value); }
     void SetBoolean(const PCaselessString &   key,    bool value) { SetAt(key, value ? "true" : "false"); }
     void SetBoolean(const PCaselessString & (*key)(), bool value) { SetBoolean(key(), value); }
 
     /// Get the option value as an integer.
     long GetInteger(const char *              key,    long dflt = 0) const { PConstCaselessString k(key); return GetInteger(k, dflt); }
+    long GetInteger(const std::string     &   key,    long dflt = 0) const { return GetInteger(PCaselessString(key), dflt); }
     long GetInteger(const PString         &   key,    long dflt = 0) const { return GetInteger(PCaselessString(key), dflt); }
     long GetInteger(const PCaselessString &   key,    long dflt = 0) const;
     long GetInteger(const PCaselessString & (*key)(), long dflt = 0) const { return GetInteger(key(), dflt); }
 
     /// Set an integer value for the particular MIME info field.
     void SetInteger(const char *              key,    long value) { PConstCaselessString k(key); SetInteger(k, value); }
+    void SetInteger(const std::string     &   key,    long value) { SetInteger(PCaselessString(key), value); }
     void SetInteger(const PString         &   key,    long value) { SetInteger(PCaselessString(key), value); }
     void SetInteger(const PCaselessString &   key,    long value);
     void SetInteger(const PCaselessString & (*key)(), long value) { SetInteger(key(), value); }
 
     /// Get the option value as an enum.
     template<typename E> E GetEnum(const char *              key,    E dflt) const { PConstCaselessString k(key); return GetEnum(k, dflt); }
+    template<typename E> E GetEnum(const std::string     &   key,    E dflt) const { return GetEnum(PCaselessString(key), dflt); }
     template<typename E> E GetEnum(const PString         &   key,    E dflt) const { return GetEnum(PCaselessString(key), dflt); }
     template<typename E> E GetEnum(const PCaselessString &   key,    E dflt) const { return (E)GetInteger(key, dflt); }
     template<typename E> E GetEnum(const PCaselessString & (*key)(), E dflt) const { return GetEnum(key(), dflt); }
 
     /// Set an enum value for the particular MIME info field.
     template<typename E> void SetEnum(const char *              key,    E value) { PConstCaselessString k(key); SetInteger(k, value); }
+    template<typename E> void SetEnum(const std::string     &   key,    E value) { SetInteger(PCaselessString(key), value); }
     template<typename E> void SetEnum(const PString         &   key,    E value) { SetInteger(PCaselessString(key), value); }
     template<typename E> void SetEnum(const PCaselessString &   key,    E value) { SetInteger(key, value); }
     template<typename E> void SetEnum(const PCaselessString & (*key)(), E value) { SetInteger(key(), value); }
 
     /// Get the option value as a floating point real.
     double GetReal(const char *              key,    double dflt = 0) const { PConstCaselessString k(key); return GetReal(k, dflt); }
+    double GetReal(const std::string     &   key,    double dflt = 0) const { return GetReal(PCaselessString(key), dflt); }
     double GetReal(const PString         &   key,    double dflt = 0) const { return GetReal(PCaselessString(key), dflt); }
     double GetReal(const PCaselessString &   key,    double dflt = 0) const;
     double GetReal(const PCaselessString & (*key)(), double dflt = 0) const { return GetReal(key(), dflt); }
 
     /// Set a floating point real value for the particular MIME info field.
     void SetReal(const char *              key,    double value, int decimals) { PConstCaselessString k(key); SetReal(k, value, decimals); }
+    void SetReal(const std::string     &   key,    double value, int decimals) { SetReal(PCaselessString(key), value, decimals); }
     void SetReal(const PString         &   key,    double value, int decimals) { SetReal(PCaselessString(key), value, decimals); }
     void SetReal(const PCaselessString &   key,    double value, int decimals);
     void SetReal(const PCaselessString & (*key)(), double value, int decimals) { SetReal(key(), value, decimals); }
 
     /// Get the option value as any type.
     template<typename T> T GetVar(const char *              key,    const T & dflt) const { PConstCaselessString k(key); return GetVar<T>(k, dflt); }
+    template<typename T> T GetVar(const std::string     &   key,    const T & dflt) const { return GetVar<T>(PCaselessString(key), dflt); }
     template<typename T> T GetVar(const PString         &   key,    const T & dflt) const { return GetVar<T>(PCaselessString(key), dflt); }
     template<typename T> T GetVar(const PCaselessString &   key,    const T & dflt) const { PStringStream s(GetString(key)); T v; s>>v; return s.fail() || s.bad() ? dflt : v; }
     template<typename T> T GetVar(const PCaselessString & (*key)(), const T & dflt) const { return GetVar<T>(key(), dflt); }
 
     template<typename T> bool SetVar(const char *              key,    const T & value) { PConstCaselessString k(key); return SetVar<T>(k, value); }
+    template<typename T> bool SetVar(const std::string     &   key,    const T & value) { return SetVar<T>(PCaselessString(key), value); }
     template<typename T> bool SetVar(const PString         &   key,    const T & value) { return SetVar<T>(PCaselessString(key), value); }
     template<typename T> bool SetVar(const PCaselessString &   key,    const T & value) { return SetString(key, PSTRSTRM(value)); }
     template<typename T> bool SetVar(const PCaselessString & (*key)(), const T & value) { return SetVar<T>(key(), value); }
 
     /// Determine of the option exists.
-    __inline bool Has(const char * key) const                 { return Contains(key); }
-    __inline bool Has(const PString & key) const              { return Contains(key); }
-    __inline bool Has(const PCaselessString & key) const      { return Contains(key); }
+    __inline bool Has(const char            * key)      const { return Contains(key); }
+    __inline bool Has(const std::string     & key)      const { return Contains(key); }
+    __inline bool Has(const PString         & key)      const { return Contains(key); }
+    __inline bool Has(const PCaselessString & key)      const { return Contains(key); }
     __inline bool Has(const PCaselessString & (*key)()) const { return Contains(key); }
 
     /// Get the option value.
     __inline PString Get(const char *              key,    const char * dflt = NULL) const { return GetString(key, dflt); }
     __inline PString Get(const PString         &   key,    const char * dflt = NULL) const { return GetString(key, dflt); }
+    __inline PString Get(const std::string     &   key,    const char * dflt = NULL) const { return GetString(key, dflt); }
     __inline PString Get(const PCaselessString &   key,    const char * dflt = NULL) const { return GetString(key, dflt); }
     __inline PString Get(const PCaselessString & (*key)(), const char * dflt = NULL) const { return GetString(key, dflt); }
-    __inline PString Get(const char *              key,    const PString & dflt) const { return GetString(key, dflt); }
-    __inline PString Get(const PString         &   key,    const PString & dflt) const { return GetString(key, dflt); }
-    __inline PString Get(const PCaselessString &   key,    const PString & dflt) const { return GetString(key, dflt); }
-    __inline PString Get(const PCaselessString & (*key)(), const PString & dflt) const { return GetString(key, dflt); }
+    __inline PString Get(const char *              key,    const std::string & dflt) const { return GetString(key, dflt.c_str()); }
+    __inline PString Get(const std::string     &   key,    const std::string & dflt) const { return GetString(key, dflt.c_str()); }
+    __inline PString Get(const PString         &   key,    const std::string & dflt) const { return GetString(key, dflt.c_str()); }
+    __inline PString Get(const PCaselessString &   key,    const std::string & dflt) const { return GetString(key, dflt.c_str()); }
+    __inline PString Get(const PCaselessString & (*key)(), const std::string & dflt) const { return GetString(key, dflt.c_str()); }
+    __inline PString Get(const char *              key,    const PString     & dflt) const { return GetString(key, dflt); }
+    __inline PString Get(const std::string     &   key,    const PString     & dflt) const { return GetString(key, dflt); }
+    __inline PString Get(const PString         &   key,    const PString     & dflt) const { return GetString(key, dflt); }
+    __inline PString Get(const PCaselessString &   key,    const PString     & dflt) const { return GetString(key, dflt); }
+    __inline PString Get(const PCaselessString & (*key)(), const PString     & dflt) const { return GetString(key, dflt); }
 
     /// Set the option value.
     __inline bool Set(const char *              key,    const PString & value) { return SetAt(key, value); }
+    __inline bool Set(const std::string     &   key,    const PString & value) { return SetAt(key, value); }
     __inline bool Set(const PString         &   key,    const PString & value) { return SetAt(key, value); }
     __inline bool Set(const PCaselessString &   key,    const PString & value) { return SetAt(key, value); }
     __inline bool Set(const PCaselessString & (*key)(), const PString & value) { return SetAt(key, value); }
 
     /// Remove option value
     __inline void Remove(const char *              key)    { RemoveAt(key); }
+    __inline void Remove(const std::string     &   key)    { RemoveAt(key); }
     __inline void Remove(const PString         &   key)    { RemoveAt(key); }
     __inline void Remove(const PCaselessString &   key)    { RemoveAt(key); }
     __inline void Remove(const PCaselessString & (*key)()) { RemoveAt(key); }
@@ -3631,7 +3684,7 @@ class PRegularExpression : public PObject
   //@}
 
   protected:
-    bool InternalCompile();
+    bool InternalCompile(bool assertOnFail);
     void InternalClean();
 
     PString            m_pattern;

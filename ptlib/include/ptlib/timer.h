@@ -443,14 +443,23 @@ class PPoolTimer : public PTimer
     PCLASSINFO(PPoolTimer, PTimer);
   protected:
     Pool_T & m_pool;
+    bool     m_stopped;
   public:
     PPoolTimer(Pool_T & pool)
       : m_pool(pool)
+      , m_stopped(false)
     {
+    }
+
+    ~PPoolTimer()
+    {
+      m_stopped = true;
     }
 
     virtual void OnTimeout()
     {
+      if (m_stopped)
+        return;
       Work_T * work = CreateWork();
       if (work != NULL)
         m_pool.AddWork(work, GetGroup(*work));
