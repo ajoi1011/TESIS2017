@@ -716,7 +716,7 @@ bool PSTUNMessage::Write(PUDPSocket & socket, const PIPSocketAddressAndPort & ap
     return true;
   }
 
-  PTRACE(2, "Error writing to " << ap << " - " << socket.GetErrorText(PChannel::LastWriteError));
+  PTRACE(2, "Error writing to " << ap << " on " << socket.GetLocalAddress() << " - " << socket.GetErrorText(PChannel::LastWriteError));
   return false;
 }
 

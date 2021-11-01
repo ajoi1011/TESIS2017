@@ -1600,7 +1600,8 @@ public:
       if (m_reading)
         avformat_close_input(&m_formatContext);
       else {
-        CHECK_ERROR(av_write_trailer, (m_formatContext));
+        if (m_headerWritten)
+          CHECK_ERROR(av_write_trailer, (m_formatContext));
         if (!(m_formatContext->oformat->flags & AVFMT_NOFILE))
           avio_closep(&m_formatContext->pb);
       }
@@ -1626,6 +1627,7 @@ public:
           info.m_rate = codec->supported_samplerates ? codec->supported_samplerates[0] : 16000;
         }
       }
+#if P_VIDEO
       else if (type == Video()) {
         info = TrackInfo(PVideoFrameInfo::CIF4Width, PVideoFrameInfo::CIF4Height, 25);
         const AVCodec * codec = avcodec_find_encoder(m_formatContext->oformat->video_codec);
@@ -1634,6 +1636,7 @@ public:
           info.m_rate = codec->supported_framerates ? codec->supported_framerates[0].num : 25;
         }
       }
+#endif // P_VIDEO
       return true;
     }
 

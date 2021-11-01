@@ -45,7 +45,7 @@
 
 void PSASLString::AppendValidated(const char * str)
 {
-  PWCharArray wide(PConstString(str).AsUCS2());
+  PWCharArray wide(PConstString(str).AsWide());
   for (PINDEX i = 0; i < wide.GetSize(); ++i)
     AppendValidated(wide[i]);
 }
@@ -1268,7 +1268,13 @@ void PHMAC_MD5::InternalProcess(const void * data, PINDEX len, PHMAC::Result & r
 
 #include <openssl/hmac.h>
 
-PHMAC_SHA::PHMAC_SHA(Algorithm const * algo)
+#if (OPENSSL_VERSION_NUMBER < 0x10100000L)
+  __inline HMAC_CTX * HMAC_CTX_new()           { return new HMAC_CTX(); }
+  __inline void HMAC_CTX_reset(HMAC_CTX * ctx) { HMAC_CTX_init(ctx); }
+  __inline void HMAC_CTX_free(HMAC_CTX * ctx)  { HMAC_CTX_cleanup(ctx); delete ctx; }
+#endif
+
+PHMAC_SHA::PHMAC_SHA(Algorithm algo)
   : m_algorithm(algo)
 {
 }
@@ -1276,37 +1282,37 @@ PHMAC_SHA::PHMAC_SHA(Algorithm const * algo)
 
 void PHMAC_SHA::InternalProcess(const void * data, PINDEX len, PHMAC::Result & result)
 {
-  HMAC_CTX hmac;
+  HMAC_CTX * hmac = HMAC_CTX_new();
   unsigned int signatureSize;
-  HMAC_CTX_init(&hmac);
-  HMAC_Init_ex(&hmac, m_key, m_key.GetSize(), m_algorithm, NULL);
-  HMAC_Update(&hmac, (const unsigned char *)data, len);
-  HMAC_Final(&hmac, result.GetPointer(256), &signatureSize);
+  HMAC_CTX_reset(hmac);
+  HMAC_Init_ex(hmac, m_key, m_key.GetSize(), (const EVP_MD *)m_algorithm, NULL);
+  HMAC_Update(hmac, (const unsigned char *)data, len);
+  HMAC_Final(hmac, result.GetPointer(256), &signatureSize);
   result.SetSize(signatureSize);
-  HMAC_CTX_cleanup(&hmac);
+  HMAC_CTX_free(hmac);
 }
 
 
 PHMAC_SHA1::PHMAC_SHA1()
-  : PHMAC_SHA(EVP_sha1())
+  : PHMAC_SHA((Algorithm)EVP_sha1())
 {
 }
 
 
 PHMAC_SHA256::PHMAC_SHA256()
-  : PHMAC_SHA(EVP_sha256())
+  : PHMAC_SHA((Algorithm)EVP_sha256())
 {
 }
 
 
 PHMAC_SHA384::PHMAC_SHA384()
-  : PHMAC_SHA(EVP_sha384())
+  : PHMAC_SHA((Algorithm)EVP_sha384())
 {
 }
 
 
 PHMAC_SHA512::PHMAC_SHA512()
-  : PHMAC_SHA(EVP_sha512())
+  : PHMAC_SHA((Algorithm)EVP_sha512())
 {
 }
 

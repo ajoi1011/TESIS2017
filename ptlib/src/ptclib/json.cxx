@@ -351,7 +351,7 @@ void PJSON::Object::ReadFrom(istream & strm)
     if (value == NULL)
       return;
 
-    insert(make_pair(name, value));
+    insert(make_pair(name.GetPointer(), value));
     value->ReadFrom(strm);
     if (strm.fail())
       return;
@@ -397,7 +397,7 @@ void PJSON::Object::PrintOn(ostream & strm) const
 PJSON::Base * PJSON::Object::DeepClone() const
 {
   PJSON::Object * obj = new Object();
-  for (std::map<PString, Base *>::const_iterator it = begin(); it != end(); ++it)
+  for (std::map<std::string, Base *>::const_iterator it = begin(); it != end(); ++it)
       obj->insert(make_pair(it->first, it->second->DeepClone()));
   return obj;
 }
@@ -459,6 +459,18 @@ bool PJSON::Object::GetBoolean(const PString & name) const
 }
 
 
+PTime PJSON::Object::GetTime(const PString & name) const
+{
+  return PTime(GetString(name));
+}
+
+
+PTimeInterval PJSON::Object::GetInterval(const PString & name) const
+{
+  return PTimeInterval::Seconds((double)GetNumber(name));
+}
+
+
 bool PJSON::Object::Set(const PString & name, Types type)
 {
   if (find(name) != end())
@@ -468,7 +480,7 @@ bool PJSON::Object::Set(const PString & name, Types type)
   if (ptr == NULL)
     return false;
 
-  insert(make_pair(name, ptr));
+  insert(make_pair(name.GetPointer(), ptr));
   return true;
 }
 
@@ -478,7 +490,7 @@ bool PJSON::Object::Set(const PString & name, const Base & toInsert)
   if (find(name) != end())
     return false;
 
-  insert(make_pair(name, toInsert.DeepClone()));
+  insert(make_pair(name.GetPointer(), toInsert.DeepClone()));
   return true;
 }
 
@@ -526,6 +538,30 @@ bool PJSON::Object::SetBoolean(const PString & name, bool value)
   if (!Set(name, e_Boolean))
     return false;
   *Get<Boolean>(name) = value;
+  return true;
+}
+
+
+bool PJSON::Object::SetTime(const PString & name, const PTime & value)
+{
+  return SetString(name, value.AsString(PTime::LongISO8601));
+}
+
+
+bool PJSON::Object::SetInterval(const PString & name, const PTimeInterval & value)
+{
+  return SetNumber(name, value.GetSecondsAsDouble());
+}
+
+
+bool PJSON::Object::Remove(const PString & name)
+{
+  iterator it = find(name);
+  if (it == end())
+    return false;
+
+  delete it->second;
+  erase(it);
   return true;
 }
 
@@ -670,6 +706,18 @@ bool PJSON::Array::GetBoolean(size_t index) const
 }
 
 
+PTime PJSON::Array::GetTime(size_t index) const
+{
+  return PTime(GetString(index));
+}
+
+
+PTimeInterval PJSON::Array::GetInterval(size_t index) const
+{
+  return PTimeInterval::Seconds((double)GetNumber(index));
+}
+
+
 void PJSON::Array::Append(Types type)
 {
   Base * ptr = CreateByType(type);
@@ -722,6 +770,31 @@ void PJSON::Array::AppendBoolean(bool value)
 {
   Append(e_Boolean);
   dynamic_cast<Boolean &>(*back()) = value;
+}
+
+
+void PJSON::Array::AppendTime(const PTime & value)
+{
+  AppendString(value.AsString(PTime::LongISO8601));
+}
+
+
+void PJSON::Array::AppendInterval(const PTimeInterval & value)
+{
+  AppendNumber(value.GetSecondsAsDouble());
+}
+
+
+bool PJSON::Array::Remove(size_t index)
+{
+  if (index >= size())
+    return false;
+
+  iterator it = begin();
+  advance(it, index);
+  delete *it;
+  erase(it);
+  return true;
 }
 
 

@@ -105,15 +105,15 @@ void PVarType::InternalDestroy()
 }
 
 
-bool PVarType::SetType(BasicType type, PINDEX option)
+bool PVarType::SetType(BasicType type, int option)
 {
   InternalDestroy();
 
   m_type = type;
   switch (m_type) {
     case VarTime :
-      m_.time.seconds = 0;
-      m_.time.format = (PTime::TimeFormat)option;
+      m_.time.microseconds = 0;
+      m_.time.format = option < 0 ? PTime::LongISO8601 : (PTime::TimeFormat)option;
       break;
 
     case VarStaticString :
@@ -123,6 +123,8 @@ bool PVarType::SetType(BasicType type, PINDEX option)
     case VarFixedString :
     case VarDynamicString :
     case VarDynamicBinary :
+      if (option < 0)
+        option = 0;
       memset(m_.dynamic.Alloc(option), 0, option);
       break;
 
@@ -272,7 +274,7 @@ PVarType & PVarType::operator=(const PGloballyUniqueID & value)
 PVarType & PVarType::operator=(const PTime & value)
 {
   if (SetType(VarTime)) {
-    m_.time.seconds = value.GetTimeInSeconds();
+    m_.time.microseconds = value.GetTimestamp();
     OnValueChanged();
   }
   return *this;
@@ -292,6 +294,65 @@ PVarType & PVarType::SetValue(const PString & value)
       ReadFrom(strm);
   }
   OnValueChanged();
+  return *this;
+}
+
+
+PVarType & PVarType::FromString(const PString & value, bool autoDetect)
+{
+  if (!autoDetect)
+    return SetValue(value);
+
+  static PConstString const Digits("0123456789");
+  PString trimmed = value.Trim().ToUpper();
+  PINDEX pos;
+
+  if (trimmed.IsEmpty())
+    operator=(value);
+  else if (trimmed.FindSpan(Digits) == P_MAX_INDEX) {
+    uint64_t ival = trimmed.AsUnsigned64();
+    if (ival <= std::numeric_limits<uint8_t>::max())
+      operator=((uint8_t)ival);
+    else if (ival < std::numeric_limits<uint16_t>::max())
+      operator=((uint16_t)ival);
+    else if (ival < std::numeric_limits<uint32_t>::max())
+      operator=((uint32_t)ival);
+    else
+      operator=(ival);
+  }
+  else if (value.GetLength() == 1)
+    operator=(value[0]);
+  else if ((trimmed[0] == '+' || trimmed[0] == '-') && trimmed.FindSpan(Digits, 1) == P_MAX_INDEX) {
+    int64_t ival = trimmed.AsUnsigned64();
+    if (ival >= std::numeric_limits<int8_t>::min() && ival <= std::numeric_limits<int8_t>::max())
+      operator=((int8_t)ival);
+    else if (ival >= std::numeric_limits<int16_t>::min() && ival < std::numeric_limits<int16_t>::max())
+      operator=((int16_t)ival);
+    else if (ival >= std::numeric_limits<int32_t>::min() && ival < std::numeric_limits<int32_t>::max())
+      operator=((int32_t)ival);
+    else
+      operator=(ival);
+  }
+  else if (trimmed[pos = trimmed.FindSpan(Digits, trimmed[0] == '+' || trimmed[0] == '-' ? 1 : 0)] == 'E' &&
+           trimmed.FindSpan(Digits, trimmed[pos+1] == '+' || trimmed[pos+1] == '-' ? (pos+3) : (pos+2)) == P_MAX_INDEX) {
+    operator=(trimmed.AsReal());
+  }
+  else {
+    PGloballyUniqueID guid(trimmed);
+    if (!guid.IsNULL())
+      operator=(guid);
+    else {
+      PTime timeDate(trimmed);
+      if (timeDate.IsValid())
+        operator=(timeDate);
+      else if (trimmed *= "true")
+        operator=(true);
+      else if (trimmed *= "false")
+        operator=(false);
+      else
+        operator=(value);
+    }
+  }
   return *this;
 }
 
@@ -361,7 +422,7 @@ void PVarType::PrintOn(ostream & strm) const
       strm << "(null)";
       break;
     case VarBoolean :
-      strm << (m_.boolean ? "true" : "false");
+      strm << boolalpha << m_.boolean;
       break;
     case VarChar :
       strm << m_.character;
@@ -400,7 +461,7 @@ void PVarType::PrintOn(ostream & strm) const
       strm << m_.floatExtended;
       break;
     case VarTime :
-      strm << PTime(m_.time.seconds);
+      strm << PTime(0, m_.time.microseconds).AsString(m_.time.format);
       break;
     case VarGUID :
       strm << PGloballyUniqueID(m_.guid, sizeof(m_.guid));
@@ -430,7 +491,7 @@ void PVarType::ReadFrom(istream & strm)
     case VarNULL :
       break;
     case VarBoolean :
-      strm >> m_.boolean;
+      strm >> boolalpha >> m_.boolean;
       break;
     case VarChar :
       strm >> m_.character;
@@ -469,7 +530,7 @@ void PVarType::ReadFrom(istream & strm)
       strm >> m_.floatExtended;
       break;
     case VarTime :
-      { PTime t; strm >> t; m_.time.seconds = t.GetTimeInSeconds(); }
+      { PTime t; strm >> t; m_.time.microseconds = t.GetTimestamp(); }
       break;
     case VarGUID :
       { PGloballyUniqueID guid; strm >> guid; memcpy(m_.guid, guid, sizeof(m_.guid)); }
@@ -533,7 +594,7 @@ bool PVarType::AsBoolean() const
     case VarFloatExtended :
       return m_.floatExtended != 0;
     case VarTime :
-      return PTime(m_.time.seconds).IsValid();
+      return PTime(0, m_.time.microseconds).IsValid();
     case VarGUID :
       return !PGloballyUniqueID(m_.guid, sizeof(m_.guid)).IsNULL();
     case VarStaticString :
@@ -605,9 +666,9 @@ int PVarType::AsInteger() const
         return std::numeric_limits<int>::max();
       return (int)m_.floatExtended;
     case VarTime :
-      if (m_.time.seconds > std::numeric_limits<int>::max())
+      if (m_.time.microseconds > std::numeric_limits<int64_t>::max())
         return std::numeric_limits<int>::max();
-      return (int)m_.time.seconds;
+      return (int)m_.time.microseconds;
     case VarGUID :
       return !PGloballyUniqueID(m_.guid, sizeof(m_.guid)).HashFunction();
     case VarStaticString :
@@ -681,9 +742,9 @@ unsigned PVarType::AsUnsigned() const
         return std::numeric_limits<unsigned>::max();
       return (unsigned)m_.floatExtended;
     case VarTime :
-      if ((unsigned)m_.time.seconds > std::numeric_limits<unsigned>::max())
+      if ((unsigned)m_.time.microseconds > std::numeric_limits<unsigned>::max())
         return std::numeric_limits<unsigned>::max();
-      return (unsigned)m_.time.seconds;
+      return (unsigned)m_.time.microseconds;
     case VarGUID :
       return !PGloballyUniqueID(m_.guid, sizeof(m_.guid)).HashFunction();
     case VarStaticString :
@@ -771,7 +832,7 @@ double PVarType::AsFloat() const
     case VarFloatExtended :
       return (double)m_.floatExtended;
     case VarTime :
-      return (double)m_.time.seconds;
+      return (double)m_.time.microseconds;
     case VarGUID :
       return !PGloballyUniqueID(m_.guid, sizeof(m_.guid)).HashFunction();
     case VarStaticString :
@@ -813,7 +874,7 @@ PTime PVarType::AsTime() const
 
     case VarTime :
       const_cast<PVarType *>(this)->OnGetValue();
-      return PTime(m_.time.seconds);
+      return PTime(0, m_.time.microseconds);
 
     default :
       return PTime(AsInteger());
@@ -857,7 +918,7 @@ PString PVarType::AsString() const
     case VarFloatExtended :
       strm << m_.floatExtended; break;
     case VarTime :
-      strm << PTime(m_.time.seconds).AsString(m_.time.format); break;
+      strm << PTime(0, m_.time.microseconds).AsString(m_.time.format); break;
     case VarGUID :
       strm << PGloballyUniqueID(m_.guid, sizeof(m_.guid)); break;
     case VarStaticString :
@@ -975,5 +1036,30 @@ void PVarType::OnGetValue()
 void PVarType::OnValueChanged()
 {
 }
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+static PThreadLocalStorage<PVarData::Object*> s_varDataInitialiser;
+
+PVarData::Object::Object()
+{
+  m_memberValues.DisallowDeleteObjects();
+  *s_varDataInitialiser = this;
+}
+
+
+void PVarData::ConstructMember(PString & name, PVarType * member)
+{
+  if (name[0] == '_')
+    name.Delete(0, 1);
+  else if (name.NumCompare("m_") == PObject::EqualTo)
+    name.Delete(0, 2);
+
+  PVarData::Object & obj = **s_varDataInitialiser;
+  obj.m_memberNames.AppendString(name);
+  obj.m_memberValues.SetAt(name, member);
+}
+
 
 #endif // P_VARTYPE

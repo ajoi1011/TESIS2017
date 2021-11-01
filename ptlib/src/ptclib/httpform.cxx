@@ -30,10 +30,10 @@
 
 #include <ptlib.h>
 #include <ptclib/httpform.h>
-#include <ptclib/random.h>
 
 #if P_HTTPFORMS
 
+#include <ptclib/random.h>
 #include <ptclib/cypher.h>
 
 
@@ -394,6 +394,64 @@ void PHTTPField::SaveToConfig(PConfig & cfg) const
 }
 
 
+static const PJSON::Base * InternalLoadFromJSON(const PJSON::Base & json, const PString & baseName, PJSON::Types type)
+{
+  if (json.IsType(type))
+    return &json;
+
+  if (json.IsType(PJSON::e_Object)) {
+    const PJSON::Object & obj = dynamic_cast<const PJSON::Object &>(json);
+    if (obj.IsType(baseName, type))
+      return obj.at(baseName);
+  }
+
+  if (json.IsType(PJSON::e_Array)) {
+    const PJSON::Array & arr = dynamic_cast<const PJSON::Array &>(json);
+    return arr.back();
+  }
+
+  return NULL;
+}
+
+
+void PHTTPField::LoadFromJSON(const PJSON::Base & json)
+{
+  const PJSON::String * data = dynamic_cast<const PJSON::String *>(InternalLoadFromJSON(json, m_baseName, PJSON::e_String));
+  if (data != NULL)
+    SetValue(*data);
+}
+
+
+static PJSON::Base * InternalSaveToJSON(PJSON::Base & json, const PString & baseName, PJSON::Types type)
+{
+  if (baseName.IsEmpty() && json.IsType(type))
+    return &json;
+
+  if (json.IsType(PJSON::e_Object)) {
+    PJSON::Object & obj = dynamic_cast<PJSON::Object &>(json);
+    if (obj.Set(baseName, type))
+      return obj.at(baseName);
+  }
+
+  if (json.IsType(PJSON::e_Array)) {
+    PJSON::Array & arr = dynamic_cast<PJSON::Array &>(json);
+    arr.Append(type);
+    return arr.back();
+  }
+
+  PAssertAlways(PLogicError);
+  return NULL;
+}
+
+
+void PHTTPField::SaveToJSON(PJSON::Base & json) const
+{
+  PJSON::String * data = dynamic_cast<PJSON::String *>(InternalSaveToJSON(json, m_baseName, PJSON::e_String));
+  if (data != NULL)
+    *data = GetValue();
+}
+
+
 PBoolean PHTTPField::Validated(const PString &, PStringStream &) const
 {
   return true;
@@ -454,6 +512,11 @@ void PHTTPDividerField::SetValue(const PString &)
 
 
 void PHTTPDividerField::SaveToConfig(PConfig &) const
+{
+}
+
+
+void PHTTPDividerField::SaveToJSON(PJSON::Base &) const
 {
 }
 
@@ -611,6 +674,28 @@ void PHTTPCompositeField::SaveToConfig(PConfig & cfg) const
 {
   for (PINDEX i = 0; i < GetSize(); i++)
     m_fields[i].SaveToConfig(cfg);
+}
+
+
+void PHTTPCompositeField::LoadFromJSON(const PJSON::Base & json)
+{
+  SetName(m_fullName);
+
+  const PJSON::Base * data = InternalLoadFromJSON(json, m_baseName, PJSON::e_Object);
+  if (data != NULL) {
+    for (PINDEX i = 0; i < GetSize(); i++)
+      m_fields[i].LoadFromJSON(*data);
+  }
+}
+
+
+void PHTTPCompositeField::SaveToJSON(PJSON::Base & json) const
+{
+  PJSON::Base * data = InternalSaveToJSON(json, m_baseName, PJSON::e_Object);
+  if (data != NULL) {
+    for (PINDEX i = 0; i < GetSize(); i++)
+      m_fields[i].SaveToJSON(*data);
+  }
 }
 
 
@@ -940,6 +1025,33 @@ void PHTTPFieldArray::SaveToConfig(PConfig & cfg) const
     }
   }
   PHTTPCompositeField::SaveToConfig(cfg);
+}
+
+
+void PHTTPFieldArray::LoadFromJSON(const PJSON::Base & json)
+{
+  const PJSON::Array * data = dynamic_cast<const PJSON::Array *>(InternalLoadFromJSON(json, m_baseName, PJSON::e_Array));
+  if (data == NULL)
+    return;
+
+  SetSize(data->size());
+  for (PINDEX i = 0; i < GetSize(); i++)
+    m_fields[i].LoadFromJSON(*data);
+}
+
+
+void PHTTPFieldArray::SaveToJSON(PJSON::Base & json) const
+{
+  PString adjustedName = m_baseName;
+  PINDEX pos = adjustedName.Find("%u");
+  if (pos != P_MAX_INDEX)
+    adjustedName.Delete(adjustedName.FindLast('\\', pos), P_MAX_INDEX);
+
+  PJSON::Base * data = InternalSaveToJSON(json, adjustedName, PJSON::e_Array);
+  if (data != NULL) {
+    for (PINDEX i = 0; i < GetSize(); i++)
+      m_fields[i].SaveToJSON(*data);
+  }
 }
 
 
@@ -1353,6 +1465,22 @@ void PHTTPIntegerField::SaveToConfig(PConfig & cfg) const
 }
 
 
+void PHTTPIntegerField::LoadFromJSON(const PJSON::Base & json)
+{
+  const PJSON::Number * data = dynamic_cast<const PJSON::Number *>(InternalLoadFromJSON(json, m_baseName, PJSON::e_Number));
+  if (data != NULL)
+    m_value = (int)data->GetValue();
+}
+
+
+void PHTTPIntegerField::SaveToJSON(PJSON::Base & json) const
+{
+  PJSON::Number * data = dynamic_cast<PJSON::Number *>(InternalSaveToJSON(json, m_baseName, PJSON::e_Number));
+  if (data != NULL)
+    *data = m_value;
+}
+
+
 PBoolean PHTTPIntegerField::Validated(const PString & newVal, PStringStream & msg) const
 {
   int val = newVal.AsInteger();
@@ -1492,6 +1620,22 @@ void PHTTPBooleanField::SaveToConfig(PConfig & cfg) const
     case 2 :
       cfg.SetBoolean(section, key, m_value);
   }
+}
+
+
+void PHTTPBooleanField::LoadFromJSON(const PJSON::Base & json)
+{
+  const PJSON::Boolean * data = dynamic_cast<const PJSON::Boolean *>(InternalLoadFromJSON(json, m_baseName, PJSON::e_Boolean));
+  if (data != NULL)
+    m_value = data->GetValue();
+}
+
+
+void PHTTPBooleanField::SaveToJSON(PJSON::Base & json) const
+{
+  PJSON::Boolean * data = dynamic_cast<PJSON::Boolean *>(InternalSaveToJSON(json, m_baseName, PJSON::e_Boolean));
+  if (data != NULL)
+    *data = m_value;
 }
 
 
@@ -2184,10 +2328,24 @@ void PHTTPConfig::Construct()
 }
 
 
-bool PHTTPConfig::LoadFromConfig()
+void PHTTPConfig::LoadFromConfig()
 {
   PConfig cfg(m_section);
-  return m_fields.LoadFromConfig(cfg);
+  m_fields.LoadFromConfig(cfg);
+}
+
+
+void PHTTPConfig::LoadFromJSON(const PJSON & json)
+{
+  if (json.IsType(PJSON::e_Object))
+    m_fields.LoadFromJSON(json.GetObject());
+}
+
+
+void PHTTPConfig::SaveToJSON(PJSON & json)
+{
+  json = PJSON(PJSON::e_Object);
+  m_fields.SaveToJSON(json.GetObject());
 }
 
 
@@ -2227,7 +2385,16 @@ PBoolean PHTTPConfig::Post(PHTTPRequest & request,
     }
   }
 
-  PHTTPForm::Post(request, data, msg);
+  if (request.inMIME.Get(PHTTP::ContentTypeTag) != PMIMEInfo::ApplicationJSON())
+    PHTTPForm::Post(request, data, msg);
+  else {
+    PJSON json(request.entityBody);
+    if (json.IsValid())
+      LoadFromJSON(json);
+    else
+      request.code = PHTTP::BadRequest;
+  }
+
   if (request.code != PHTTP::RequestOK)
     return true;
 

@@ -76,7 +76,7 @@ void PScriptLanguage::OnError(int code, const PString & str)
 
 bool PScriptLanguage::InternalSetFunction(const PString & name, const FunctionNotifier & func)
 {
-  FunctionMap::iterator it = m_functions.find(name);
+  FunctionMap::iterator it = m_functions.find(PString(name));
   if (it == m_functions.end())
     return func.IsNULL();
 
@@ -90,7 +90,7 @@ bool PScriptLanguage::InternalSetFunction(const PString & name, const FunctionNo
 
 void PScriptLanguage::InternalRemoveFunction(const PString & prefix)
 {
-  FunctionMap::iterator it = m_functions.lower_bound(prefix);
+  FunctionMap::iterator it = m_functions.lower_bound(PString(prefix));
   while (it != m_functions.end() && it->first.NumCompare(prefix) == EqualTo) {
     if (isalnum(it->first[prefix.GetLength()]))
       ++it;

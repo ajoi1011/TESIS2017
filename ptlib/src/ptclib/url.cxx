@@ -1150,6 +1150,36 @@ PFACTORY_CREATE(PURLSchemeFactory,PURL_TelScheme, "tel", true);
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// RFC8141/RFC3406/RFC2141 URN URI
+
+class PURL_URNScheme : public PURLScheme
+{
+    PCLASSINFO(PURL_URNScheme, PURLScheme);
+  public:
+    virtual bool Parse(const char * cstr, PURL & url) const
+    {
+      url.SetContents(cstr);
+      return true;
+    }
+
+    virtual PString AsString(PURL::UrlFormat fmt, const PURL& url) const
+    {
+      switch (fmt) {
+        case PURL::FullURL :
+          return "urn:" + url.GetContents();
+        case PURL::LocationOnly :
+          return PString::Empty();
+        default :
+          return url.GetContents();
+      }
+    }
+};
+
+PFACTORY_CREATE(PURLSchemeFactory, PURL_URNScheme, "urn", true);
+
+
+///////////////////////////////////////////////////////////////////////////////
+
 // RFC2397 data URI
 
 class PURL_DataScheme : public PURLScheme
@@ -1185,7 +1215,9 @@ class PURL_DataScheme : public PURLScheme
       const PStringToString & params = purl.GetParamVars();
       PStringStream strm;
 
-      strm << "data:" + params("type", PMIMEInfo::TextPlain());
+      if (fmt == PURL::FullURL)
+        strm << "data:";
+      strm << params("type", PMIMEInfo::TextPlain());
 
       bool base64 = false;
       for (PStringOptions::const_iterator it = params.begin(); it != params.end(); ++it) {

@@ -126,6 +126,28 @@ extern "C" {
 
 #define PTraceModule() "SSL"
 
+#if (OPENSSL_VERSION_NUMBER < 0x10100000L)
+  __inline unsigned char * EVP_CIPHER_CTX_iv(EVP_CIPHER_CTX * ctx) { return ctx->iv; }
+  __inline void DH_get0_pqg(const DH *dh, const BIGNUM **p, const BIGNUM **q, const BIGNUM **g) { if(p)*p=dh->p; if(q)*q=dh->q; if(g)*g=dh->g; }
+  __inline void DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g) { dh->p = p; dh->q = q; dh->g = g; }
+  __inline void DH_get0_key(const DH *dh, const BIGNUM **pub_key, const BIGNUM **priv_key) { if(pub_key)*pub_key=dh->pub_key; if(priv_key)*priv_key=dh->priv_key; }
+  __inline void DH_set0_key(DH *dh, BIGNUM *pub_key, BIGNUM *priv_key) { dh->pub_key = pub_key; dh->priv_key = priv_key; }
+  typedef BIO_METHOD * BIO_METHOD_PTR;
+  __inline BIO_METHOD *BIO_meth_new(int type, const char *name) { BIO_METHOD * biom = new BIO_METHOD(); memset(biom, 0, sizeof(*biom)); biom->type = type; biom->name = name; return biom; }
+  __inline void BIO_meth_free(BIO_METHOD *biom) { delete biom; }
+  __inline void BIO_meth_set_write(BIO_METHOD *biom, int (*write) (BIO *, const char *, int)) { biom->bwrite = write; }
+  __inline void BIO_meth_set_read(BIO_METHOD *biom, int (*read) (BIO *, char *, int)) { biom->bread = read;  }
+  __inline void BIO_meth_set_ctrl(BIO_METHOD *biom, long (*ctrl) (BIO *, int, long, void *)) { biom->ctrl = ctrl;  }
+  __inline void BIO_meth_set_destroy(BIO_METHOD *biom, int (*destroy) (BIO *)) { biom->destroy = destroy;  }
+  __inline int BIO_get_init(const BIO * bio) { return bio->init; }
+  __inline void BIO_set_init(BIO * bio, int init) { bio->init = init; }
+  __inline int BIO_get_shutdown(const BIO * bio) { return bio->shutdown; }
+  __inline void BIO_set_shutdown(BIO * bio, int shutdown) { bio->shutdown = shutdown; }
+  __inline void * BIO_get_data(const BIO * bio) { return bio->ptr; }
+  __inline void BIO_set_data(BIO * bio, void * data) { bio->ptr = data; }
+#else
+  typedef BIO_METHOD const * BIO_METHOD_PTR;
+#endif
 
 class PSSLInitialiser : public PProcessStartup
 {
@@ -133,12 +155,31 @@ class PSSLInitialiser : public PProcessStartup
   public:
     virtual void OnStartup();
     virtual void OnShutdown();
-    void LockingCallback(int mode, int n);
 
     PFACTORY_GET_SINGLETON(PProcessStartupFactory, PSSLInitialiser);
 
+#if (OPENSSL_VERSION_NUMBER < 0x10100000L)
+    static unsigned long ThreadIdCallback()
+    {
+      return PThread::GetCurrentUniqueIdentifier();
+    }
+
+    static void StaticLockingCallback(int mode, int n, const char *, int)
+    {
+      PSSLInitialiser::GetInstance().LockingCallback(mode, n);
+    }
+
+    void LockingCallback(int mode, int n)
+    {
+      if ((mode & CRYPTO_LOCK) != 0)
+        mutexes[n].Wait();
+      else
+        mutexes[n].Signal();
+    }
+
   private:
     vector<PMutex> mutexes;
+#endif
 };
 
 PFACTORY_CREATE_SINGLETON(PProcessStartupFactory, PSSLInitialiser);
@@ -161,7 +202,7 @@ static PString PSSLError(unsigned long err = ERR_peek_error())
 class PSSL_BIO
 {
   public:
-    PSSL_BIO(BIO_METHOD *method = BIO_s_file_internal())
+    PSSL_BIO(BIO_METHOD_PTR method = BIO_s_file())
       { bio = BIO_new(method); }
 
     ~PSSL_BIO()
@@ -1074,10 +1115,15 @@ void PAESContext::Decrypt(const void * in, void * out)
 
 PSSLCipherContext::PSSLCipherContext(bool encrypt)
   : m_padMode(PadPKCS)
-  , m_context(new EVP_CIPHER_CTX)
+  , m_encrypt(encrypt)
+  , m_context(EVP_CIPHER_CTX_new())
+  , m_pad_buf_len(0)
+  , m_pad_final_used(false)
 {
+  memset(m_pad_buf, 0, sizeof(m_pad_buf));
+  memset(m_pad_final_buf, 0, sizeof(m_pad_final_buf));
+
   EVP_CIPHER_CTX_init(m_context);
-  m_context->encrypt = encrypt;
   EVP_CIPHER_CTX_set_padding(m_context, 1);
 }
 
@@ -1085,7 +1131,7 @@ PSSLCipherContext::PSSLCipherContext(bool encrypt)
 PSSLCipherContext::~PSSLCipherContext()
 {
   EVP_CIPHER_CTX_cleanup(m_context);
-  delete m_context;
+  EVP_CIPHER_CTX_free(m_context);
 }
 
 
@@ -1113,7 +1159,7 @@ bool PSSLCipherContext::SetAlgorithm(const PString & name)
     }
   }
 
-  if (EVP_CipherInit_ex(m_context, cipher, NULL, NULL, NULL, m_context->encrypt)) {
+  if (EVP_CipherInit_ex(m_context, cipher, NULL, NULL, NULL, m_encrypt)) {
     PTRACE(4, "Set cipher algorithm \"" << GetAlgorithm() << "\" from \"" << name << '"');
     return true;
   }
@@ -1132,7 +1178,7 @@ bool PSSLCipherContext::SetKey(const BYTE * keyPtr, PINDEX keyLen)
     return false;
   }
 
-  if (EVP_CipherInit_ex(m_context, NULL, NULL, keyPtr, NULL, m_context->encrypt))
+  if (EVP_CipherInit_ex(m_context, NULL, NULL, keyPtr, NULL, m_encrypt))
     return true;
 
   PTRACE(2, "Could not set key: " << PSSLError());
@@ -1154,7 +1200,7 @@ bool PSSLCipherContext::SetIV(const BYTE * ivPtr, PINDEX ivLen)
     return false;
   }
 
-  if (EVP_CipherInit_ex(m_context, NULL, NULL, NULL, ivPtr, m_context->encrypt))
+  if (EVP_CipherInit_ex(m_context, NULL, NULL, NULL, ivPtr, m_encrypt))
     return true;
 
   PTRACE(2, "Could not set initial vector: " << PSSLError());
@@ -1174,246 +1220,369 @@ bool PSSLCipherContext::Process(const PBYTEArray & in, PBYTEArray & out)
   return out.SetSize(outLen);
 }
 
-
-// ciphertext stealing code based on a OpenSSL patch by An-Cheng Huang
-// Note: This ciphertext stealing implementation doesn't seem to always produce
-// compatible results, avoid when encrypting:
-
-static int EVP_CipherUpdate_cts(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl,
-                      const unsigned char *in, int inl)
+bool PSSLCipherContext::UpdateCTS(unsigned char *out, int *outl, const unsigned char *in, int inl)
 {
-    int bl = ctx->cipher->block_size;
-    int leftover = 0;
-    OPENSSL_assert(bl <= (int)sizeof(ctx->buf));
-    *outl = 0;
+  const int bl = EVP_CIPHER_CTX_block_size(m_context);
+  PAssert(bl <= (int)sizeof(m_pad_buf), PLogicError);
+  *outl = 0;
 
-    if ((ctx->buf_len + inl) <= bl) {
-        /* new plaintext is no more than 1 block */
-        /* copy the in data into the buffer and return */
-        memcpy(&(ctx->buf[ctx->buf_len]), in, inl);
-        ctx->buf_len += inl;
-        *outl = 0;
-        return 1;
-    }
+  if (inl <= 0)
+    return inl == 0;
 
-    /* more than 1 block of new plaintext available */
-    /* encrypt the previous plaintext, if any */
-    if (ctx->final_used) {
-        if (!(ctx->cipher->do_cipher(ctx, out, ctx->final, bl))) {
-          return 0;
-        }
-        out += bl;
-        *outl += bl;
-        ctx->final_used = 0;
-    }
+  if ((m_pad_buf_len + inl) <= bl) {
+    /* new plaintext is no more than 1 block */
+    /* copy the in data into the buffer and return */
+    memcpy(&(m_pad_buf[m_pad_buf_len]), in, inl);
+    m_pad_buf_len += inl;
+    return true;
+  }
 
-    /* we already know ctx->buf_len + inl must be > bl */
-    memcpy(&(ctx->buf[ctx->buf_len]), in, (bl - ctx->buf_len));
-    in += (bl - ctx->buf_len);
-    inl -= (bl - ctx->buf_len);
-    ctx->buf_len = bl;
+  /* more than 1 block of new plaintext available */
+  /* encrypt the previous plaintext, if any */
+  if (m_pad_final_used) {
+    if (!EVP_Cipher(m_context, out, m_pad_final_buf, bl))
+      return false;
 
-    if (inl <= bl) {
-        memcpy(ctx->final, ctx->buf, bl);
-        ctx->final_used = 1;
-        memcpy(ctx->buf, in, inl);
-        ctx->buf_len = inl;
-        return 1;
-    } else {
-        if (!(ctx->cipher->do_cipher(ctx, out, ctx->buf, bl))) {
-            return 0;
-        }
-        out += bl;
-        *outl += bl;
-        ctx->buf_len = 0;
+    out += bl;
+    *outl += bl;
+    m_pad_final_used = false;
+  }
 
-        leftover = inl & ctx->block_mask;
-        if (leftover) {
-            inl -= (bl + leftover);
-            memcpy(ctx->buf, &(in[(inl + bl)]), leftover);
-            ctx->buf_len = leftover;
-        } else {
-            inl -= (2 * bl);
-             memcpy(ctx->buf, &(in[(inl + bl)]), bl);
-             ctx->buf_len = bl;
-        }
-        memcpy(ctx->final, &(in[inl]), bl);
-        ctx->final_used = 1;
-        if (!(ctx->cipher->do_cipher(ctx, out, in, inl))) {
-            return 0;
-        }
-        out += inl;
-        *outl += inl;
-    }
+  /* we already know buf_len + inl must be > bl */
+  memcpy(&(m_pad_buf[m_pad_buf_len]), in, (bl - m_pad_buf_len));
+  in += (bl - m_pad_buf_len);
+  inl -= (bl - m_pad_buf_len);
+  m_pad_buf_len = bl;
 
-    return 1;
+  if (inl <= bl) {
+    memcpy(m_pad_final_buf, m_pad_buf, bl);
+    m_pad_final_used = true;
+    memcpy(m_pad_buf, in, inl);
+    m_pad_buf_len = inl;
+    return true;
+  }
+
+  if (!EVP_Cipher(m_context, out, m_pad_buf, bl))
+    return false;
+
+  out += bl;
+  *outl += bl;
+  m_pad_buf_len = 0;
+
+  int leftover = inl & (bl - 1);
+  if (leftover) {
+    inl -= (bl + leftover);
+    memcpy(m_pad_buf, &(in[(inl + bl)]), leftover);
+    m_pad_buf_len = leftover;
+  }
+  else {
+    inl -= (2 * bl);
+    memcpy(m_pad_buf, &(in[(inl + bl)]), bl);
+    m_pad_buf_len = bl;
+  }
+  memcpy(m_pad_final_buf, &(in[inl]), bl);
+  m_pad_final_used = true;
+
+  if (!EVP_Cipher(m_context, out, in, inl))
+    return false;
+
+  out += inl;
+  *outl += inl;
+
+  return true;
 }
 
-static int EVP_EncryptFinal_cts(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
+bool PSSLCipherContext::EncryptFinalCTS(unsigned char *out, int *outl)
 {
-    unsigned char tmp[EVP_MAX_BLOCK_LENGTH];
-    int bl = ctx->cipher->block_size;
-    int leftover = 0;
-    *outl = 0;
+  unsigned char tmp[EVP_MAX_BLOCK_LENGTH];
+  const int bl = EVP_CIPHER_CTX_block_size(m_context);
+  int leftover = 0;
+  *outl = 0;
 
-    if (!ctx->final_used) {
-        PTRACE(1, "CTS Error: expecting previous ciphertext");
-        return 0;
-    }
-    if (ctx->buf_len == 0) {
-        PTRACE(1, "CTS Error: expecting previous plaintext");
-        return 0;
-    }
+  if (!m_pad_final_used) {
+    PTRACE(1, "CTS Error: expecting previous ciphertext");
+    return false;
+  }
 
-    /* handle leftover bytes */
-    leftover = ctx->buf_len;
+  if (m_pad_buf_len == 0) {
+    PTRACE(1, "CTS Error: expecting previous plaintext");
+    return false;
+  }
 
-    switch (EVP_CIPHER_CTX_mode(ctx)) {
-        case EVP_CIPH_ECB_MODE: {
-            /* encrypt => C_{n} plus C' */
-            if (!(ctx->cipher->do_cipher(ctx, tmp, ctx->final, bl))) {
-                 return 0;
-            }
+  /* handle leftover bytes */
+  leftover = m_pad_buf_len;
 
-            /* P_n plus C' */
-            memcpy(&(ctx->buf[leftover]), &(tmp[leftover]), (bl - leftover));
-            /* encrypt => C_{n-1} */
-            if (!(ctx->cipher->do_cipher(ctx, out, ctx->buf, bl))) {
-                return 0;
-            }
+  switch (EVP_CIPHER_CTX_mode(m_context)) {
+    case EVP_CIPH_ECB_MODE:
+      /* encrypt => C_{n} plus C' */
+      if (!EVP_Cipher(m_context, tmp, m_pad_final_buf, bl))
+        return false;
 
-            memcpy((out + bl), tmp, leftover);
-            *outl += (bl + leftover);
-            return 1;
-        }
-        case EVP_CIPH_CBC_MODE: {
-            /* encrypt => C_{n} plus C' */
-            if (!(ctx->cipher->do_cipher(ctx, tmp, ctx->final, bl))) {
-                return 0;
-            }
+      /* P_n plus C' */
+      memcpy(&(m_pad_buf[leftover]), &(tmp[leftover]), (bl - leftover));
+      /* encrypt => C_{n-1} */
+      if (!EVP_Cipher(m_context, out, m_pad_buf, bl))
+        return false;
 
-            /* P_n plus 0s */
-            memset(&(ctx->buf[leftover]), 0, (bl - leftover));
+      memcpy((out + bl), tmp, leftover);
+      *outl += (bl + leftover);
+      return true;
 
-            /* note that in cbc encryption, plaintext will be xor'ed with the previous
-             * ciphertext, which is what we want.
-             */
-            /* encrypt => C_{n-1} */
-            if (!(ctx->cipher->do_cipher(ctx, out, ctx->buf, bl))) {
-                return 0;
-            }
+    case EVP_CIPH_CBC_MODE:
+      /* encrypt => C_{n} plus C' */
+      if (!EVP_Cipher(m_context, tmp, m_pad_final_buf, bl))
+        return false;
 
-            memcpy((out + bl), tmp, leftover);
-            *outl += (bl + leftover);
-            return 1;
-        }
-        default:
-            PTRACE(1, "CTS Error: unsupported mode");
-            return 0;
-    }
+      /* P_n plus 0s */
+      memset(&(m_pad_buf[leftover]), 0, (bl - leftover));
+
+      /* note that in cbc encryption, plaintext will be xor'ed with the previous
+              * ciphertext, which is what we want.
+              */
+      /* encrypt => C_{n-1} */
+      if (!EVP_Cipher(m_context, out, m_pad_buf, bl))
+        return false;
+
+      memcpy((out + bl), tmp, leftover);
+      *outl += (bl + leftover);
+      return true;
+
+    default:
+      PTRACE(1, "CTS Error: unsupported mode");
+      return false;
+  }
 }
 
-static int EVP_DecryptFinal_cts(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
+bool PSSLCipherContext::DecryptFinalCTS(unsigned char *out, int *outl)
 {
-    unsigned char tmp[EVP_MAX_BLOCK_LENGTH];
-    int bl = ctx->cipher->block_size;
-    int leftover = 0;
-    *outl = 0;
+  unsigned char tmp[EVP_MAX_BLOCK_LENGTH];
+  const int bl = EVP_CIPHER_CTX_block_size(m_context);
+  int leftover = 0;
+  *outl = 0;
 
-    if (!ctx->final_used) {
-        PTRACE(1, "CTS Error: expecting previous ciphertext");
-        return 0;
-    }
-    if (ctx->buf_len == 0) {
-        PTRACE(1, "CTS Error: expecting previous ciphertext");
-        return 0;
-    }
+  if (!m_pad_final_used) {
+    PTRACE(1, "CTS Error: expecting previous ciphertext");
+    return false;
+  }
 
-    /* handle leftover bytes */
-    leftover = ctx->buf_len;
+  if (m_pad_buf_len == 0) {
+    PTRACE(1, "CTS Error: expecting previous ciphertext");
+    return false;
+  }
 
-    switch (EVP_CIPHER_CTX_mode(ctx)) {
-        case EVP_CIPH_ECB_MODE: {
-            /* decrypt => P_n plus C' */
-            if (!(ctx->cipher->do_cipher(ctx, tmp, ctx->final, bl))) {
-                return 0;
-            }
+  /* handle leftover bytes */
+  leftover = m_pad_buf_len;
 
-            /* C_n plus C' */
-            memcpy(&(ctx->buf[leftover]), &(tmp[leftover]), (bl - leftover));
-            /* decrypt => P_{n-1} */
-            if (!(ctx->cipher->do_cipher(ctx, out, ctx->buf, bl))) {
-                return 0;
-            }
+  switch (EVP_CIPHER_CTX_mode(m_context)) {
+    case EVP_CIPH_ECB_MODE:
+      /* decrypt => P_n plus C' */
+      if (!EVP_Cipher(m_context, tmp, m_pad_final_buf, bl))
+        return false;
 
-            memcpy((out + bl), tmp, leftover);
-            *outl += (bl + leftover);
-            return 1;
-        }
-        case EVP_CIPH_CBC_MODE: {
-            int i = 0;
-            unsigned char C_n_minus_2[EVP_MAX_BLOCK_LENGTH];
+      /* C_n plus C' */
+      memcpy(&(m_pad_buf[leftover]), &(tmp[leftover]), (bl - leftover));
+      /* decrypt => P_{n-1} */
+      if (!EVP_Cipher(m_context, out, m_pad_buf, bl))
+        return false;
 
-            memcpy(C_n_minus_2, ctx->iv, bl);
+      memcpy((out + bl), tmp, leftover);
+      *outl += (bl + leftover);
+      return true;
 
-            /* C_n plus 0s in ctx->buf */
-            memset(&(ctx->buf[leftover]), 0, (bl - leftover));
+    case EVP_CIPH_CBC_MODE:
+      unsigned char C_n_minus_2[EVP_MAX_BLOCK_LENGTH];
 
-            /* ctx->final is C_{n-1} */
-            /* decrypt => (P_n plus C')'' */
-            if (!(ctx->cipher->do_cipher(ctx, tmp, ctx->final, bl))) {
-                return 0;
-            }
-            /* XOR'ed with C_{n-2} => (P_n plus C')' */
-            for (i = 0; i < bl; i++) {
-                tmp[i] = tmp[i] ^ C_n_minus_2[i];
-            }
-            /* XOR'ed with (C_n plus 0s) => P_n plus C' */
-            for (i = 0; i < bl; i++) {
-                tmp[i] = tmp[i] ^ ctx->buf[i];
-            }
+      memcpy(C_n_minus_2, EVP_CIPHER_CTX_iv(m_context), bl);
 
-            /* C_n plus C' in ctx->buf */
-            memcpy(&(ctx->buf[leftover]), &(tmp[leftover]), (bl - leftover));
-            /* decrypt => P_{n-1}'' */
-            if (!(ctx->cipher->do_cipher(ctx, out, ctx->buf, bl))) {
-                return 0;
-            }
-            /* XOR'ed with C_{n-1} => P_{n-1}' */
-            for (i = 0; i < bl; i++) {
-                out[i] = out[i] ^ ctx->final[i];
-            }
-            /* XOR'ed with C_{n-2} => P_{n-1} */
-            for (i = 0; i < bl; i++) {
-                out[i] = out[i] ^ C_n_minus_2[i];
-            }
+      /* C_n plus 0s in buf */
+      memset(&(m_pad_buf[leftover]), 0, (bl - leftover));
 
-            memcpy((out + bl), tmp, leftover);
-            *outl += (bl + leftover);
-            return 1;
-        }
-        default:
-            PTRACE(1, "CTS Error: unsupported mode");
-            return 0;
-    }
+      /* final_buf is C_{n-1} */
+      /* decrypt => (P_n plus C')'' */
+      if (!EVP_Cipher(m_context, tmp, m_pad_final_buf, bl))
+        return false;
+
+      /* XOR'ed with C_{n-2} => (P_n plus C')' */
+      for (int i = 0; i < bl; i++)
+        tmp[i] = tmp[i] ^ C_n_minus_2[i];
+
+      /* XOR'ed with (C_n plus 0s) => P_n plus C' */
+      for (int i = 0; i < bl; i++)
+        tmp[i] = tmp[i] ^ m_pad_buf[i];
+
+      /* C_n plus C' in buf */
+      memcpy(&(m_pad_buf[leftover]), &(tmp[leftover]), (bl - leftover));
+      /* decrypt => P_{n-1}'' */
+      if (!EVP_Cipher(m_context, out, m_pad_buf, bl))
+        return false;
+
+      /* XOR'ed with C_{n-1} => P_{n-1}' */
+      for (int i = 0; i < bl; i++)
+        out[i] = out[i] ^ m_pad_final_buf[i];
+
+      /* XOR'ed with C_{n-2} => P_{n-1} */
+      for (int i = 0; i < bl; i++)
+        out[i] = out[i] ^ C_n_minus_2[i];
+
+      memcpy((out + bl), tmp, leftover);
+      *outl += (bl + leftover);
+      return true;
+
+    default:
+      PTRACE(1, "CTS Error: unsupported mode");
+      return false;
+  }
 }
 
+bool PSSLCipherContext::UpdateLoose(unsigned char *out, int *outl, const unsigned char *in, int inl)
+{
+  *outl = 0;
+
+  if (inl <= 0)
+    return inl == 0;
+
+  const int bl = EVP_CIPHER_CTX_block_size(m_context);
+  PAssert(bl <= (int)sizeof(m_pad_buf), PLogicError);
+  if (m_pad_buf_len == 0 && (inl & (bl - 1)) == 0) {
+    if (!EVP_Cipher(m_context, out, in, inl))
+      return false;
+
+    *outl = inl;
+    return true;
+  }
+
+  int i = m_pad_buf_len;
+  if (i != 0) {
+    if (i + inl < bl) {
+      memcpy(m_pad_buf + i, in, inl);
+      m_pad_buf_len += inl;
+      return true;
+    }
+
+    int j = bl - i;
+    memcpy(m_pad_buf + i, in, j);
+    if (!EVP_Cipher(m_context, out, m_pad_buf, bl))
+      return false;
+
+    inl -= j;
+    in += j;
+    out += bl;
+    *outl = bl;
+  }
+
+  i = inl & (bl - 1);
+  inl -= i;
+  if (inl > 0) {
+    if (!EVP_Cipher(m_context, out, in, inl))
+      return false;
+
+    *outl += inl;
+  }
+
+  if (i != 0)
+    memcpy(m_pad_buf, in + inl, i);
+  m_pad_buf_len = i;
+  return true;
+}
+
+bool PSSLCipherContext::DecryptUpdateLoose(unsigned char *out, int *outl, const unsigned char *in, int inl)
+{
+  if (inl <= 0) {
+    *outl = 0;
+    return inl == 0;
+  }
+
+  const int bl = EVP_CIPHER_CTX_block_size(m_context);
+  PAssert(bl <= (int)sizeof(m_pad_final_buf), PLogicError);
+
+  int fix_len = 0;
+  if (m_pad_final_used) {
+    memcpy(out, m_pad_final_buf, bl);
+    out += bl;
+    fix_len = 1;
+  }
+
+  if (!UpdateLoose(out, outl, in, inl))
+    return false;
+
+  /*
+     * if we have 'decrypted' a multiple of block size, make sure we have a
+     * copy of this last block
+     */
+  if (bl > 1 && !m_pad_buf_len) {
+    *outl -= bl;
+    m_pad_final_used = true;
+    memcpy(m_pad_final_buf, out + *outl, bl);
+  }
+  else
+    m_pad_final_used = false;
+
+  if (fix_len)
+    *outl += bl;
+
+  return true;
+}
+
+bool PSSLCipherContext::DecryptFinalLoose(unsigned char *out, int *outl)
+{
+  *outl = 0;
+
+  const int bl = EVP_CIPHER_CTX_block_size(m_context);
+  if (bl > 1) {
+    if (m_pad_buf_len || !m_pad_final_used) {
+      PTRACE(1, "Decrypt error: wrong final block length");
+      return false;
+    }
+
+    PAssert(bl <= (int)sizeof(m_pad_final_buf), PLogicError);
+    int n = m_pad_final_buf[bl - 1];
+    if (n == 0 || n > bl) {
+      PTRACE(1, "Decrypt error: bad decrypt");
+      return false;
+    }
+
+    // Polycom endpoints (eg. m100 and PVX) don't fill the padding propperly, so we have to disable this check
+    /*
+        for (int i=0; i<n; i++) {
+            if (final_buf[bl - i] != n) {
+                PTRACE(1, "Decrypt error: incorrect padding");
+                return false;
+            }
+        }
+*/
+    n = bl - n;
+    memcpy(out, m_pad_final_buf, n);
+    *outl = n;
+  }
+
+  return true;
+}
 
 bool PSSLCipherContext::Process(const BYTE * inPtr, PINDEX inLen, BYTE * outPtr, PINDEX & outLen, bool partial)
 {
-  if (outLen < (m_context->encrypt ? GetBlockedDataSize(inLen) : inLen))
+  if (outLen < (m_encrypt ? GetBlockedDataSize(inLen) : inLen))
     return false;
 
   int len = -1;
-  if (m_padMode == PadCipherStealing) {
-    if (!EVP_CipherUpdate_cts(m_context, outPtr, &len, inPtr, inLen))
-      return false;
-  }
-  else {
-    if (!EVP_CipherUpdate(m_context, outPtr, &len, inPtr, inLen)) {
-      PTRACE(2, "Could not update data: " << PSSLError());
-      return false;
-    }
+  switch (m_padMode) {
+    case PadCipherStealing :
+      if (!UpdateCTS(outPtr, &len, inPtr, inLen))
+        return false;
+      break;
+
+    case PadLoosePKCS :
+      if (!m_encrypt) {
+        if (!DecryptUpdateLoose(outPtr, &len, inPtr, inLen))
+          return false;
+        break;
+      }
+      // Do next case
+
+    default :
+      if (!EVP_CipherUpdate(m_context, outPtr, &len, inPtr, inLen)) {
+        PTRACE(2, "Could not update data: " << PSSLError());
+        return false;
+      }
   }
 
   outLen = len;
@@ -1430,6 +1599,15 @@ bool PSSLCipherContext::Process(const BYTE * inPtr, PINDEX inLen, BYTE * outPtr,
       len = 0;
       break;
 
+    // Polycom endpoints (eg. m100 and PVX) don't fill the pading properly, so we have to disable some checks
+    case PadLoosePKCS :
+      if (!m_encrypt) {
+        if (!DecryptFinalLoose(outPtr+len, &len))
+          return false;
+        break;
+      }
+      // Do next case
+
     case PadPKCS :
       if (!EVP_CipherFinal(m_context, outPtr+len, &len)) {
         PTRACE(2, "Could not finalise data: " << PSSLError());
@@ -1437,30 +1615,8 @@ bool PSSLCipherContext::Process(const BYTE * inPtr, PINDEX inLen, BYTE * outPtr,
       }
       break;
 
-    // Polycom endpoints (eg. m100 and PVX) don't fill the pading properly, so we have to disable some checks
-    case PadLoosePKCS :
-      if (m_context->buf_len != 0 || m_context->final_used == 0) {
-        PTRACE(2, "Decrypt error: wrong final block length:"
-                       " buf_len=" << m_context->buf_len <<
-                    " final_used=" << m_context->final_used);
-        return false;
-      }
-      else {
-        int b = m_context->cipher->block_size;
-        int n = m_context->final[b-1];
-        if (n == 0 || n > b) {
-          PTRACE(1, "Decrypt error: bad decrypt");
-          return false;
-        }
-        len = b - n;
-        for (n = 0; n < len; n++)
-          outPtr[outLen+n] = m_context->final[n];
-      }
-      break;
-
     case PadCipherStealing :
-      if (!(m_context->encrypt ? EVP_EncryptFinal_cts(m_context, outPtr+len, &len)
-                               : EVP_DecryptFinal_cts(m_context, outPtr+len, &len)))
+      if (!(m_encrypt ? EncryptFinalCTS(outPtr+len, &len) : DecryptFinalCTS(outPtr+len, &len)))
         return false;
       break;
   }
@@ -1472,7 +1628,7 @@ bool PSSLCipherContext::Process(const BYTE * inPtr, PINDEX inLen, BYTE * outPtr,
 
 bool PSSLCipherContext::IsEncrypt() const
 {
-  return m_context->encrypt != 0;
+  return m_encrypt;
 }
 
 
@@ -1587,11 +1743,7 @@ bool PSSLDiffieHellman::Construct(const BYTE * pData, PINDEX pSize,
   if (!PAssert(pSize >= 64 && pSize%4 == 0 && gSize <= pSize && kSize <= pSize, PInvalidParameter))
     return false;
 
-  if ((m_dh->p = BN_bin2bn(pData, pSize, NULL)) == NULL)
-    return false;
-
-  if ((m_dh->g = BN_bin2bn(gData, gSize, NULL)) == NULL)
-    return false;
+  DH_set0_pqg(m_dh, BN_bin2bn(pData, pSize, NULL), NULL, BN_bin2bn(gData, gSize, NULL));
 
   int err = -1;
   if (DH_check(m_dh, &err)) {
@@ -1625,11 +1777,15 @@ bool PSSLDiffieHellman::Construct(const BYTE * pData, PINDEX pSize,
   if (!PAssert(kSize <= pSize && kSize%4 == 0, PInvalidParameter))
     return false;
 
-  if ((m_dh->pub_key = BN_bin2bn(kData, kSize, NULL)) != NULL)
-    return true;
+  BIGNUM * pub_key = BN_bin2bn(kData, kSize, NULL);
+  if (pub_key == NULL) {
+    PSSLAssert("DH public key invalid: ");
+    return false;
+  }
 
-  PSSLAssert("DH public key invalid: ");
-  return false;
+  DH_set0_key(m_dh, pub_key, NULL);
+  return true;
+
 }
 
 
@@ -1719,18 +1875,23 @@ PBoolean PSSLDiffieHellman::Load(const PFilePath & dhFile, PSSLFileTypes fileTyp
 
 PINDEX PSSLDiffieHellman::GetNumBits() const
 {
-  return m_dh != NULL ? BN_num_bits(m_dh->p) : 0;
+  if (m_dh == NULL)
+    return 0;
+
+  const BIGNUM * p;
+  DH_get0_pqg(m_dh, &p, NULL, NULL);
+  return BN_num_bits(p);
 }
 
 
-static PBYTEArray GetBigNum(BIGNUM * bn, PINDEX numBits)
+static PBYTEArray GetBigNum(const BIGNUM * bn)
 {
   PBYTEArray bytes;
 
   if (bn == NULL)
     return bytes;
 
-  PINDEX numBytes = numBits/8;
+  PINDEX numBytes = BN_num_bits(bn)/8;
   if (BN_bn2bin(bn, bytes.GetPointer(numBytes) + numBytes - BN_num_bytes(bn)) > 0)
     return bytes;
 
@@ -1741,19 +1902,34 @@ static PBYTEArray GetBigNum(BIGNUM * bn, PINDEX numBits)
 
 PBYTEArray PSSLDiffieHellman::GetModulus() const
 {
-  return GetBigNum(m_dh != NULL ? m_dh->p : NULL, GetNumBits());
+  if (m_dh == NULL)
+    return PBYTEArray();
+
+  const BIGNUM * p;
+  DH_get0_pqg(m_dh, &p, NULL, NULL);
+  return GetBigNum(p);
 }
 
 
 PBYTEArray PSSLDiffieHellman::GetGenerator() const
 {
-  return GetBigNum(m_dh != NULL ? m_dh->g : NULL, GetNumBits());
+  if (m_dh == NULL)
+    return PBYTEArray();
+
+  const BIGNUM * g;
+  DH_get0_pqg(m_dh, NULL, NULL, &g);
+  return GetBigNum(g);
 }
 
 
 PBYTEArray PSSLDiffieHellman::GetHalfKey() const
 {
-  return GetBigNum(m_dh != NULL ? m_dh->pub_key : NULL, GetNumBits());
+  if (m_dh == NULL)
+    return PBYTEArray();
+
+  const BIGNUM * k;
+  DH_get0_key(m_dh, &k, NULL);
+  return GetBigNum(k);
 }
 
 
@@ -1778,18 +1954,6 @@ bool PSSLDiffieHellman::ComputeSessionKey(const PBYTEArray & otherHalf)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void LockingCallback(int mode, int n, const char * /*file*/, int /*line*/)
-{
-  PSSLInitialiser::GetInstance().LockingCallback(mode, n);
-}
-
-
-static unsigned long ThreadIdCallback()
-{
-  return PThread::GetCurrentUniqueIdentifier();
-}
-
-
 void PSSLInitialiser::OnStartup()
 {
   SSL_library_init();
@@ -1801,11 +1965,13 @@ void PSSLInitialiser::OnStartup()
     seed[i] = (BYTE)rand();
   RAND_seed(seed, sizeof(seed));
 
+#if (OPENSSL_VERSION_NUMBER < 0x10100000L)
   // set up multithread stuff
   for (int i = 0; i < CRYPTO_num_locks(); ++i)
     mutexes.push_back(PMutex(PDebugLocation(__FILE__, __LINE__, "SSLMutex")));
-  CRYPTO_set_locking_callback(::LockingCallback);
+  CRYPTO_set_locking_callback(StaticLockingCallback);
   CRYPTO_set_id_callback(ThreadIdCallback);
+#endif
 }
 
 
@@ -1813,16 +1979,9 @@ void PSSLInitialiser::OnShutdown()
 {
   CRYPTO_set_locking_callback(NULL);
   ERR_free_strings();
+#if (OPENSSL_VERSION_NUMBER < 0x10100000L)
   mutexes.clear();
-}
-
-
-void PSSLInitialiser::LockingCallback(int mode, int n)
-{
-  if ((mode & CRYPTO_LOCK) != 0)
-    mutexes[n].Wait();
-  else
-    mutexes[n].Signal();
+#endif
 }
 
 
@@ -2412,29 +2571,20 @@ void PSSLChannel::Construct(PSSLContext * ctx, PBoolean autoDel)
 
   SSL_set_app_data(m_ssl, this);
 
-  static BIO_METHOD BioMethods =
-  {
-    BIO_TYPE_SOCKET,
-    "PTLib-PSSLChannel",
-    BioWrite,
-    BioRead,
-    NULL,
-    NULL,
-    BioControl,
-    NULL,
-    BioClose,
-    NULL
-  };
+  m_bioMethod = BIO_meth_new(BIO_TYPE_SOCKET, "PTLib-PSSLChannel");
+  BIO_meth_set_write(m_bioMethod, BioWrite);
+  BIO_meth_set_read(m_bioMethod, BioRead);
+  BIO_meth_set_ctrl(m_bioMethod, BioControl);
+  BIO_meth_set_destroy(m_bioMethod, BioClose);
 
-  m_bio = BIO_new(&BioMethods);
+  m_bio = BIO_new(m_bioMethod);
   if (m_bio == NULL) {
     PSSLAssert("Error creating BIO: ");
     return;
   }
 
-  m_bio->ptr = this;
-  m_bio->init = 1;
-
+  BIO_set_data(m_bio, this);
+  BIO_set_init(m_bio, 1);
   SSL_set_bio(m_ssl, m_bio, m_bio);
 
   PTRACE(4, "Constructed channel: ssl=" << m_ssl << " method=" << m_context->GetMethod() << " context=" << &*m_context);
@@ -2450,6 +2600,10 @@ PSSLChannel::~PSSLChannel()
     SSL_free(m_ssl);
 
   // The above free of SSL also frees the m_bio, no need to it here
+  // But we do need to clean up the bio method
+
+  if (m_bioMethod != NULL)
+    BIO_meth_free(m_bioMethod);
 
   if (m_autoDeleteContext)
     delete m_context;
@@ -2488,7 +2642,14 @@ PBoolean PSSLChannel::Read(void * buf, PINDEX len)
 
 int PSSLChannel::BioRead(bio_st * bio, char * buf, int len)
 {
-  return bio != NULL && bio->ptr != NULL ? reinterpret_cast<PSSLChannel *>(bio->ptr)->BioRead(buf, len) : -1;
+  if (bio == NULL)
+    return -1;
+
+  void * p = BIO_get_data(bio);
+  if (p == NULL)
+    return -1;
+
+  return reinterpret_cast<PSSLChannel *>(p)->BioRead(buf, len);
 }
 
 
@@ -2549,7 +2710,14 @@ PBoolean PSSLChannel::Write(const void * buf, PINDEX len)
 
 int PSSLChannel::BioWrite(bio_st * bio, const char * buf, int len)
 {
-  return bio != NULL && bio->ptr != NULL ? reinterpret_cast<PSSLChannel *>(bio->ptr)->BioWrite(buf, len) : -1;
+  if (bio == NULL)
+    return -1;
+
+  void * p = BIO_get_data(bio);
+  if (p == NULL)
+    return -1;
+
+  return reinterpret_cast<PSSLChannel *>(p)->BioWrite(buf, len);
 }
 
 
@@ -2592,19 +2760,26 @@ PBoolean PSSLChannel::Close()
 
 int PSSLChannel::BioClose(bio_st * bio)
 {
-  return bio != NULL && bio->ptr != NULL ? reinterpret_cast<PSSLChannel *>(bio->ptr)->BioClose() : 0;
+  if (bio == NULL)
+    return 0;
+
+  void * p = BIO_get_data(bio);
+  if (p == NULL)
+    return 0;
+
+  return reinterpret_cast<PSSLChannel *>(p)->BioClose();
 }
 
 
 int PSSLChannel::BioClose()
 {
-  if (m_bio->shutdown) {
-    if (m_bio->init) {
+  if (BIO_get_shutdown(m_bio)) {
+    if (BIO_get_init(m_bio)) {
       Shutdown(PSocket::ShutdownReadAndWrite);
       PIndirectChannel::Close(); // Don't do PSSLChannel::Close() as OpenSSL might die
     }
-    m_bio->init  = 0;
-    m_bio->flags = 0;
+    BIO_set_init(m_bio, 0);
+    BIO_set_flags(m_bio, 0);
   }
 
   return 1;
@@ -2613,16 +2788,22 @@ int PSSLChannel::BioClose()
 
 PBoolean PSSLChannel::ConvertOSError(P_INT_PTR libcReturnValue, ErrorGroup group)
 {
-  Errors lastError = NoError;
-  DWORD osError = 0;
-  if (m_ssl != NULL && SSL_get_error(m_ssl, (int)libcReturnValue) != SSL_ERROR_NONE && (osError = ERR_peek_error()) != 0) {
-    osError |= 0x80000000;
-    if (osError == 0x94090086) {
-      int certVerifyError = GetErrorNumber(LastGeneralError);
-      if ((certVerifyError & 0xc0000000) == 0xc0000000)
-        osError = certVerifyError;
-    }
-    lastError = AccessDenied;
+  if (m_ssl == NULL)
+    return SetErrorValues(NotOpen, EBADF, group);
+
+  if (libcReturnValue >= 0)
+    return SetErrorValues(NoError, 0, group);
+
+  Errors lastError = AccessDenied;
+  DWORD osError = SSL_get_error(m_ssl, (int)libcReturnValue);
+  if (osError == SSL_ERROR_NONE)
+    osError = ERR_peek_error();
+  osError |= 0x80000000;
+
+  if (osError == 0x94090086) {
+    int certVerifyError = GetErrorNumber(LastGeneralError);
+    if ((certVerifyError & 0xc0000000) == 0xc0000000)
+      osError = certVerifyError;
   }
 
   return SetErrorValues(lastError, osError, group);
@@ -2791,7 +2972,14 @@ bool PSSLChannel::GetPeerCertificate(PSSLCertificate & certificate, PString * er
 
 long PSSLChannel::BioControl(bio_st * bio, int cmd, long num, void * ptr)
 {
-  return bio != NULL && bio->ptr != NULL ? reinterpret_cast<PSSLChannel *>(bio->ptr)->BioControl(cmd, num, ptr) : 0;
+  if (bio == NULL)
+    return 0;
+
+  void * p = BIO_get_data(bio);
+  if (p == NULL)
+    return 0;
+
+  return reinterpret_cast<PSSLChannel *>(p)->BioControl(cmd, num, ptr);
 }
 
 
@@ -2799,11 +2987,11 @@ long PSSLChannel::BioControl(int cmd, long num, void * /*ptr*/)
 {
   switch (cmd) {
     case BIO_CTRL_SET_CLOSE:
-      m_bio->shutdown = (int)num;
+      BIO_set_shutdown(m_bio, num);
       return 1;
 
     case BIO_CTRL_GET_CLOSE:
-      return m_bio->shutdown;
+      return BIO_get_shutdown(m_bio);
 
     case BIO_CTRL_FLUSH:
       return 1;
@@ -2927,7 +3115,7 @@ bool PSSLChannelDTLS::ExecuteHandshake()
 
 bool PSSLChannelDTLS::IsServer() const
 {
-  return PAssertNULL(m_ssl) != NULL && m_ssl->server;
+  return PAssertNULL(m_ssl) != NULL && SSL_is_server(m_ssl);
 }
 
 

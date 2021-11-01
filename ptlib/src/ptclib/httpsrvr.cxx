@@ -210,13 +210,15 @@ PHTTPResource * PHTTPSpace::FindResource(const PURL & url)
 // PHTTPServer
 
 PHTTPServer::PHTTPServer()
+  : m_lastCommandTime(0)
 {
   Construct();
 }
 
 
 PHTTPServer::PHTTPServer(const PHTTPSpace & space)
-  : m_urlSpace(space)
+  : m_lastCommandTime(0)
+  , m_urlSpace(space)
 {
   Construct();
 }
@@ -244,7 +246,7 @@ PBoolean PHTTPServer::ProcessCommand()
     return false;
 
   PTime now;
-  PTRACE(5, "Delay waiting for next command: " << now - m_lastCommandTime);
+  PTRACE_IF(5, m_lastCommandTime.IsValid(), "Time since last command: " << now - m_lastCommandTime);
   m_lastCommandTime = now;
 
   m_connectInfo.commandCode = (Commands)cmd;
@@ -258,6 +260,7 @@ PBoolean PHTTPServer::ProcessCommand()
 
   // if no tokens, error
   if (args.IsEmpty()) {
+    PTRACE(4, "No arguments on command line for " << m_connectInfo.commandName);
     OnError(BadRequest, args, m_connectInfo);
     return false;
   }
@@ -382,7 +385,7 @@ bool PHTTPServer::OnWebSocket(PHTTPConnectionInfo & connectInfo)
   PStringArray protocols = mime(WebSocketProtocolTag()).Tokenise(", \t\r\n", false);
   for (PINDEX i = 0; i < protocols.GetSize(); ++i) {
     PString protocol = protocols[i];
-    std::map<PString, WebSocketNotifier>::iterator notifier = m_webSocketNotifiers.find(protocol);
+    WebSocketNotifierMap::iterator notifier = m_webSocketNotifiers.find(protocol);
     if (notifier != m_webSocketNotifiers.end()) {
       if (notifier->second.IsNULL()) {
         supportedGlobally = protocol;
@@ -462,7 +465,7 @@ void PHTTPServer::SetWebSocketNotifier(const PString & protocol, const WebSocket
 
 void PHTTPServer::ClearWebSocketNotifier(const PString & protocol)
 {
-  std::map<PString, WebSocketNotifier>::iterator it = m_webSocketNotifiers.find(protocol);
+  WebSocketNotifierMap::iterator it = m_webSocketNotifiers.find(protocol);
   if (it != m_webSocketNotifiers.end())
     m_webSocketNotifiers.erase(it);
 }
@@ -870,7 +873,7 @@ void PHTTPListener::ShutdownListeners()
 
   m_httpServersMutex.Wait();
   for (PList<PHTTPServer>::iterator it = m_httpServers.begin(); it != m_httpServers.end(); ++it)
-    it->Close();
+    it->CloseBaseReadChannel();
   m_httpServersMutex.Signal();
 
   m_threadPool.Shutdown();
@@ -1215,7 +1218,9 @@ PBoolean PWebSocket::Read(void * buf, PINDEX len)
 
     switch (opCode) {
       case Ping :
+        m_writeMutex.Wait();
         WriteHeader(Pong, false, 0, -1);
+        m_writeMutex.Signal();
         break;
 
       case ConnectionClose :
@@ -1550,6 +1555,7 @@ PBoolean PHTTPConnectionInfo::Initialise(PHTTPServer & server, PString & args)
   // otherwise, attempt to extract a version number
   PINDEX dotPos = args.Find('.', lastSpacePos+6);
   if (dotPos == 0 || dotPos == P_MAX_INDEX) {
+    PTRACE(3, "Malformed version number: \"" << args << '"');
     server.OnError(PHTTP::BadRequest, "Malformed version number: " + args, *this);
     return false;
   }
@@ -1563,8 +1569,10 @@ PBoolean PHTTPConnectionInfo::Initialise(PHTTPServer & server, PString & args)
 
   // build our connection info reading MIME info until an empty line is
   // received, or EOF
-  if (!mimeInfo.Read(server))
+  if (!mimeInfo.Read(server)) {
+    PTRACE(4, "Failed to read MIME: " << server.GetErrorText());
     return false;
+  }
 
   wasPersistent = isPersistent;
   isPersistent = false;
@@ -1583,8 +1591,18 @@ PBoolean PHTTPConnectionInfo::Initialise(PHTTPServer & server, PString & args)
       if (token == PHTTP::KeepAliveTag())
         isPersistent = true;
       else if (token == PHTTP::UpgradeTag()) {
-        if (PHTTP::WebSocketTag() != mimeInfo(PHTTP::UpgradeTag()) || mimeInfo(PHTTP::WebSocketVersionTag()) != "13")
-          return server.OnError(PHTTP::MethodNotAllowed, "Cannot upgrade to protocol or version", *this);
+        PCaselessString protocol = mimeInfo(PHTTP::UpgradeTag());
+        if (protocol != PHTTP::WebSocketTag()) {
+          PTRACE(4, "Cannot upgrade to protocol \"" << protocol << '"');
+          return server.OnError(PHTTP::MethodNotAllowed, "Can only upgrade to \"websocket\" protocol", *this);
+        }
+
+        int wsVer = mimeInfo.GetInteger(PHTTP::WebSocketVersionTag());
+        if (wsVer < 13) {
+          PTRACE(4, "WebSocket version " << wsVer << " is not supported.");
+          return server.OnError(PHTTP::MethodNotAllowed, "Can only upgrade to websocket version 13 or later", *this);
+        }
+
         m_isWebSocket = true;
       }
     }
