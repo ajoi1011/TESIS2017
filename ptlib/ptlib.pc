@@ -1,0 +1,66 @@
+Name: ptlib
+Description: PT Library
+Version: 2.19.4
+
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+datarootdir=${prefix}/share
+makedir=${datarootdir}/ptlib/make
+target_cpu=x86
+target_os=linux
+target=linux_x86
+suffix=
+objdir=obj/linux_x86$(suffix)
+
+cppflags=-I${includedir}   -pthread -I/usr/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/i386-linux-gnu/glib-2.0/include  -D_REENTRANT -I/usr/include/SDL2  -I/usr/include/ncursesw   -I/usr/include/lua5.1     -Wall -Wno-unknown-pragmas  -fno-diagnostics-show-caret -D_REENTRANT -DPTRACING=2 
+cxxflags=-I${includedir}   -pthread -I/usr/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/i386-linux-gnu/glib-2.0/include  -D_REENTRANT -I/usr/include/SDL2  -I/usr/include/ncursesw   -I/usr/include/lua5.1     -Wall -Wno-unknown-pragmas  -fno-diagnostics-show-caret -D_REENTRANT -DPTRACING=2  -fexceptions -Wreorder -felide-constructors -Wno-overloaded-virtual -fno-omit-frame-pointer -march=i686  -Wno-deprecated-declarations -pthread 
+Cflags: -I${includedir}   -pthread -I/usr/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/i386-linux-gnu/glib-2.0/include  -D_REENTRANT -I/usr/include/SDL2  -I/usr/include/ncursesw   -I/usr/include/lua5.1     -Wall -Wno-unknown-pragmas  -fno-diagnostics-show-caret -D_REENTRANT -DPTRACING=2  -fno-omit-frame-pointer -march=i686  -pthread -D__STDC_CONSTANT_MACROS
+Libs.private:  -ldl -lodbc -lgio-2.0 -lgstapp-1.0 -lgstbase-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  -lSDL2  -lncurses  -lv8  -llua5.1  -lexpat  -lldap -llber -lsasl2 -ljpeg  -lpcap -lresolv -lrt  
+Libs: -L${libdir} -lpt${suffix}
+
+PTLIB_IPV6=yes
+PTLIB_DNS_RESOLVER=yes
+PTLIB_PCAP=yes
+PTLIB_OPENSSL=no
+PTLIB_SSL=no
+PTLIB_SSL_AES=no
+PTLIB_OPENLDAP=yes
+PTLIB_LDAP=yes
+PTLIB_SASL=no
+PTLIB_SASL2=yes
+PTLIB_EXPAT=yes
+PTLIB_REGEX=yes
+PTLIB_SDL=yes
+
+PTLIB_TTS=yes
+PTLIB_ASN=yes
+PTLIB_STUN=yes
+PTLIB_PIPECHAN=yes
+PTLIB_DTMF=yes
+PTLIB_WAVFILE=yes
+PTLIB_SOCKS=yes
+PTLIB_FTP=yes
+PTLIB_SNMP=yes
+PTLIB_TELNET=yes
+PTLIB_CLI=yes
+PTLIB_REMCONN=yes
+PTLIB_SERIAL=yes
+PTLIB_POP3SMTP=yes
+PTLIB_AUDIO=yes
+PTLIB_VIDEO=yes
+PTLIB_SHM_VIDEO=
+
+PTLIB_VXML=yes
+PTLIB_JABBER=yes
+PTLIB_XMLRPC=yes
+PTLIB_SOAP=yes
+PTLIB_URL=yes
+PTLIB_HTTP=yes
+PTLIB_HTTPFORMS=yes
+PTLIB_HTTPSVC=yes
+PTLIB_CONFIG_FILE=yes
+PTLIB_VIDFILE=yes
+PTLIB_ODBC=yes
+PTLIB_GSTREAMER=yes

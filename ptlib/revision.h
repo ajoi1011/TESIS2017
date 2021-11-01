@@ -1,9 +1,9 @@
 /*
- * version.h
+ * revision.h 
  *
- * Version number header file for PTLib
+ * GIT commit string header file for PTLib
  *
- * Copyright (c) 1993-2000 Equivalence Pty. Ltd.
+ * Copyright (c) 2010-2016 Equivalence Pty. Ltd.
  *
  * The contents of this file are subject to the Mozilla Public License
  * Version 1.0 (the "License"); you may not use this file except in
@@ -16,32 +16,20 @@
  * under the License.
  *
  * The Original Code is Portable Windows Library.
- * Subsequenty renamed 
+ * Subsequenty renamed to Portalble Tools Library
  *
  * The Initial Developer of the Original Code is Equivalence Pty. Ltd.
  *
  * Contributor(s): ______________________________________.
  */
 
-#ifndef _PTLib_VERSION_H
-#define _PTLib_VERSION_H
+#ifndef _PTLib_REVISION_H
+#define _PTLib_REVISION_H
 
+#define SVN_REVISION 0
+#define GIT_COMMIT ""
 
-
-/* WARNING: You MUST NOT add any comments to the #defines which follow
-   or add extra commented out #defines, or have more than one space
-   between the name and the value, as this will confuse the parser
-   which extracts the version numbers
- */
-
-#define MAJOR_VERSION 2
-#define MINOR_VERSION 19
-#define BUILD_TYPE AlphaCode
-#define PATCH_VERSION 4
-#define OEM_VERSION 0
-
-
-#endif  // _PTLib_VERSION_H
+#endif  // _PTLib_REVISION_H
 
 
 // End of File ///////////////////////////////////////////////////////////////
