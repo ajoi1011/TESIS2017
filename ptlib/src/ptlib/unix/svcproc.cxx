@@ -153,12 +153,6 @@ static int KillProcess(int pid, unsigned timeout, int sig)
 #endif // !P_VXWORKS
 
 
-void PServiceProcess::_PXShowSystemWarning(PINDEX code, const PString & str)
-{
-  PSYSTEMLOG(Warning, "PTLib\t" << GetOSClass() << " error #" << code << '-' << str);
-}
-
-
 static unsigned CountOptionSet(const PArgList & args, const char * options)
 {
   unsigned count = 0;
@@ -538,11 +532,11 @@ int PServiceProcess::InternalMain(void *)
       started = OnStart();
     }
     catch (const std::exception & e) {
-      PAssertAlways(PSTRSTRM("Exception (" << typeid(e).name() << " \"" << e.what() << "\") caught in service process start, terminating"));
+      PAssertException("service process start", &e);
       std::terminate();
     }
     catch (...) {
-      PAssertAlways(PSTRSTRM("Exception caught in service process start, terminating"));
+      PAssertException("service process start", NULL);
       std::terminate();
     }
 #else
@@ -669,7 +663,7 @@ void PServiceProcess::AsynchronousRunTimeSignal(int signal, PProcessIdentifier s
   }
 
   abort(); // Dump core
-  _exit(signal+100); // Fail safe if raise() didn't dump core and exit
+  _exit(signal+100); // Fail safe if abort() didn't dump core and exit
 }
 
 
@@ -713,4 +707,3 @@ void PServiceProcess::HandleRunTimeSignal(int signal)
 
   PProcess::HandleRunTimeSignal(signal);
 }
-
