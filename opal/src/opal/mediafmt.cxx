@@ -1290,7 +1290,7 @@ OpalMediaFormatInternal::OpalMediaFormatInternal(const char * fullName,
                                                  const OpalMediaType & _mediaType,
                                                  RTP_DataFrame::PayloadTypes pt,
                                                  const char * en,
-                                                 PBoolean     nj,
+                                                 bool     nj,
                                                  OpalBandwidth bw,
                                                  PINDEX   fs,
                                                  unsigned ft,
@@ -1367,7 +1367,7 @@ void OpalMediaFormatInternal::DeconflictPayloadTypes(OpalMediaFormatList & forma
     // A conflict is when we are after an explicit payload type, we have found one already using it
     if (rtpPayloadType > RTP_DataFrame::DynamicBase && rtpPayloadType == format->GetPayloadType()) {
       // If it is a shared payload types, which happens when encoding name is the same, then allow it
-      if (!m_allowMultiple && rtpEncodingName == format->GetEncodingName())
+      if (m_allowMultiple && rtpEncodingName == format->GetEncodingName())
         return;
 
       // Have a conflicting media format, move it later when we know where to

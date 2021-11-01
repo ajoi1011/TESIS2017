@@ -828,7 +828,9 @@ void OpalManager::InternalClearAllCalls(OpalConnection::CallEndReason reason, bo
 
 void OpalManager::OnClearedCall(OpalCall & PTRACE_PARAM(call))
 {
-  PTRACE(3, "OnClearedCall " << call << " from \"" << call.GetPartyA() << "\" to \"" << call.GetPartyB() << '"');
+  PTRACE(3, "OnClearedCall " << call << '\n'
+         << setw(20) << "Call end reason" << ": " << call.GetCallEndReason() << '\n'
+         << setprecision(2) << PTrace::LogObject(call.GetFinalStatistics()));
 }
 
 
@@ -1002,7 +1004,8 @@ bool OpalManager::OnRouteConnection(PStringSet & routesTried,
     if (MakeConnection(call, route, NULL, options, stringOptions) != NULL)
       return true;
 
-    if (call.GetConnection(0)->IsReleased())
+    PSafePtr<OpalConnection> pConn = call.GetConnection(0);
+    if (pConn == NULL || pConn->IsReleased())
       return false;
 
     // Recursively call with translated route
@@ -1435,16 +1438,13 @@ static void OnStartStopMediaPatch(PScriptLanguage * script, const char * fn, Opa
 
 void OpalManager::OnStartMediaPatch(OpalConnection & connection, OpalMediaPatch & patch)
 {
+  PTRACE(3, "OnStartMediaPatch " << patch << " on " << connection);
+
 #if OPAL_SCRIPT
   OnStartStopMediaPatch(m_script, "OnStartMedia", connection, patch);
 #endif
-  PTRACE(3, "OnStartMediaPatch " << patch << " on " << connection);
 
-  if (&patch.GetSource().GetConnection() == &connection) {
-    PSafePtr<OpalConnection> other = connection.GetOtherPartyConnection();
-    if (other != NULL)
-      other->OnStartMediaPatch(patch);
-  }
+  connection.GetCall().OnStartMediaPatch(connection, patch);
 }
 
 
@@ -1456,11 +1456,7 @@ void OpalManager::OnStopMediaPatch(OpalConnection & connection, OpalMediaPatch &
   OnStartStopMediaPatch(m_script, "OnStopMedia", connection, patch);
 #endif
 
-  if (&patch.GetSource().GetConnection() == &connection) {
-    PSafePtr<OpalConnection> other = connection.GetOtherPartyConnection();
-    if (other != NULL)
-      other->OnStopMediaPatch(patch);
-  }
+  connection.GetCall().OnStopMediaPatch(connection, patch);
 }
 
 
@@ -1468,7 +1464,16 @@ bool OpalManager::OnMediaFailed(OpalConnection & connection, unsigned, PChannel:
 {
   if (connection.AllMediaFailed()) {
     PTRACE(2, "All media failed, releasing " << connection);
-    connection.Release(error == PChannel::Timeout ? OpalConnection::EndedByMediaFailed : OpalConnection::EndedByMediaTransportFail);
+    switch (error) {
+      case PChannel::Timeout :
+        connection.Release(OpalConnection::EndedByMediaFailed);
+        break;
+      case PChannel::Unavailable :
+        connection.Release(OpalConnection::EndedByMediaTransportFail);
+        break;
+      default :
+        connection.Release(OpalConnection::CallEndReason(OpalConnection::EndedByCustomCode, (unsigned)error));
+    }
   }
   return true;
 }
@@ -1933,7 +1938,7 @@ PBoolean OpalManager::IsLocalAddress(const PIPSocket::Address & ip) const
   return m_natMethods->IsLocalAddress(ip);
 #else
   /* Check if the remote address is a private IP, broadcast, or us */
-  return ip.IsAny() || ip.IsBroadcast() || ip.IsRFC1918() || PIPSocket::IsLocalHost(ip);
+  return ip.IsAny() || ip.IsBroadcast() || ip.IsPrivate() || PIPSocket::IsLocalHost(ip);
 #endif
 }
 
@@ -1971,12 +1976,12 @@ PBoolean OpalManager::IsRTPNATEnabled(OpalConnection & /*conn*/,
   if (peerAddr == sigAddr)
     return false;
 
-  /* Next test is to see if BOTH addresses are "public", non RFC1918. There are
+  /* Next test is to see if BOTH addresses are "public". There are
      some cases with proxies, particularly with SIP, where this is possible. We
      will assume that NAT never occurs between two public addresses though it
      could occur between two private addresses */
 
-  if (!peerAddr.IsRFC1918() && !sigAddr.IsRFC1918())
+  if (!peerAddr.IsPrivate() && !sigAddr.IsPrivate())
     return false;
 
   /* So now we have a remote that is confused in some way, so needs help. Our
@@ -1990,7 +1995,7 @@ PBoolean OpalManager::IsRTPNATEnabled(OpalConnection & /*conn*/,
      need to check if we are actually ABLE to help. We test if the local end
      of the connection is public, i.e. no NAT at this end so we can help.
      */
-  if (!localAddr.IsRFC1918())
+  if (!localAddr.IsPrivate())
     return true;
 
   /* Another test for if we can help, we are behind a NAT too, but the user has
@@ -2005,7 +2010,7 @@ PBoolean OpalManager::IsRTPNATEnabled(OpalConnection & /*conn*/,
   /* This looks for seriously confused systems were NAT is between two private
       networks. Unfortunately, we don't have a netmask so we can only guess based
       on the IP address class. */
-  if ( peerAddr.IsRFC1918() && sigAddr.IsRFC1918() &&
+  if ( peerAddr.IsPrivate() && sigAddr.IsPrivate() &&
       !peerAddr.IsSubNet(sigAddr, PIPAddress::GetAny(peerAddr.GetVersion())))
     return true;
 
@@ -2064,7 +2069,7 @@ bool OpalManager::SetNATServer(const PString & method,
   natMethod->SetPortRanges(GetUDPPortRange().GetBase(), GetUDPPortRange().GetMax(),
                            GetRtpIpPortRange().GetBase(), GetRtpIpPortRange().GetMax());
   if (!natMethod->SetServer(server)) {
-    PTRACE(2, "Invalid server \"" << server << "\" for " << method << " NAT method");
+    PTRACE_IF(2, activate, "Invalid server \"" << server << "\" for " << method << " NAT method");
     return false;
   }
 

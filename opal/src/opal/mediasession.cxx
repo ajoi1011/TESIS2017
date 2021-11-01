@@ -408,7 +408,7 @@ void OpalMediaStatistics::PrintOn(ostream & strm) const
   std::streamsize indent = strm.precision()+20;
 
   strm << setw(indent) <<            "Media format" << " = " << m_mediaFormat << " (" << m_mediaType << ")\n"
-       << setw(indent) <<      "Session start time" << " = " << m_startTime << '\n'
+       << setw(indent) <<      "Session start time" << " = " << m_startTime.AsString(PTime::LoggingFormat) << '\n'
        << setw(indent) <<        "Session duration" << " = " << InternalTimeDiff(m_updateInfo.m_lastUpdateTime, m_startTime)
                                                              << " (" << InternalTimeDiff(m_updateInfo.m_lastUpdateTime, m_updateInfo.m_previousUpdateTime) << ")\n"
        << setw(indent) <<               "CPU usage" << " = " << GetCPU() << '\n';
@@ -470,7 +470,70 @@ void OpalMediaStatistics::PrintOn(ostream & strm) const
 #endif
   strm << '\n';
 }
+
+
+void OpalMediaStatistics::ToJSON(PJSON::Object & json) const
+{
+  json.SetString("MediaType", m_mediaType);
+  json.SetString("MediaFormat", m_mediaFormat);
+  json.SetTime("SessionStartTime", m_startTime);
+  json.SetNumber("SessionDuration", (m_updateInfo.m_lastUpdateTime - m_startTime).GetMilliSeconds()/1000.0);
+  json.SetString("LocalAddress", m_localAddress);
+  json.SetString("RemoteAddress", m_remoteAddress);
+  json.SetNumber("TotalBytes", (PJSON::NumberType)m_totalBytes);
+  json.SetNumber("AverageBitRate", GetBitRate());
+  json.SetNumber("TotalPackets", m_totalPackets);
+  json.SetNumber("AveragePacketRate", GetPacketRate());
+  json.SetNumber("MinimumPacketTime", m_minimumPacketTime/1000.0);
+  json.SetNumber("AveragePacketTime", m_averagePacketTime/1000.0);
+  json.SetNumber("MaximumPacketTime", m_maximumPacketTime/1000.0);
+  json.SetNumber("PacketsLost", m_packetsLost);
+  json.SetNumber("RestoredOutOfOrder", m_packetsOutOfOrder);
+  json.SetNumber("LateOutOfOrder", m_lateOutOfOrder);
+  json.SetNumber("NACK", m_NACKs);
+  json.SetNumber("FEC", m_FEC);
+  json.SetNumber("RoundTripTime", m_roundTripTime);
+
+  if (m_mediaType == OpalMediaType::Audio()) {
+    PJSON::Object & audio = json.SetObject("audio");
+    audio.SetNumber("JitterBufferTooLate", m_packetsTooLate);
+    audio.SetNumber("JitterBufferOverruns", m_packetOverruns);
+    audio.SetNumber("AverageJitter", m_averageJitter/1000.0);
+    audio.SetNumber("MaximumJitter", m_maximumJitter/1000.0);
+    audio.SetNumber("JitterBufferDelay", m_jitterBufferDelay/1000.0);
+  }
+#if OPAL_VIDEO
+  else if (m_mediaType == OpalMediaType::Video()) {
+    PJSON::Object & video = json.SetObject("video");
+    video.SetNumber("TotalFrames", m_totalFrames);
+    video.SetNumber("AverageFrameRate", GetFrameRate());
+    video.SetNumber("TotalKeyFrames", m_keyFrames);
+    video.SetNumber("DroppedFrames", m_droppedFrames);
+    video.SetNumber("Quality", m_videoQuality);
+  }
 #endif
+#if OPAL_FAX
+  else if (m_mediaType == OpalMediaType::Fax()) {
+    PJSON::Object & fax = json.SetObject("fax");
+    fax.SetNumber("FaxResult", m_fax.m_result);
+    fax.SetNumber("SelectedBitRate", m_fax.m_bitRate);
+    fax.SetNumber("Compression", m_fax.m_compression);
+    fax.SetNumber("TotalImagePages", m_fax.m_totalPages);
+    fax.SetNumber("TotalImageBytes", m_fax.m_imageSize);
+    PJSON::Object & res = fax.SetObject("Resolution");
+    res.SetNumber("x", m_fax.m_resolutionX);
+    res.SetNumber("y", m_fax.m_resolutionY);
+    PJSON::Object & dim = fax.SetObject("PageDimensions");
+    dim.SetNumber("width", m_fax.m_pageWidth);
+    dim.SetNumber("height", m_fax.m_pageHeight);
+    fax.SetNumber("BadRowsTotal", m_fax.m_badRows);
+    fax.SetNumber("BadRowsLongestRun=", m_fax.m_mostBadRows);
+    fax.SetNumber("ErrorCorrection", m_fax.m_errorCorrection);
+    fax.SetNumber("ErrorRetries", m_fax.m_errorCorrectionRetries);
+  }
+#endif
+}
+#endif // OPAL_STATISTICS
 
 /////////////////////////////////////////////////////////////////////////////
 
@@ -1086,7 +1149,7 @@ bool OpalUDPMediaTransport::SetRemoteAddress(const OpalTransportAddress & remote
 {
   PIPAddressAndPort ap;
   if (!remoteAddress.GetIpAndPort(ap)) {
-    PTRACE(2, "Illegal IP address, or no prt specified: " << remoteAddress);
+    PTRACE(2, "Illegal IP address, or no port specified: channel=" << subchannel << ", addr=\"" << remoteAddress << '"');
     return false;
   }
 
@@ -1318,8 +1381,8 @@ bool OpalUDPMediaTransport::Open(OpalMediaSession & session,
   if (!manager.IsLocalAddress(remoteIP)) {
     PNatMethod * natMethod = manager.GetNatMethods().GetMethod(bindingIP, this);
     if (natMethod != NULL) {
-      PTRACE(4, session << "NAT Method " << natMethod->GetMethodName() << " selected for call.");
-
+      static PTimeInterval const TimeToLive(0, 10);
+      natMethod->GetNatType(TimeToLive);
       switch (natMethod->GetRTPSupport()) {
         case PNatMethod::RTPIfSendMedia :
           /* This NAT variant will work if we send something out through the
@@ -1331,7 +1394,7 @@ bool OpalUDPMediaTransport::Open(OpalMediaSession & session,
           // Then do case for full cone support and create NAT sockets
 
         case PNatMethod::RTPSupported :
-          PTRACE(4, session << "attempting natMethod: " << natMethod->GetMethodName());
+          PTRACE(4, session << "attempting natMethod: " << natMethod->GetMethodName() << ' ' << natMethod->GetNatTypeName());
           if (subchannelCount == 2) {
             PUDPSocket * dataSocket = NULL;
             PUDPSocket * controlSocket = NULL;
@@ -1364,6 +1427,7 @@ bool OpalUDPMediaTransport::Open(OpalMediaSession & session,
              talk to the real RTP destination. All we can so is bind to the
              local interface the NAT is on and hope the NAT router is doing
              something sneaky like symmetric port forwarding. */
+          PTRACE(4, session << "cannot use natMethod: " << natMethod->GetMethodName() << ' ' << natMethod->GetNatTypeName());
           break;
       }
     }
