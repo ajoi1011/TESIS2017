@@ -61,13 +61,15 @@
 
 srtp_err_status_t srtp_validate(void);
 
-#ifdef OPENSSL
+srtp_err_status_t srtp_validate_null(void);
+
+#ifdef GCM
 srtp_err_status_t srtp_validate_gcm(void);
 #endif
 
 srtp_err_status_t srtp_validate_encrypted_extensions_headers(void);
 
-#ifdef OPENSSL
+#ifdef GCM
 srtp_err_status_t srtp_validate_encrypted_extensions_headers_gcm(void);
 #endif
 
@@ -79,7 +81,7 @@ srtp_err_status_t srtp_dealloc_big_policy(srtp_policy_t *list);
 
 srtp_err_status_t srtp_test_empty_payload(void);
 
-#ifdef OPENSSL
+#ifdef GCM
 srtp_err_status_t srtp_test_empty_payload_gcm(void);
 #endif
 
@@ -181,11 +183,12 @@ void log_handler(srtp_log_level_t level, const char *msg, void *data)
 }
 
 /*
- * The policy_array is a null-terminated array of policy structs. it
- * is declared at the end of this file
+ * The policy_array and invalid_policy_array are null-terminated arrays of
+ * policy structs. They is declared at the end of this file.
  */
 
 extern const srtp_policy_t *policy_array[];
+extern const srtp_policy_t *invalid_policy_array[];
 
 /* the wildcard_policy is declared below; it has a wildcard ssrc */
 
@@ -302,6 +305,7 @@ int main(int argc, char *argv[])
     if (do_validation) {
         const srtp_policy_t **policy = policy_array;
         srtp_policy_t *big_policy;
+        srtp_t srtp_sender;
 
         /* loop over policy array, testing srtp and srtcp for each policy */
         while (*policy != NULL) {
@@ -364,6 +368,21 @@ int main(int argc, char *argv[])
             policy++;
         }
 
+        /* loop over invalid policy array, testing that an SRTP context cannot
+         * be created with the policy */
+        policy = invalid_policy_array;
+        while (*policy != NULL) {
+            printf("testing srtp_create fails with invalid policy\n");
+            if (srtp_create(&srtp_sender, *policy) != srtp_err_status_ok) {
+                printf("passed\n\n");
+            } else {
+                printf("failed\n");
+                exit(1);
+            }
+
+            policy++;
+        }
+
         /* create a big policy list and run tests on it */
         status = srtp_create_big_policy(&big_policy);
         if (status) {
@@ -422,7 +441,16 @@ int main(int argc, char *argv[])
             exit(1);
         }
 
-#ifdef OPENSSL
+        printf("testing srtp_protect and srtp_unprotect against "
+               "reference packet using null cipher and HMAC\n");
+        if (srtp_validate_null() == srtp_err_status_ok) {
+            printf("passed\n\n");
+        } else {
+            printf("failed\n");
+            exit(1);
+        }
+
+#ifdef GCM
         printf("testing srtp_protect and srtp_unprotect against "
                "reference packet using GCM\n");
         if (srtp_validate_gcm() == srtp_err_status_ok) {
@@ -442,7 +470,7 @@ int main(int argc, char *argv[])
             exit(1);
         }
 
-#ifdef OPENSSL
+#ifdef GCM
         printf("testing srtp_protect and srtp_unprotect against "
                "reference packet with encrypted extension headers (GCM)\n");
         if (srtp_validate_encrypted_extensions_headers_gcm() ==
@@ -478,7 +506,7 @@ int main(int argc, char *argv[])
             printf("failed\n");
             exit(1);
         }
-#ifdef OPENSSL
+#ifdef GCM
         printf("testing srtp_protect and srtp_unprotect against "
                "packet with empty payload (GCM)\n");
         if (srtp_test_empty_payload_gcm() == srtp_err_status_ok) {
@@ -589,7 +617,7 @@ int main(int argc, char *argv[])
         policy.ssrc.type = ssrc_specific;
         policy.ssrc.value = 0xdecafbad;
         policy.key = test_key;
-        policy.ekt = NULL;
+        policy.deprecated_ekt = NULL;
         policy.window_size = 128;
         policy.allow_repeat_tx = 0;
         policy.next = NULL;
@@ -928,12 +956,10 @@ double srtp_rejections_per_second(int msg_len_octets,
 
 void err_check(srtp_err_status_t s)
 {
-    if (s == srtp_err_status_ok) {
-        return;
-    } else {
+    if (s != srtp_err_status_ok) {
         fprintf(stderr, "error: unexpected srtp failure (code %d)\n", s);
+        exit(1);
     }
-    exit(1);
 }
 
 srtp_err_status_t srtp_test_call_protect(srtp_t srtp_sender,
@@ -1341,6 +1367,8 @@ srtp_err_status_t srtcp_test(const srtp_policy_t *policy, int mki_index)
      */
     rcvr_policy = (srtp_policy_t *)malloc(sizeof(srtp_policy_t));
     if (rcvr_policy == NULL) {
+        free(hdr);
+        free(hdr2);
         return srtp_err_status_alloc_fail;
     }
     memcpy(rcvr_policy, policy, sizeof(srtp_policy_t));
@@ -1606,6 +1634,9 @@ double mips_estimate(int num_trials, int *ignore)
         sum += i;
     }
     t = clock() - t;
+    if (t < 1) {
+        t = 1;
+    }
 
     /*   printf("%d\n", sum); */
     *ignore = sum;
@@ -1678,7 +1709,7 @@ srtp_err_status_t srtp_validate()
     policy.ssrc.type = ssrc_specific;
     policy.ssrc.value = 0xcafebabe;
     policy.key = test_key;
-    policy.ekt = NULL;
+    policy.deprecated_ekt = NULL;
     policy.window_size = 128;
     policy.allow_repeat_tx = 0;
     policy.next = NULL;
@@ -1702,7 +1733,7 @@ srtp_err_status_t srtp_validate()
     debug_print(mod_driver, "ciphertext reference:\n  %s",
                 octet_string_hex_string(srtp_ciphertext, len));
 
-    if (octet_string_is_eq(srtp_plaintext, srtp_ciphertext, len)) {
+    if (srtp_octet_string_is_eq(srtp_plaintext, srtp_ciphertext, len)) {
         return srtp_err_status_fail;
     }
 
@@ -1720,7 +1751,7 @@ srtp_err_status_t srtp_validate()
     debug_print(mod_driver, "srtcp ciphertext reference:\n  %s",
                 octet_string_hex_string(srtcp_ciphertext, len));
 
-    if (octet_string_is_eq(rtcp_plaintext, srtcp_ciphertext, len)) {
+    if (srtp_octet_string_is_eq(rtcp_plaintext, srtcp_ciphertext, len)) {
         return srtp_err_status_fail;
     }
 
@@ -1742,7 +1773,7 @@ srtp_err_status_t srtp_validate()
         return status;
     }
 
-    if (octet_string_is_eq(srtp_ciphertext, srtp_plaintext_ref, len)) {
+    if (srtp_octet_string_is_eq(srtp_ciphertext, srtp_plaintext_ref, len)) {
         return srtp_err_status_fail;
     }
 
@@ -1755,7 +1786,7 @@ srtp_err_status_t srtp_validate()
         return status;
     }
 
-    if (octet_string_is_eq(srtcp_ciphertext, rtcp_plaintext_ref, len)) {
+    if (srtp_octet_string_is_eq(srtcp_ciphertext, rtcp_plaintext_ref, len)) {
         return srtp_err_status_fail;
     }
 
@@ -1772,7 +1803,167 @@ srtp_err_status_t srtp_validate()
     return srtp_err_status_ok;
 }
 
-#ifdef OPENSSL
+/*
+ * srtp_validate_null() verifies the correctness of libsrtp by comparing
+ * some computed packets against some pre-computed reference values.
+ * These packets were made with a policy that applies null encryption
+ * and HMAC authentication.
+ */
+
+srtp_err_status_t srtp_validate_null()
+{
+    // clang-format off
+    uint8_t srtp_plaintext_ref[28] = {
+        0x80, 0x0f, 0x12, 0x34, 0xde, 0xca, 0xfb, 0xad,
+        0xca, 0xfe, 0xba, 0xbe, 0xab, 0xab, 0xab, 0xab,
+        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
+        0xab, 0xab, 0xab, 0xab
+    };
+    uint8_t srtp_plaintext[38] = {
+        0x80, 0x0f, 0x12, 0x34, 0xde, 0xca, 0xfb, 0xad,
+        0xca, 0xfe, 0xba, 0xbe, 0xab, 0xab, 0xab, 0xab,
+        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
+        0xab, 0xab, 0xab, 0xab, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    uint8_t srtp_ciphertext[38] = {
+        0x80, 0x0f, 0x12, 0x34, 0xde, 0xca, 0xfb, 0xad,
+        0xca, 0xfe, 0xba, 0xbe, 0xab, 0xab, 0xab, 0xab,
+        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
+        0xab, 0xab, 0xab, 0xab, 0xab, 0xa1, 0x36, 0x27,
+        0x0b, 0x67, 0x91, 0x34, 0xce, 0x9b
+    };
+    uint8_t rtcp_plaintext_ref[24] = {
+        0x81, 0xc8, 0x00, 0x0b, 0xca, 0xfe, 0xba, 0xbe,
+        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
+        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
+    };
+    uint8_t rtcp_plaintext[38] = {
+        0x81, 0xc8, 0x00, 0x0b, 0xca, 0xfe, 0xba, 0xbe,
+        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
+        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    uint8_t srtcp_ciphertext[38] = {
+        0x81, 0xc8, 0x00, 0x0b, 0xca, 0xfe, 0xba, 0xbe,
+        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
+        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
+        0x00, 0x00, 0x00, 0x01, 0xfe, 0x88, 0xc7, 0xfd,
+        0xfd, 0x37, 0xeb, 0xce, 0x61, 0x5d,
+    };
+    // clang-format on
+
+    srtp_t srtp_snd, srtp_recv;
+    srtp_err_status_t status;
+    int len;
+    srtp_policy_t policy;
+
+    /*
+     * create a session with a single stream using the default srtp
+     * policy and with the SSRC value 0xcafebabe
+     */
+    memset(&policy, 0, sizeof(policy));
+    srtp_crypto_policy_set_null_cipher_hmac_sha1_80(&policy.rtp);
+    srtp_crypto_policy_set_null_cipher_hmac_sha1_80(&policy.rtcp);
+    policy.ssrc.type = ssrc_specific;
+    policy.ssrc.value = 0xcafebabe;
+    policy.key = test_key;
+    policy.deprecated_ekt = NULL;
+    policy.window_size = 128;
+    policy.allow_repeat_tx = 0;
+    policy.next = NULL;
+
+    status = srtp_create(&srtp_snd, &policy);
+    if (status) {
+        return status;
+    }
+
+    /*
+     * protect plaintext, then compare with ciphertext
+     */
+    len = 28;
+    status = srtp_protect(srtp_snd, srtp_plaintext, &len);
+    if (status || (len != 38)) {
+        return srtp_err_status_fail;
+    }
+
+    debug_print(mod_driver, "ciphertext:\n  %s",
+                octet_string_hex_string(srtp_plaintext, len));
+    debug_print(mod_driver, "ciphertext reference:\n  %s",
+                octet_string_hex_string(srtp_ciphertext, len));
+
+    if (srtp_octet_string_is_eq(srtp_plaintext, srtp_ciphertext, len)) {
+        return srtp_err_status_fail;
+    }
+
+    /*
+     * protect plaintext rtcp, then compare with srtcp ciphertext
+     */
+    len = 24;
+    status = srtp_protect_rtcp(srtp_snd, rtcp_plaintext, &len);
+    if (status || (len != 38)) {
+        return srtp_err_status_fail;
+    }
+
+    debug_print(mod_driver, "srtcp ciphertext:\n  %s",
+                octet_string_hex_string(rtcp_plaintext, len));
+    debug_print(mod_driver, "srtcp ciphertext reference:\n  %s",
+                octet_string_hex_string(srtcp_ciphertext, len));
+
+    if (srtp_octet_string_is_eq(rtcp_plaintext, srtcp_ciphertext, len)) {
+        return srtp_err_status_fail;
+    }
+
+    /*
+     * create a receiver session context comparable to the one created
+     * above - we need to do this so that the replay checking doesn't
+     * complain
+     */
+    status = srtp_create(&srtp_recv, &policy);
+    if (status) {
+        return status;
+    }
+
+    /*
+     * unprotect ciphertext, then compare with plaintext
+     */
+    status = srtp_unprotect(srtp_recv, srtp_ciphertext, &len);
+    if (status || (len != 28)) {
+        return status;
+    }
+
+    if (srtp_octet_string_is_eq(srtp_ciphertext, srtp_plaintext_ref, len)) {
+        return srtp_err_status_fail;
+    }
+
+    /*
+     * unprotect srtcp ciphertext, then compare with rtcp plaintext
+     */
+    len = 38;
+    status = srtp_unprotect_rtcp(srtp_recv, srtcp_ciphertext, &len);
+    if (status || (len != 24)) {
+        return status;
+    }
+
+    if (srtp_octet_string_is_eq(srtcp_ciphertext, rtcp_plaintext_ref, len)) {
+        return srtp_err_status_fail;
+    }
+
+    status = srtp_dealloc(srtp_snd);
+    if (status) {
+        return status;
+    }
+
+    status = srtp_dealloc(srtp_recv);
+    if (status) {
+        return status;
+    }
+
+    return srtp_err_status_ok;
+}
+
+#ifdef GCM
 /*
  * srtp_validate_gcm() verifies the correctness of libsrtp by comparing
  * an computed packet against the known ciphertext for the plaintext.
@@ -1846,7 +2037,7 @@ srtp_err_status_t srtp_validate_gcm()
     policy.ssrc.type = ssrc_specific;
     policy.ssrc.value = 0xcafebabe;
     policy.key = test_key_gcm;
-    policy.ekt = NULL;
+    policy.deprecated_ekt = NULL;
     policy.window_size = 128;
     policy.allow_repeat_tx = 0;
     policy.next = NULL;
@@ -1870,7 +2061,7 @@ srtp_err_status_t srtp_validate_gcm()
     debug_print(mod_driver, "srtp ciphertext reference:\n  %s",
                 octet_string_hex_string(srtp_ciphertext, len));
 
-    if (octet_string_is_eq(rtp_plaintext, srtp_ciphertext, len)) {
+    if (srtp_octet_string_is_eq(rtp_plaintext, srtp_ciphertext, len)) {
         return srtp_err_status_fail;
     }
 
@@ -1888,7 +2079,7 @@ srtp_err_status_t srtp_validate_gcm()
     debug_print(mod_driver, "srtcp ciphertext reference:\n  %s",
                 octet_string_hex_string(srtcp_ciphertext, len));
 
-    if (octet_string_is_eq(rtcp_plaintext, srtcp_ciphertext, len)) {
+    if (srtp_octet_string_is_eq(rtcp_plaintext, srtcp_ciphertext, len)) {
         return srtp_err_status_fail;
     }
 
@@ -1911,7 +2102,7 @@ srtp_err_status_t srtp_validate_gcm()
         return status;
     }
 
-    if (octet_string_is_eq(srtp_ciphertext, rtp_plaintext_ref, len)) {
+    if (srtp_octet_string_is_eq(srtp_ciphertext, rtp_plaintext_ref, len)) {
         return srtp_err_status_fail;
     }
 
@@ -1924,7 +2115,7 @@ srtp_err_status_t srtp_validate_gcm()
         return status;
     }
 
-    if (octet_string_is_eq(srtcp_ciphertext, rtcp_plaintext_ref, len)) {
+    if (srtp_octet_string_is_eq(srtcp_ciphertext, rtcp_plaintext_ref, len)) {
         return srtp_err_status_fail;
     }
 
@@ -2003,7 +2194,7 @@ srtp_err_status_t srtp_validate_encrypted_extensions_headers()
     policy.ssrc.type = ssrc_specific;
     policy.ssrc.value = 0xcafebabe;
     policy.key = test_key_ext_headers;
-    policy.ekt = NULL;
+    policy.deprecated_ekt = NULL;
     policy.window_size = 128;
     policy.allow_repeat_tx = 0;
     policy.enc_xtn_hdr = headers;
@@ -2027,7 +2218,7 @@ srtp_err_status_t srtp_validate_encrypted_extensions_headers()
     debug_print(mod_driver, "ciphertext reference:\n  %s",
                 srtp_octet_string_hex_string(srtp_ciphertext, len));
 
-    if (octet_string_is_eq(srtp_plaintext, srtp_ciphertext, len))
+    if (srtp_octet_string_is_eq(srtp_plaintext, srtp_ciphertext, len))
         return srtp_err_status_fail;
 
     /*
@@ -2049,7 +2240,7 @@ srtp_err_status_t srtp_validate_encrypted_extensions_headers()
         return srtp_err_status_fail;
     }
 
-    if (octet_string_is_eq(srtp_ciphertext, srtp_plaintext_ref, len))
+    if (srtp_octet_string_is_eq(srtp_ciphertext, srtp_plaintext_ref, len))
         return srtp_err_status_fail;
 
     status = srtp_dealloc(srtp_snd);
@@ -2063,7 +2254,7 @@ srtp_err_status_t srtp_validate_encrypted_extensions_headers()
     return srtp_err_status_ok;
 }
 
-#ifdef OPENSSL
+#ifdef GCM
 
 /*
  * Headers of test vectors taken from RFC 6904, Appendix A
@@ -2124,7 +2315,7 @@ srtp_err_status_t srtp_validate_encrypted_extensions_headers_gcm()
     policy.ssrc.type = ssrc_specific;
     policy.ssrc.value = 0xcafebabe;
     policy.key = test_key_ext_headers;
-    policy.ekt = NULL;
+    policy.deprecated_ekt = NULL;
     policy.window_size = 128;
     policy.allow_repeat_tx = 0;
     policy.enc_xtn_hdr = headers;
@@ -2148,7 +2339,7 @@ srtp_err_status_t srtp_validate_encrypted_extensions_headers_gcm()
     debug_print(mod_driver, "ciphertext reference:\n  %s",
                 srtp_octet_string_hex_string(srtp_ciphertext, len));
 
-    if (octet_string_is_eq(srtp_plaintext, srtp_ciphertext, len))
+    if (srtp_octet_string_is_eq(srtp_plaintext, srtp_ciphertext, len))
         return srtp_err_status_fail;
 
     /*
@@ -2170,7 +2361,7 @@ srtp_err_status_t srtp_validate_encrypted_extensions_headers_gcm()
         return srtp_err_status_fail;
     }
 
-    if (octet_string_is_eq(srtp_ciphertext, srtp_plaintext_ref, len))
+    if (srtp_octet_string_is_eq(srtp_ciphertext, srtp_plaintext_ref, len))
         return srtp_err_status_fail;
 
     status = srtp_dealloc(srtp_snd);
@@ -2240,7 +2431,7 @@ srtp_err_status_t srtp_validate_aes_256()
     policy.ssrc.type = ssrc_specific;
     policy.ssrc.value = 0xcafebabe;
     policy.key = aes_256_test_key;
-    policy.ekt = NULL;
+    policy.deprecated_ekt = NULL;
     policy.window_size = 128;
     policy.allow_repeat_tx = 0;
     policy.next = NULL;
@@ -2264,7 +2455,7 @@ srtp_err_status_t srtp_validate_aes_256()
     debug_print(mod_driver, "ciphertext reference:\n  %s",
                 octet_string_hex_string(srtp_ciphertext, len));
 
-    if (octet_string_is_eq(srtp_plaintext, srtp_ciphertext, len)) {
+    if (srtp_octet_string_is_eq(srtp_plaintext, srtp_ciphertext, len)) {
         return srtp_err_status_fail;
     }
 
@@ -2286,7 +2477,7 @@ srtp_err_status_t srtp_validate_aes_256()
         return status;
     }
 
-    if (octet_string_is_eq(srtp_ciphertext, srtp_plaintext_ref, len)) {
+    if (srtp_octet_string_is_eq(srtp_ciphertext, srtp_plaintext_ref, len)) {
         return srtp_err_status_fail;
     }
 
@@ -2306,7 +2497,8 @@ srtp_err_status_t srtp_validate_aes_256()
 srtp_err_status_t srtp_create_big_policy(srtp_policy_t **list)
 {
     extern const srtp_policy_t *policy_array[];
-    srtp_policy_t *p, *tmp;
+    srtp_policy_t *p = NULL;
+    srtp_policy_t *tmp;
     int i = 0;
     uint32_t ssrc = 0;
 
@@ -2367,7 +2559,7 @@ srtp_err_status_t srtp_test_empty_payload()
     policy.ssrc.type = ssrc_specific;
     policy.ssrc.value = 0xcafebabe;
     policy.key = test_key;
-    policy.ekt = NULL;
+    policy.deprecated_ekt = NULL;
     policy.window_size = 128;
     policy.allow_repeat_tx = 0;
     policy.next = NULL;
@@ -2424,7 +2616,7 @@ srtp_err_status_t srtp_test_empty_payload()
     return srtp_err_status_ok;
 }
 
-#ifdef OPENSSL
+#ifdef GCM
 srtp_err_status_t srtp_test_empty_payload_gcm()
 {
     srtp_t srtp_snd, srtp_recv;
@@ -2443,7 +2635,7 @@ srtp_err_status_t srtp_test_empty_payload_gcm()
     policy.ssrc.type = ssrc_specific;
     policy.ssrc.value = 0xcafebabe;
     policy.key = test_key;
-    policy.ekt = NULL;
+    policy.deprecated_ekt = NULL;
     policy.window_size = 128;
     policy.allow_repeat_tx = 0;
     policy.next = NULL;
@@ -2499,7 +2691,7 @@ srtp_err_status_t srtp_test_empty_payload_gcm()
 
     return srtp_err_status_ok;
 }
-#endif // OPENSSL
+#endif // GCM
 
 srtp_err_status_t srtp_test_remove_stream()
 {
@@ -2568,7 +2760,7 @@ srtp_err_status_t srtp_test_remove_stream()
     policy.ssrc.type = ssrc_specific;
     policy.ssrc.value = 0xcafebabe;
     policy.key = test_key;
-    policy.ekt = NULL;
+    policy.deprecated_ekt = NULL;
     policy.window_size = 128;
     policy.allow_repeat_tx = 0;
     policy.next = NULL;
@@ -2627,7 +2819,7 @@ srtp_err_status_t srtp_test_update()
     memset(&policy, 0, sizeof(policy));
     srtp_crypto_policy_set_rtp_default(&policy.rtp);
     srtp_crypto_policy_set_rtcp_default(&policy.rtcp);
-    policy.ekt = NULL;
+    policy.deprecated_ekt = NULL;
     policy.window_size = 128;
     policy.allow_repeat_tx = 0;
     policy.next = NULL;
@@ -2783,15 +2975,15 @@ srtp_err_status_t srtp_test_setup_protect_trailer_streams(
     srtp_policy_t policy;
     srtp_policy_t policy_mki;
 
-#ifdef OPENSSL
+#ifdef GCM
     srtp_policy_t policy_aes_gcm;
     srtp_policy_t policy_aes_gcm_mki;
-#endif // OPENSSL
+#endif // GCM
 
     memset(&policy, 0, sizeof(policy));
     srtp_crypto_policy_set_rtp_default(&policy.rtp);
     srtp_crypto_policy_set_rtcp_default(&policy.rtcp);
-    policy.ekt = NULL;
+    policy.deprecated_ekt = NULL;
     policy.window_size = 128;
     policy.allow_repeat_tx = 0;
     policy.next = NULL;
@@ -2801,7 +2993,7 @@ srtp_err_status_t srtp_test_setup_protect_trailer_streams(
     memset(&policy_mki, 0, sizeof(policy_mki));
     srtp_crypto_policy_set_rtp_default(&policy_mki.rtp);
     srtp_crypto_policy_set_rtcp_default(&policy_mki.rtcp);
-    policy_mki.ekt = NULL;
+    policy_mki.deprecated_ekt = NULL;
     policy_mki.window_size = 128;
     policy_mki.allow_repeat_tx = 0;
     policy_mki.next = NULL;
@@ -2810,11 +3002,11 @@ srtp_err_status_t srtp_test_setup_protect_trailer_streams(
     policy_mki.keys = test_keys;
     policy_mki.num_master_keys = 2;
 
-#ifdef OPENSSL
+#ifdef GCM
     memset(&policy_aes_gcm, 0, sizeof(policy_aes_gcm));
     srtp_crypto_policy_set_aes_gcm_128_16_auth(&policy_aes_gcm.rtp);
     srtp_crypto_policy_set_aes_gcm_128_16_auth(&policy_aes_gcm.rtcp);
-    policy_aes_gcm.ekt = NULL;
+    policy_aes_gcm.deprecated_ekt = NULL;
     policy_aes_gcm.window_size = 128;
     policy_aes_gcm.allow_repeat_tx = 0;
     policy_aes_gcm.next = NULL;
@@ -2824,7 +3016,7 @@ srtp_err_status_t srtp_test_setup_protect_trailer_streams(
     memset(&policy_aes_gcm_mki, 0, sizeof(policy_aes_gcm_mki));
     srtp_crypto_policy_set_aes_gcm_128_16_auth(&policy_aes_gcm_mki.rtp);
     srtp_crypto_policy_set_aes_gcm_128_16_auth(&policy_aes_gcm_mki.rtcp);
-    policy_aes_gcm_mki.ekt = NULL;
+    policy_aes_gcm_mki.deprecated_ekt = NULL;
     policy_aes_gcm_mki.window_size = 128;
     policy_aes_gcm_mki.allow_repeat_tx = 0;
     policy_aes_gcm_mki.next = NULL;
@@ -2832,7 +3024,7 @@ srtp_err_status_t srtp_test_setup_protect_trailer_streams(
     policy_aes_gcm_mki.key = NULL;
     policy_aes_gcm_mki.keys = test_keys;
     policy_aes_gcm_mki.num_master_keys = 2;
-#endif
+#endif // GCM
 
     /* create a send ctx with defualt profile and test_key */
     status = srtp_create(srtp_send, &policy);
@@ -2843,7 +3035,7 @@ srtp_err_status_t srtp_test_setup_protect_trailer_streams(
     if (status)
         return status;
 
-#ifdef OPENSSL
+#ifdef GCM
     status = srtp_create(srtp_send_aes_gcm, &policy_aes_gcm);
     if (status)
         return status;
@@ -2851,7 +3043,7 @@ srtp_err_status_t srtp_test_setup_protect_trailer_streams(
     status = srtp_create(srtp_send_aes_gcm_mki, &policy_aes_gcm_mki);
     if (status)
         return status;
-#endif // OPENSSL
+#endif // GCM
 
     return srtp_err_status_ok;
 }
@@ -2884,7 +3076,7 @@ srtp_err_status_t srtp_test_protect_trailer_length()
     if (length != 14)
         return srtp_err_status_fail;
 
-#ifdef OPENSSL
+#ifdef GCM
     status = srtp_get_protect_trailer_length(srtp_send_aes_gcm, 0, 0, &length);
     if (status)
         return status;
@@ -2901,11 +3093,11 @@ srtp_err_status_t srtp_test_protect_trailer_length()
     /*  TAG Length: 16 bytes + MKI length: 4 bytes*/
     if (length != 20)
         return srtp_err_status_fail;
-#endif // OPENSSL
+#endif // GCM
 
     srtp_dealloc(srtp_send);
     srtp_dealloc(srtp_send_mki);
-#ifdef OPENSSL
+#ifdef GCM
     srtp_dealloc(srtp_send_aes_gcm);
     srtp_dealloc(srtp_send_aes_gcm_mki);
 #endif
@@ -2941,7 +3133,7 @@ srtp_err_status_t srtp_test_protect_rtcp_trailer_length()
     if (length != 18)
         return srtp_err_status_fail;
 
-#ifdef OPENSSL
+#ifdef GCM
     status =
         srtp_get_protect_rtcp_trailer_length(srtp_send_aes_gcm, 0, 0, &length);
     if (status)
@@ -2959,11 +3151,11 @@ srtp_err_status_t srtp_test_protect_rtcp_trailer_length()
     /*  TAG Length: 16 bytes + SRTCP Trailer 4 bytes + MKI 4 bytes*/
     if (length != 24)
         return srtp_err_status_fail;
-#endif // OPENSSL
+#endif // GCM
 
     srtp_dealloc(srtp_send);
     srtp_dealloc(srtp_send_mki);
-#ifdef OPENSSL
+#ifdef GCM
     srtp_dealloc(srtp_send_aes_gcm);
     srtp_dealloc(srtp_send_aes_gcm_mki);
 #endif
@@ -3088,6 +3280,7 @@ static srtp_err_status_t test_set_receiver_roc(uint32_t packets,
         if (status) {
             return status;
         }
+
         seq++;
         ts++;
     }
@@ -3500,7 +3693,7 @@ const srtp_policy_t hmac_only_policy = {
     NULL
 };
 
-#ifdef OPENSSL
+#ifdef GCM
 const srtp_policy_t aes128_gcm_8_policy = {
     { ssrc_any_outbound, 0 }, /* SSRC */
     {
@@ -3724,23 +3917,7 @@ const srtp_policy_t aes_256_hmac_policy = {
     NULL
 };
 
-// clang-format off
-uint8_t ekt_test_key[16] = {
-    0x77, 0x26, 0x9d, 0xac, 0x16, 0xa3, 0x28, 0xca,
-    0x8e, 0xc9, 0x68, 0x4b, 0xcc, 0xc4, 0xd2, 0x1b
-};
-// clang-format on
-
-#include "ekt.h"
-
-// clang-format off
-srtp_ekt_policy_ctx_t ekt_test_policy = {
-    0xa5a5,                     /* SPI */
-    SRTP_EKT_CIPHER_AES_128_ECB,
-    ekt_test_key,
-    NULL
-};
-// clang-format on
+char ekt_test_policy = 'x';
 
 const srtp_policy_t hmac_only_with_ekt_policy = {
     { ssrc_any_outbound, 0 }, /* SSRC */
@@ -3763,7 +3940,7 @@ const srtp_policy_t hmac_only_with_ekt_policy = {
     NULL,
     (srtp_master_key_t **)test_keys,
     2,                /* indicates the number of Master keys          */
-    &ekt_test_policy, /* indicates that EKT is not in use             */
+    &ekt_test_policy, /* requests deprecated EKT functionality        */
     128,              /* replay window size                           */
     0,                /* retransmission not allowed                   */
     NULL,             /* no encrypted extension headers               */
@@ -3786,7 +3963,7 @@ const srtp_policy_t *policy_array[] = {
     &hmac_only_policy,
     &aes_only_policy,
     &default_policy,
-#ifdef OPENSSL
+#ifdef GCM
     &aes128_gcm_8_policy,
     &aes128_gcm_8_cauth_policy,
     &aes256_gcm_8_policy,
@@ -3794,6 +3971,12 @@ const srtp_policy_t *policy_array[] = {
 #endif
     &null_policy,
     &aes_256_hmac_policy,
+    NULL
+};
+// clang-format on
+
+// clang-format off
+const srtp_policy_t *invalid_policy_array[] = {
     &hmac_only_with_ekt_policy,
     NULL
 };
