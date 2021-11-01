@@ -45,6 +45,36 @@ class OpalManager;
 class OpalRTPSession;
 
 
+struct OpalCallStatistics
+{
+  PString m_partyA;
+  PString m_partyB;
+  PString m_nameA;
+  PString m_nameB;
+  PString m_identityA;
+  PString m_identityB;
+  bool    m_networkOriginated;
+  PTime   m_startTime;
+  PTime   m_establishedTime;
+  PTimeInterval m_duration;
+
+  OpalConnection::CallEndReason m_callEndReason;
+
+  typedef std::map<PString, OpalConnectionInfo> ConnectionInfoMap;
+  ConnectionInfoMap m_connectionInfo;
+
+#if OPAL_STATISTICS
+  typedef std::map<PString, OpalMediaStatistics> MediaStatisticsMap;
+  MediaStatisticsMap m_mediaStatistics;
+  void AddFinalMediaStreamStatistics(OpalMediaStream & stream);
+#endif
+
+  OpalCallStatistics();
+  void ToLogging(ostream & strm) const;
+  void ToJSON(PJSON::Object & obj) const;
+};
+
+
 /**This class manages a call.
    A call consists of one or more OpalConnection instances. While these
    connections may be created elsewhere this class is responsible for their
@@ -59,7 +89,7 @@ class OpalRTPSession;
    In a conference situation, one OpalCall would manage lots of
    H323Connection/SIPConnection classes.
  */
-class OpalCall : public PSafeObject
+class OpalCall : public PSafeObject, protected OpalCallStatistics
 {
     PCLASSINFO(OpalCall, PSafeObject);
   public:
@@ -74,6 +104,9 @@ class OpalCall : public PSafeObject
     /**Destroy call.
      */
     ~OpalCall();
+
+    /// Get final statistics for call
+    const OpalCallStatistics & GetFinalStatistics() const { return *this; }
   //@}
 
   /**@name Overrides from PObject */
@@ -442,7 +475,34 @@ class OpalCall : public PSafeObject
     /**Close the media streams on the connections.
      */
     virtual void CloseMediaStreams();
-  //@}
+
+    /**Call back for a media patch thread starting.
+    This function is called within the context of the thread associated
+    with the media patch.
+
+    The default behaviour does nothing
+    */
+    virtual void OnStartMediaPatch(
+      OpalConnection & connection,  ///< Connection patch is in
+      OpalMediaPatch & patch        ///< Media patch being started
+    );
+
+    /**Call back when media stream patch thread stops.
+    */
+    virtual void OnStopMediaPatch(
+      OpalConnection & connection,  ///< Connection patch is in
+      OpalMediaPatch & patch        ///< Media Patch being stopped
+    );
+
+#if OPAL_STATISTICS
+    /// Get media statistics of the type, received from the specified party.
+    bool GetStatistics(
+      const OpalMediaType & mediaType,  ///< Media type to get statistics for
+      bool fromAparty,                  ///< Getting from A-party or B-party
+      OpalMediaStatistics & statistics  ///< Received statistics
+    );
+#endif // OPAL_STATISTICS
+    //@}
 
   /**@name User indications */
   //@{
@@ -637,6 +697,8 @@ class OpalCall : public PSafeObject
 #endif // OPAL_HAS_MIXER
 
     void InternalOnClear();
+    void InternalAddConnection(OpalConnection * connection);
+    void InternalRemoveConnection(OpalConnection * connection);
 
     void SetPartyNames();
 
@@ -658,21 +720,11 @@ class OpalCall : public PSafeObject
 
     PString m_token;
 
-    PString m_partyA;
-    PString m_partyB;
-    PString m_nameA;
-    PString m_nameB;
-    PString m_identityA;
-    PString m_identityB;
-    bool    m_networkOriginated;
-    PTime   m_startTime;
-    PTime   m_establishedTime;
     bool    m_isEstablished;
     bool    m_isClearing;
     bool    m_handlingHold;
     atomic<bool> m_isCleared;
 
-    OpalConnection::CallEndReason m_callEndReason;
     std::list<PSyncPoint *> m_endCallSyncPoint;
 
     PSafeArray<OpalConnection> m_connectionsActive;
@@ -692,11 +744,6 @@ class OpalCall : public PSafeObject
       e_SwitchingFromT38
     } m_T38SwitchState;
 #endif
-
-  //use to add the connection to the call's connection list
-  friend OpalConnection::OpalConnection(OpalCall &, OpalEndPoint &, const PString &, unsigned int, OpalConnection::StringOptions *);
-  //use to remove the connection from the call's connection list
-  friend OpalConnection::~OpalConnection();
 
   P_REMOVE_VIRTUAL_VOID(OnRTPStatistics(const OpalConnection &, const OpalRTPSession &));
 };

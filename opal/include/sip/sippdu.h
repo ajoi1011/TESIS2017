@@ -710,6 +710,7 @@ class SIP_PDU : public PSafeObject
     SDPSessionDescription * GetSDP()         { return m_SDP; }
     void SetSDP(SDPSessionDescription * sdp);
     bool DecodeSDP(SIPConnection & connection, PMultiPartList & parts);
+    bool DecodeSDP(SIPConnection & connection, PString & sdpText, PMultiPartList & parts);
     bool IsContentSDP(bool emptyOK = false) const;
 
     const PString & GetExternalTransportAddress() const { return m_externalTransportAddress; }
@@ -946,6 +947,11 @@ class SIPPoolTimer : public PPoolTimerArg3<SIPTimeoutWorkItem<Target_T>,
       : BaseClass(pool, ep, token, callback)
       , m_token(token)
     {
+    }
+
+    ~SIPPoolTimer()
+    {
+      this->m_stopped = true;
     }
 
     virtual const char * GetGroup(const Work_T &) const { return m_token; }

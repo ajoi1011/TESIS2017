@@ -172,10 +172,6 @@ class SIPConnection : public OpalSDPConnection, public SIPTransactionOwner
       */
     virtual PString GetPrefixName() const;
 
-    /**Get the protocol-specific unique identifier for this connection.
-     */
-    virtual PString GetIdentifier() const;
-
     /// Call back for connection to act on changed string options
     virtual void OnApplyStringOptions();
 
@@ -218,10 +214,6 @@ class SIPConnection : public OpalSDPConnection, public SIPTransactionOwner
     /**Get any extra call information.
       */
     virtual PMultiPartList GetExtraCallInfo() const { return m_multiPartMIME; }
-
-    /**Get the local name/alias.
-      */
-    virtual PString GetLocalPartyURL() const;
 
     /**Get alerting type information of an incoming call.
        The type of "distinctive ringing" for the call. The string is protocol
@@ -619,8 +611,8 @@ class SIPConnection : public OpalSDPConnection, public SIPTransactionOwner
     /**Call back for received an INFO message with a package.
       */
     virtual bool OnReceivedInfoPackage(
-      const PString & package,
-      const PString & body
+      const PString & package,        ///< Info Package header value
+      const PMultiPartList & content  ///< Content data (PDU body)
     );
   //@}
 
@@ -693,6 +685,7 @@ class SIPConnection : public OpalSDPConnection, public SIPTransactionOwner
     void OnInviteResponseTimeout();
     void OnInviteCollision();
     void OnDelayedRefer();
+    virtual bool AllowMusicOnHold() const;
     virtual bool OnHoldStateChanged(bool placeOnHold);
     virtual void OnMediaStreamOpenFailed(bool rx);
 
@@ -813,7 +806,7 @@ class SIPConnection : public OpalSDPConnection, public SIPTransactionOwner
       ReceivedRFC2833,
       ReceivedINFO
     } m_receivedUserInputMethod;
-    void OnUserInputInlineRFC2833(OpalRFC2833Info & info, INT type);
+    void OnUserInputInlineRFC2833(OpalRFC2833Info & info, OpalRFC2833Proto::NotifyState state);
 
 
   private:
@@ -821,6 +814,8 @@ class SIPConnection : public OpalSDPConnection, public SIPTransactionOwner
     P_REMOVE_VIRTUAL_VOID(OnReceivedTrying(SIP_PDU &));
     P_REMOVE_VIRTUAL_VOID(OnMessageReceived(const SIPURL & /*from*/, const SIP_PDU & /*pdu*/));
     P_REMOVE_VIRTUAL_VOID(OnMessageReceived(const SIP_PDU & /*pdu*/));
+    P_REMOVE_VIRTUAL(bool,OnReceivedInfoPackage(const PString&,const PString&),false);
+
 
   friend class SIPTransaction;
   friend class SIP_RTP_Session;

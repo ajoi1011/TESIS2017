@@ -38,9 +38,9 @@
 
 #define OPAL_MAJOR 3
 #define OPAL_MINOR 19
-#define OPAL_PATCH 3
+#define OPAL_PATCH 5
 #define OPAL_OEM 0
-#define OPAL_VERSION "3.19.3"
+#define OPAL_VERSION "3.19.5"
 
 #define OPAL_CHECK_VERSION_OEM(major,minor,patch,oem) \
           (PTLIB_VERSION_INT_OEM(OPAL_MAJOR,OPAL_MINOR,OPAL_PATCH,OPAL_OEM) >= PTLIB_VERSION_INT_OEM(major,minor,patch,oem))
@@ -172,7 +172,7 @@
   #endif
 
   #if OPAL_PTLIB_SSL
-    #define OPAL_H235_6 1
+/*     #undef OPAL_H235_6 */
   #endif
 #endif // OPAL_H323
 
@@ -224,10 +224,10 @@
 
 
 // T.38 Fax
-#define OPAL_T38_CAPABILITY 1
+/* #undef OPAL_T38_CAPABILITY */
 
 #if OPAL_T38_CAPABILITY && OPAL_PTLIB_ASN && OPAL_STATISTICS
-  #define OPAL_FAX 1
+/*   #undef OPAL_FAX */
 #endif
 
 #if !OPAL_FAX
@@ -237,7 +237,7 @@
 
 // Presence
 #if OPAL_PTLIB_EXPAT
-  #define OPAL_HAS_PRESENCE 1
+/*   #undef OPAL_HAS_PRESENCE */
 
   #if OPAL_HAS_PRESENCE && OPAL_SIP
     #define OPAL_SIP_PRESENCE 1
@@ -246,24 +246,24 @@
 
 
 // Instant Messaging
-#define OPAL_HAS_MSRP 1
+/* #undef OPAL_HAS_MSRP */
 #if OPAL_SIP
-  #define OPAL_HAS_SIPIM 1
+/*   #undef OPAL_HAS_SIPIM */
 #endif
-#define OPAL_HAS_RFC4103 1
+/* #undef OPAL_HAS_RFC4103 */
 
 #define OPAL_HAS_IM    (OPAL_HAS_SIPIM || OPAL_HAS_MSRP || OPAL_HAS_RFC4103)
 
 
 // Far end camera control
-#define OPAL_HAS_H224 1
+/* #undef OPAL_HAS_H224 */
 #if OPAL_VIDEO && OPAL_HAS_H224
-  #define OPAL_HAS_H281 1
+/*   #undef OPAL_HAS_H281 */
 #endif
 
 
 // Use system Speex audio codec
-#define OPAL_SYSTEM_SPEEX 1
+/* #undef OPAL_SYSTEM_SPEEX */
 /* #undef OPAL_SPEEX_FLOAT_NOISE */
 
 
@@ -393,7 +393,7 @@
 // C# interface support
 //
 
-#define OPAL_CSHARP 1
+/* #undef OPAL_CSHARP */
 
 
 /////////////////////////////////////////////////
